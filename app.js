@@ -805,7 +805,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   A.defaults = function () {
     return {
       schools: [], schoolWa: "", relayUrl: A.RELAY, publicBase: A.BASE, box: SL.rid(22), linkHours: 72, pin: "",
-      wahajCode: "", useLogo: true, lastBackup: 0,
+      wahajCode: "", wahajCodes: {}, useLogo: true, lastBackup: 0,
       tpl: {
         sign: "المكرم ولي أمر الطالب {الطالب}\nالسلام عليكم ورحمة الله وبركاته\nنأمل التكرم بالاطلاع على «{النموذج}» والتوقيع عليه عبر الرابط التالي:\n{الرابط}\nللتحقق يُطلب آخر 4 أرقام من السجل المدني للطالب، والرابط صالح {المدة} ساعة.\n{المدرسة}",
         notify: "المكرم ولي أمر الطالب {الطالب}\nالسلام عليكم ورحمة الله وبركاته\nنفيدكم بوجود ملاحظة سلوكية تخص ابنكم، نأمل التواصل مع وكيل شؤون الطلبة أو مراجعة المدرسة.\n{المدرسة}",
@@ -1849,13 +1849,23 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     main().innerHTML = html;
     bindSettings(tab);
   };
+  /* الرقم الوزاري: رقم واحد، أو رقمان للمدرسة المدمجة (ابتدائي + متوسط) — كل رقم يُربط بوهج */
+  function moeFields(z) {
+    if (z.stage !== "مدمجة") return '<label>الرقم الوزاري (لربط وهج)<input data-k="moeCode" dir="ltr" inputmode="numeric" value="' + e(z.moeCode || "") + '"></label>';
+    var two = z.moeMode === "two";
+    return '<label>الأرقام الوزارية<select data-k="moeMode" data-rerender="1"><option value="one"' + (two ? "" : " selected") + '>رقم وزاري واحد للمرحلتين</option><option value="two"' + (two ? " selected" : "") + ">رقمان: رقم للابتدائية ورقم للمتوسطة</option></select></label>" +
+      (two ? '<label>الرقم الوزاري — الابتدائية<input data-k="moeCode" dir="ltr" inputmode="numeric" value="' + e(z.moeCode || "") + '"></label>' +
+             '<label>الرقم الوزاري — المتوسطة<input data-k="moeCode2" dir="ltr" inputmode="numeric" value="' + e(z.moeCode2 || "") + '"></label>'
+           : '<label>الرقم الوزاري (لربط وهج)<input data-k="moeCode" dir="ltr" inputmode="numeric" value="' + e(z.moeCode || "") + '"></label>');
+  }
+  A.moeFields = moeFields;
   function schoolForm(z, i) {
     return '<div class="school" data-i="' + i + '"><div class="grid2">' +
       '<label>اسم المدرسة<input data-k="name" value="' + e(z.name) + '"></label>' +
       '<label>المرحلة<select data-k="stage">' + [["ابتدائي", "ابتدائي"], ["متوسط", "متوسط"], ["ثانوي", "ثانوي"], ["مدمجة", "مدمجة (ابتدائي + متوسط)"]].map(function (s) { return "<option value=\"" + s[0] + "\"" + (s[0] === z.stage ? " selected" : "") + ">" + s[1] + "</option>"; }).join("") + "</select></label>" +
       '<label>المنطقة/المحافظة<input data-k="region" value="' + e(z.region || "") + '"></label>' +
       '<label>إدارة التعليم<input data-k="admin" value="' + e(z.admin || "") + '" placeholder="الإدارة العامة للتعليم بمنطقة …"></label>' +
-      '<label>الرقم الوزاري (لربط وهج)<input data-k="moeCode" dir="ltr" value="' + e(z.moeCode || "") + '"></label></div>' +
+      moeFields(z) + '</div>' +
       '<button class="link danger" type="button" data-rm="' + i + '">حذف هذه المدرسة</button></div>';
   }
   function bindSettings(tab) {
@@ -1864,6 +1874,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       if (!cfg.schools.length) cfg.schools.push({ id: "C" + SL.rid(6), name: "", stage: "متوسط", region: "", admin: "" }), $("#sc-l").innerHTML = schoolForm(cfg.schools[0], 0);
       $("#sc-add").onclick = function () { collect(); cfg.schools.push({ id: "C" + SL.rid(6), name: "", stage: "ابتدائي", region: "", admin: "" }); $("#sc-l").innerHTML = cfg.schools.map(schoolForm).join(""); rm(); };
       function collect() { $$(".school").forEach(function (d) { var z = cfg.schools[+d.dataset.i]; $$("[data-k]", d).forEach(function (el) { z[el.dataset.k] = el.value.trim(); }); }); }
+      $("#sc-l").addEventListener("change", function (ev) { var k = ev.target.dataset && ev.target.dataset.k; if (k === "stage" || k === "moeMode") { collect(); $("#sc-l").innerHTML = cfg.schools.map(schoolForm).join(""); rm(); } });
       function rm() { $$("[data-rm]").forEach(function (b) { b.onclick = async function () { var i = +b.dataset.rm; if (A.S.students.some(function (s) { return s.school === cfg.schools[i].id; })) return A.toast("المدرسة مرتبطة بطلاب", "err"); collect(); cfg.schools.splice(i, 1); $("#sc-l").innerHTML = cfg.schools.map(schoolForm).join(""); rm(); }; }); }
       rm();
       $("#sc-save").onclick = async function () { collect(); cfg.schools = cfg.schools.filter(function (z) { return z.name; }); cfg.useLogo = $("#sc-logo").checked; await A.saveSettings(); A.toast("تم الحفظ"); A.route(); };
@@ -1964,15 +1975,42 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var s = await crypto.subtle.sign("HMAC", k, enc.encode(msg));
     return Array.prototype.map.call(new Uint8Array(s), function (b) { return b.toString(16).padStart(2, "0"); }).join("").slice(0, 12);
   }
+  /* وحدات الربط: رقم وزاري لكل مدرسة، أو رقمان للمدرسة المدمجة */
+  A.wahajUnits = function () {
+    var out = [];
+    A.S.settings.schools.forEach(function (z) {
+      var two = z.stage === "مدمجة" && z.moeMode === "two";
+      if (two) {
+        out.push({ id: z.id + ":p", school: z.id, stage: "ابتدائي", label: z.name + " — الابتدائية", moe: z.moeCode || "", key: keyNorm(z.moeCode || "—"), nameKey: keyNorm(z.name) });
+        out.push({ id: z.id + ":m", school: z.id, stage: "متوسط", label: z.name + " — المتوسطة", moe: z.moeCode2 || "", key: keyNorm(z.moeCode2 || "—"), nameKey: keyNorm(z.name) });
+      } else out.push({ id: z.id, school: z.id, stage: "", label: z.name, moe: z.moeCode || "", key: keyNorm(z.moeCode || "—"), nameKey: keyNorm(z.name) });
+    });
+    return out;
+  };
+  /* حالة الربط لكل وحدة */
+  A.wahajStatus = async function () {
+    var cfg = A.S.settings, codes = cfg.wahajCodes || {};
+    if (cfg.wahajCode && !Object.keys(codes).length) codes = { _: cfg.wahajCode };
+    var list = Object.keys(codes).map(function (k) { return codes[k]; }), units = A.wahajUnits(), res = [], any = null;
+    for (var u of units) {
+      var best = null;
+      for (var c of list) {
+        var r = await A.wahajCheck(c); if (!r.ok) continue;
+        var ck = keyNorm(String(c).split(".")[1]);
+        if (ck === "ALL" || ck === u.key || ck === u.nameKey) { if (!best || r.end > best.end) best = r; }
+      }
+      res.push(Object.assign({}, u, { ok: !!best, end: best && best.end }));
+      if (best && (!any || best.end > any)) any = best.end;
+    }
+    return { ok: res.some(function (x) { return x.ok; }), units: res, end: any };
+  };
   A.wahajCheck = async function (code) {
     var p = String(code || "").trim().replace(/\s+/g, "").split(".");
     if (p.length !== 4 || p[0].toUpperCase() !== "WJ" || !/^\d{8}$/.test(p[2])) return { ok: false, why: "صيغة كود وهج غير صحيحة." };
     if (p[3].toLowerCase() !== (await hmac12(keyNorm(p[1]) + "|" + p[2]))) return { ok: false, why: "كود وهج غير صالح." };
     var key = keyNorm(p[1]);
-    if (key !== "ALL") {
-      var mine = A.S.settings.schools.some(function (z) { return keyNorm(z.moeCode) === key || keyNorm(z.name) === key; });
-      if (!mine) return { ok: false, why: "كود وهج مخصص لمدرسة أخرى. أدخل الرقم الوزاري للمدرسة في الإعدادات إن كان الكود مبنياً عليه." };
-    }
+    if (key !== "ALL" && !A.wahajUnits().some(function (u) { return u.key === key || u.nameKey === key; }))
+      return { ok: false, why: "كود وهج مخصص لرقم وزاري آخر. تأكد من الرقم الوزاري في الإعدادات ← المدرسة." };
     var end = new Date(+p[2].slice(0, 4), +p[2].slice(4, 6) - 1, +p[2].slice(6, 8), 23, 59, 59);
     if (Date.now() > end) return { ok: false, why: "انتهى اشتراك وهج بتاريخ " + SL.greg(end) + "." };
     return { ok: true, end: end };
@@ -2031,24 +2069,54 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   V.absence = function (p, q) {
     document.getElementById("top-title").textContent = "الغياب — ربط وهج";
     var cfg = A.S.settings;
-    A.wahajCheck(cfg.wahajCode).then(function (lic) {
+    A.wahajStatus().then(function (lic) {
       if (!lic.ok) {
         main().innerHTML = '<section class="card"><h2>ربط «وهج» — ميزة لمشتركي وهج</h2><p>«وهج» إضافة لمتصفح Chrome تجمع غياب الطلاب من نظام نور بتواريخه. عند ربطها بـ«سَمْت» تستورد تقرير الغياب، فتظهر لكل طالب إجراءات المادة (33) بعذر والمادة (34) بدون عذر عند 3 و5 و10 أيام، مع النماذج 15 و16 و17 والتوقيع ورسائل أولياء الأمور.</p>' +
-          (cfg.wahajCode ? '<p class="alert err sm">' + e(lic.why) + "</p>" : "") +
-          '<label>كود اشتراك وهج<input id="wj-c" dir="ltr" placeholder="WJ.…" value="' + e(cfg.wahajCode || "") + '"></label><div class="actions"><button class="btn pri" id="wj-s" type="button">تفعيل الربط</button></div></section>';
-        $("#wj-s").onclick = async function () { var c = $("#wj-c").value.trim(), r = await A.wahajCheck(c); if (!r.ok) return A.toast(r.why, "err"); cfg.wahajCode = c; await A.saveSettings(); A.toast("تم تفعيل ربط وهج حتى " + SL.greg(r.end)); A.route(); };
+          codesForm(lic) + "</section>";
+        bindCodes();
         return;
       }
       draw(lic, q);
     });
   };
 
+  /* نموذج أكواد وهج: حقل لكل رقم وزاري */
+  function codesForm(lic) {
+    var cfg = A.S.settings, codes = cfg.wahajCodes || {};
+    if (!lic.units.length) return '<p class="alert warn sm">أضف المدرسة أولاً من <a href="#settings">الإعدادات ← المدرسة</a>.</p>';
+    return '<h3>أكواد اشتراك وهج</h3>' + (lic.units.length > 1 ? '<p class="mut">لكل رقم وزاري كود خاص من وهج، أو كود واحد يشمل الجميع (ALL).</p>' : "") +
+      lic.units.map(function (u) {
+        return '<label>' + e(u.label) + (u.moe ? ' <small class="mut" dir="ltr">(' + e(u.moe) + ")</small>" : ' <small class="mut">(لم يُحدد الرقم الوزاري)</small>') +
+          (u.ok ? ' <span class="chip ok">مفعّل حتى ' + e(SL.greg(u.end)) + "</span>" : "") +
+          '<input data-wj="' + e(u.id) + '" dir="ltr" placeholder="WJ.…" value="' + e(codes[u.id] || "") + '"></label>';
+      }).join("") + '<div class="actions"><button class="btn pri" id="wj-s" type="button">حفظ وتفعيل</button><a class="btn" href="#settings">الأرقام الوزارية</a></div>';
+  }
+  function bindCodes() {
+    var b = $("#wj-s"); if (!b) return;
+    b.onclick = async function () {
+      var cfg = A.S.settings, codes = {}, msgs = [];
+      for (var el of $$("[data-wj]")) {
+        var c = el.value.trim(); if (!c) continue;
+        var r = await A.wahajCheck(c); if (!r.ok) { msgs.push(el.closest("label").firstChild.textContent.trim() + ": " + r.why); continue; }
+        codes[el.dataset.wj] = c;
+      }
+      cfg.wahajCodes = codes; cfg.wahajCode = ""; await A.saveSettings();
+      var st = await A.wahajStatus();
+      if (msgs.length) A.sheet("أكواد لم تُقبل", "<ul>" + msgs.map(function (m) { return "<li>" + e(m) + "</li>"; }).join("") + "</ul>");
+      else A.toast(st.ok ? "تم تفعيل ربط وهج" : "لم يُفعّل أي رقم", st.ok ? "" : "err");
+      A.route();
+    };
+  }
+  function allowed(lic, stu) {
+    return lic.units.some(function (u) { return u.ok && u.school === stu.school && (!u.stage || u.stage === A.stageText(stu)); });
+  }
+
   function draw(lic, q) {
     var S = A.S, list = S.absences.slice().filter(function (a) { return A.byId[a.stu]; });
     list.sort(function (a, b) { return b.un - a.un || b.ex - a.ex; });
     var flagged = list.filter(function (a) { return a.un >= 3 || a.ex >= 3; });
     var last = list.reduce(function (m, a) { return Math.max(m, a.importedAt || 0); }, 0);
-    main().innerHTML = '<section class="card"><div class="row1"><span class="chip ok">وهج مفعّل حتى ' + e(SL.greg(lic.end)) + "</span></div>" +
+    main().innerHTML = '<section class="card"><div class="row1">' + lic.units.map(function (u) { return '<span class="chip ' + (u.ok ? "ok" : "warnc") + '">' + e(u.label) + (u.ok ? " — مفعّل حتى " + e(SL.greg(u.end)) : " — غير مفعّل") + "</span>"; }).join(" ") + ' <button class="link" id="wj-edit" type="button">الأكواد</button></div>' +
       "<p>من لوحة «وهج» في نور اضغط زر <b>Excel</b> ثم ارفع الملف هنا. تُطابق الأسماء بالسجل المدني.</p>" +
       '<div class="actions wrap"><label class="btn pri">رفع تقرير وهج<input id="wj-f" type="file" accept=".xls,.xlsx,.html,.htm" hidden></label>' +
       '<input id="wj-range" placeholder="الفترة (مثال: 1448/03/01 – 1448/03/20)" value="' + e((list[0] || {}).range || "") + '"></div>' +
@@ -2060,20 +2128,22 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
           '<div class="row3">' + (a.un ? '<span class="chip red">بدون عذر ' + a.un + "</span> " : "") + (a.ex ? '<span class="chip">بعذر ' + a.ex + "</span> " : "") + (a.run >= 3 ? '<span class="chip warnc">متصل ' + a.run + " أيام</span> " : "") +
           (lu ? '<span class="lvl l' + lu + '">م34: ' + lu + "</span> " : "") + (le ? '<span class="lvl l' + le + '">م33: ' + le + "</span>" : "") + "</div></button></li>";
       }).join("") + "</ul></section>" : list.length ? '<p class="alert ok">لا يوجد طالب بلغ 3 أيام غياب.</p>' : "");
+    $("#wj-edit").onclick = function () { var sh = A.sheet("أكواد وهج", codesForm(lic)); bindCodes(); };
     $("#wj-range").onchange = async function () { var v = this.value; for (var a of S.absences) { a.range = v; } await A.saveMany(S.absences.slice()); };
     $("#wj-f").onchange = async function () {
       var f = this.files[0]; if (!f) return;
       try {
-        var rows = await parseFile(f), recs = [], miss = [];
+        var rows = await parseFile(f), recs = [], miss = [], skip = [];
         rows.forEach(function (r) {
           var s = (r.sid && S.students.find(function (x) { return x.sid === r.sid; })) || S.students.find(function (x) { return A.norm(x.name) === A.norm(r.name); });
           if (!s) { miss.push(r.name); return; }
+          if (!allowed(lic, s)) { skip.push(r.name); return; }
           var id = "A" + s.id, old = A.byId[id] || { id: id, t: "abs", stu: s.id, done: {} };
           Object.assign(old, { ex: r.ex, un: r.un, late: r.late, days: r.days, run: r.run, importedAt: Date.now(), range: $("#wj-range").value || old.range || "" });
           recs.push(old);
         });
         await A.saveMany(recs); A.log("استيراد تقرير وهج: " + recs.length + " طالب");
-        A.toast("تم استيراد " + recs.length + " طالب" + (miss.length ? " — لم يُطابق " + miss.length : ""));
+        A.toast("تم استيراد " + recs.length + " طالب" + (miss.length ? " — لم يُطابق " + miss.length : "") + (skip.length ? " — " + skip.length + " من مرحلة رقمها الوزاري غير مفعّل" : ""));
         if (miss.length) A.sheet("أسماء لم تُطابق", "<p>هؤلاء غير موجودين في بيانات الطلاب (استوردهم أولاً أو صحّح السجل المدني):</p><ul>" + miss.map(function (m) { return "<li>" + e(m) + "</li>"; }).join("") + "</ul>");
         A.route();
       } catch (err) { A.toast(err.message, "err"); }
