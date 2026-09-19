@@ -858,6 +858,8 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   A.log = function (text, ref) { var r = { id: "L" + SL.rid(10), t: "log", at: Date.now(), text: text, ref: ref || "" }; A.S.log.push(r); C.DB.put(r); };
 
   /* ————— المدارس والطلاب ————— */
+  /* مرحلتا المدرسة المدمجة */
+  A.combinedStages = function (z) { return !z || !/^مدمجة/.test(z.stage || "") ? null : z.stage === "مدمجة-ث" ? ["متوسط", "ثانوي"] : ["ابتدائي", "متوسط"]; };
   A.school = function (id) { return A.S.settings.schools.find(function (s) { return s.id === id; }) || A.S.settings.schools[0] || { id: "", name: "", stage: "متوسط" }; };
   /* مرحلة الطالب: من نص الصف أولاً (يدعم المدرسة المدمجة: ابتدائي + متوسط)، ثم من مرحلة المدرسة */
   A.stageText = function (stu) {
@@ -865,6 +867,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var g = String((stu && stu.grade) || "");
     if (/ابتدائ/.test(g)) return "ابتدائي"; if (/متوسط/.test(g)) return "متوسط"; if (/ثانو/.test(g)) return "ثانوي";
     var s = A.school(stu && stu.school).stage || "";
+    if (s === "مدمجة-ث") return "متوسط"; /* متوسط + ثانوي: الافتراضي متوسط، وطلاب الثانوي يُحددون من «تحديد مراحل الطلاب» أو من نص الصف */
     if (/مدمج/.test(s)) return A.gradeNum(g) >= 4 ? "ابتدائي" : "متوسط"; /* الصفوف 4–6 ابتدائية حتماً؛ غيرها يُحدد من ملف الطالب */
     return s;
   };
@@ -1804,7 +1807,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var tabs = [["school", "المدرسة"], ["links", "الروابط والتوقيع"], ["msgs", "الرسائل"], ["backup", "النسخ الاحتياطي"], ["lic", "الاشتراك والتحديث"], ["sec", "القفل"]];
     var html = '<div class="tabs">' + tabs.map(function (t) { return '<a href="#settings?tab=' + t[0] + '" class="' + (t[0] === tab ? "on" : "") + '">' + t[1] + "</a>"; }).join("") + "</div>";
     if (tab === "school") {
-      html += '<section class="card"><h3>المدارس</h3><p class="mut">تحدد المرحلة المواد المطبقة: الابتدائية (6–9) أو المتوسطة والثانوية (10–14)، والمادتان (15–16) لجميع المراحل. في المدرسة المدمجة تُحدد مرحلة كل طالب من نص الصف (مثل «الرابع الابتدائي» أو «الأول المتوسط»)، أو من عمود «المرحلة» في ملف Excel.</p><div id="sc-l">' +
+      html += '<section class="card"><h3>المدارس</h3><p class="mut">تحدد المرحلة المواد المطبقة: الابتدائية (6–9) أو المتوسطة والثانوية (10–14)، والمادتان (15–16) لجميع المراحل. في المدرسة المدمجة (ابتدائي + متوسط، أو متوسط + ثانوي) تُحدد مرحلة كل طالب من نص الصف (مثل «الأول المتوسط» أو «الثاني الثانوي»)، أو من عمود «المرحلة» في ملف Excel.</p><div id="sc-l">' +
         cfg.schools.map(function (z, i) { return schoolForm(z, i); }).join("") + '</div><button class="btn" id="sc-add" type="button">＋ إضافة مدرسة</button></section>' +
         '<section class="card"><label class="row-check"><input type="checkbox" id="sc-logo"' + (cfg.useLogo ? " checked" : "") + "> إظهار شعار وزارة التعليم في ترويسة النماذج</label></section>" +
         '<div class="actions"><button class="btn pri big" id="sc-save" type="button">حفظ</button></div>';
@@ -1851,18 +1854,19 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   };
   /* الرقم الوزاري: رقم واحد، أو رقمان للمدرسة المدمجة (ابتدائي + متوسط) — كل رقم يُربط بوهج */
   function moeFields(z) {
-    if (z.stage !== "مدمجة") return '<label>الرقم الوزاري (لربط وهج)<input data-k="moeCode" dir="ltr" inputmode="numeric" value="' + e(z.moeCode || "") + '"></label>';
+    var pair = A.combinedStages(z), L = { "ابتدائي": "الابتدائية", "متوسط": "المتوسطة", "ثانوي": "الثانوية" };
+    if (!pair) return '<label>الرقم الوزاري (لربط وهج)<input data-k="moeCode" dir="ltr" inputmode="numeric" value="' + e(z.moeCode || "") + '"></label>';
     var two = z.moeMode === "two";
-    return '<label>الأرقام الوزارية<select data-k="moeMode" data-rerender="1"><option value="one"' + (two ? "" : " selected") + '>رقم وزاري واحد للمرحلتين</option><option value="two"' + (two ? " selected" : "") + ">رقمان: رقم للابتدائية ورقم للمتوسطة</option></select></label>" +
-      (two ? '<label>الرقم الوزاري — الابتدائية<input data-k="moeCode" dir="ltr" inputmode="numeric" value="' + e(z.moeCode || "") + '"></label>' +
-             '<label>الرقم الوزاري — المتوسطة<input data-k="moeCode2" dir="ltr" inputmode="numeric" value="' + e(z.moeCode2 || "") + '"></label>'
+    return '<label>الأرقام الوزارية<select data-k="moeMode" data-rerender="1"><option value="one"' + (two ? "" : " selected") + '>رقم وزاري واحد للمرحلتين</option><option value="two"' + (two ? " selected" : "") + ">رقمان: رقم لـ" + L[pair[0]] + " ورقم لـ" + L[pair[1]] + "</option></select></label>" +
+      (two ? '<label>الرقم الوزاري — ' + L[pair[0]] + '<input data-k="moeCode" dir="ltr" inputmode="numeric" value="' + e(z.moeCode || "") + '"></label>' +
+             '<label>الرقم الوزاري — ' + L[pair[1]] + '<input data-k="moeCode2" dir="ltr" inputmode="numeric" value="' + e(z.moeCode2 || "") + '"></label>'
            : '<label>الرقم الوزاري (لربط وهج)<input data-k="moeCode" dir="ltr" inputmode="numeric" value="' + e(z.moeCode || "") + '"></label>');
   }
   A.moeFields = moeFields;
   function schoolForm(z, i) {
     return '<div class="school" data-i="' + i + '"><div class="grid2">' +
       '<label>اسم المدرسة<input data-k="name" value="' + e(z.name) + '"></label>' +
-      '<label>المرحلة<select data-k="stage">' + [["ابتدائي", "ابتدائي"], ["متوسط", "متوسط"], ["ثانوي", "ثانوي"], ["مدمجة", "مدمجة (ابتدائي + متوسط)"]].map(function (s) { return "<option value=\"" + s[0] + "\"" + (s[0] === z.stage ? " selected" : "") + ">" + s[1] + "</option>"; }).join("") + "</select></label>" +
+      '<label>المرحلة<select data-k="stage">' + [["ابتدائي", "ابتدائي"], ["متوسط", "متوسط"], ["ثانوي", "ثانوي"], ["مدمجة", "مدمجة (ابتدائي + متوسط)"], ["مدمجة-ث", "مدمجة (متوسط + ثانوي)"]].map(function (s) { return "<option value=\"" + s[0] + "\"" + (s[0] === z.stage ? " selected" : "") + ">" + s[1] + "</option>"; }).join("") + "</select></label>" +
       '<label>المنطقة/المحافظة<input data-k="region" value="' + e(z.region || "") + '"></label>' +
       '<label>إدارة التعليم<input data-k="admin" value="' + e(z.admin || "") + '" placeholder="الإدارة العامة للتعليم بمنطقة …"></label>' +
       moeFields(z) + '</div>' +
@@ -1979,10 +1983,10 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   A.wahajUnits = function () {
     var out = [];
     A.S.settings.schools.forEach(function (z) {
-      var two = z.stage === "مدمجة" && z.moeMode === "two";
+      var pair = A.combinedStages(z), two = pair && z.moeMode === "two", L = { "ابتدائي": "الابتدائية", "متوسط": "المتوسطة", "ثانوي": "الثانوية" };
       if (two) {
-        out.push({ id: z.id + ":p", school: z.id, stage: "ابتدائي", label: z.name + " — الابتدائية", moe: z.moeCode || "", key: keyNorm(z.moeCode || "—"), nameKey: keyNorm(z.name) });
-        out.push({ id: z.id + ":m", school: z.id, stage: "متوسط", label: z.name + " — المتوسطة", moe: z.moeCode2 || "", key: keyNorm(z.moeCode2 || "—"), nameKey: keyNorm(z.name) });
+        out.push({ id: z.id + ":1", school: z.id, stage: pair[0], label: z.name + " — " + L[pair[0]], moe: z.moeCode || "", key: keyNorm(z.moeCode || "—"), nameKey: keyNorm(z.name) });
+        out.push({ id: z.id + ":2", school: z.id, stage: pair[1], label: z.name + " — " + L[pair[1]], moe: z.moeCode2 || "", key: keyNorm(z.moeCode2 || "—"), nameKey: keyNorm(z.name) });
       } else out.push({ id: z.id, school: z.id, stage: "", label: z.name, moe: z.moeCode || "", key: keyNorm(z.moeCode || "—"), nameKey: keyNorm(z.name) });
     });
     return out;
