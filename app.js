@@ -799,9 +799,12 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
 
   /* ————— الحالة والتخزين ————— */
   var TYPES = { stu: "students", stf: "staff", inc: "incidents", mer: "merits", sig: "sigs", abs: "absences", log: "log" };
+  /* الخدمة الرسمية لسَمْت: صفحتا التوقيع والرصد + صندوق البريد المشفّر */
+  A.BASE = "https://samt-app.github.io/";
+  A.RELAY = "https://samt-app-4132d-default-rtdb.europe-west1.firebasedatabase.app";
   A.defaults = function () {
     return {
-      schools: [], schoolWa: "", relayUrl: "", publicBase: "", box: SL.rid(22), linkHours: 72, pin: "",
+      schools: [], schoolWa: "", relayUrl: A.RELAY, publicBase: A.BASE, box: SL.rid(22), linkHours: 72, pin: "",
       wahajCode: "", useLogo: true, lastBackup: 0,
       tpl: {
         sign: "المكرم ولي أمر الطالب {الطالب}\nالسلام عليكم ورحمة الله وبركاته\nنأمل التكرم بالاطلاع على «{النموذج}» والتوقيع عليه عبر الرابط التالي:\n{الرابط}\nللتحقق يُطلب آخر 4 أرقام من السجل المدني للطالب، والرابط صالح {المدة} ساعة.\n{المدرسة}",
@@ -816,6 +819,8 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   A.load = async function () {
     var S = { settings: Object.assign(A.defaults(), (await C.DB.get("settings")) || {}) };
     S.settings.tpl = Object.assign(A.defaults().tpl, S.settings.tpl || {});
+    if (!S.settings.relayUrl) S.settings.relayUrl = A.RELAY;
+    if (!S.settings.publicBase && /samt-app\.github\.io$/.test(location.hostname)) S.settings.publicBase = A.BASE;
     var all = await C.DB.all();
     Object.keys(TYPES).forEach(function (t) { S[TYPES[t]] = []; });
     all.forEach(function (r) { if (TYPES[r.t]) S[TYPES[r.t]].push(r); });
