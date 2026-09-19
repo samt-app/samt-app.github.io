@@ -194,6 +194,34 @@
     del: async function (base, box, tok) { try { await fetch(rurl(base, box + "/" + tok), { method: "DELETE" }); } catch (e) {} }
   };
 
+  /* ————— الروابط القصيرة —————
+     يُرفع النموذج مشفراً إلى /relay/L/<بصمة الرمز>، والرابط يحمل الرمز فقط (11 حرفاً).
+     مفتاح فك التشفير مشتق من الرمز، فلا يستطيع الوسيط قراءة المحتوى. */
+  SL.DEFAULT_RELAY = "https://samt-app-4132d-default-rtdb.europe-west1.firebasedatabase.app";
+  var B56 = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  function code(n) { var s = ""; while (s.length < n) { var a = new Uint8Array(n * 2); crypto.getRandomValues(a); for (var i = 0; i < a.length && s.length < n; i++) if (a[i] < 224) s += B56[a[i] % 56]; } return s; }
+  async function codeKey(c) { var b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("samt-link|" + c)); return b64u(new Uint8Array(b)); }
+  async function codeId(c) { return (await SL.sha256("samt-lid|" + c)).slice(0, 24); }
+  SL.linkRelay = function (base) { var h = ""; try { h = new URL(base).hostname; } catch (e) {} return /^(localhost|127\.)/.test(h) ? new URL(base).origin : SL.DEFAULT_RELAY; };
+  SL.short = {
+    put: async function (relay, obj) { var c = code(11); await SL.relay.put(relay, "L", await codeId(c), await SL.seal(await codeKey(c), obj)); return c; },
+    get: async function (relay, c) {
+      var r = await fetch(rurl(relay, "L/" + (await codeId(c))), { cache: "no-store" });
+      if (!r.ok) throw new Error("relay " + r.status);
+      var v = await r.json(); if (!v) throw new Error("gone");
+      return SL.open(await codeKey(c), v);
+    },
+    del: async function (relay, c) { if (c) await SL.relay.del(relay, "L", await codeId(c)); },
+    url: function (base, c) { return base + (/github\.io\/$/.test(base) ? "s#" : "s.html#") + c; }
+  };
+  /* يعيد رابطاً قصيراً إن أمكن، وإلا الرابط الكامل */
+  SL.makeLink = async function (base, page, relay, obj) {
+    try {
+      if (String(relay || "").replace(/\/+$/, "") === SL.linkRelay(base).replace(/\/+$/, "")) { var c = await SL.short.put(relay, obj); return { url: SL.short.url(base, c), code: c }; }
+    } catch (e) {}
+    return { url: base + page + "#" + (await SL.pack(obj)), code: "" };
+  };
+
   /* قاعدة الروابط العامة (صفحة التوقيع وصفحة المعلم) */
   SL.base = function (configured) {
     if (configured) return String(configured).replace(/\/?$/, "/");

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d2b3a">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>سَمْت</title>
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="pub.css">
+</head>
+<body>
+<div class="pub" id="app"><div class="pub-h"><div class="logo">س</div><div><b>سَمْت</b><small>جارٍ فتح الرابط…</small></div></div></div>
+<script src="shared.js"></script>
+<script>
+(async function () {
+  var app = document.getElementById("app"), c = location.hash.slice(1).replace(/[^A-Za-z0-9]/g, "");
+  function fail(m) { app.innerHTML = '<div class="pub-h"><div class="logo">س</div><div><b>سَمْت</b><small>رابط من المدرسة</small></div></div><div class="card done"><div class="ic" style="color:#c62828;background:#fdecec;box-shadow:0 0 0 6px #fef5f5">!</div><h2>' + SL.esc(m) + '</h2><p class="mut">تواصل مع المدرسة إن احتجت رابطاً جديداً.</p></div>'; }
+  if (c.length < 8) return fail("الرابط غير مكتمل");
+  try {
+    var P = await SL.short.get(SL.linkRelay(location.href), c);
+    location.replace((P.kind === "teacher" ? "teacher.html" : "sign.html") + "#" + (await SL.pack(P)));
+  } catch (e) {
+    fail(/gone/.test(e && e.message) ? "هذا الرابط لم يعد متاحاً — ربما تم التوقيع عليه أو استُبدل برابط أحدث" : "تعذّر فتح الرابط — تأكد من الاتصال بالإنترنت ثم أعد المحاولة");
+  }
+})();
+</script>
+</body>
+</html>

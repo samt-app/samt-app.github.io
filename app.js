@@ -195,6 +195,34 @@
     del: async function (base, box, tok) { try { await fetch(rurl(base, box + "/" + tok), { method: "DELETE" }); } catch (e) {} }
   };
 
+  /* ————— الروابط القصيرة —————
+     يُرفع النموذج مشفراً إلى /relay/L/<بصمة الرمز>، والرابط يحمل الرمز فقط (11 حرفاً).
+     مفتاح فك التشفير مشتق من الرمز، فلا يستطيع الوسيط قراءة المحتوى. */
+  SL.DEFAULT_RELAY = "https://samt-app-4132d-default-rtdb.europe-west1.firebasedatabase.app";
+  var B56 = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  function code(n) { var s = ""; while (s.length < n) { var a = new Uint8Array(n * 2); crypto.getRandomValues(a); for (var i = 0; i < a.length && s.length < n; i++) if (a[i] < 224) s += B56[a[i] % 56]; } return s; }
+  async function codeKey(c) { var b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("samt-link|" + c)); return b64u(new Uint8Array(b)); }
+  async function codeId(c) { return (await SL.sha256("samt-lid|" + c)).slice(0, 24); }
+  SL.linkRelay = function (base) { var h = ""; try { h = new URL(base).hostname; } catch (e) {} return /^(localhost|127\.)/.test(h) ? new URL(base).origin : SL.DEFAULT_RELAY; };
+  SL.short = {
+    put: async function (relay, obj) { var c = code(11); await SL.relay.put(relay, "L", await codeId(c), await SL.seal(await codeKey(c), obj)); return c; },
+    get: async function (relay, c) {
+      var r = await fetch(rurl(relay, "L/" + (await codeId(c))), { cache: "no-store" });
+      if (!r.ok) throw new Error("relay " + r.status);
+      var v = await r.json(); if (!v) throw new Error("gone");
+      return SL.open(await codeKey(c), v);
+    },
+    del: async function (relay, c) { if (c) await SL.relay.del(relay, "L", await codeId(c)); },
+    url: function (base, c) { return base + (/github\.io\/$/.test(base) ? "s#" : "s.html#") + c; }
+  };
+  /* يعيد رابطاً قصيراً إن أمكن، وإلا الرابط الكامل */
+  SL.makeLink = async function (base, page, relay, obj) {
+    try {
+      if (String(relay || "").replace(/\/+$/, "") === SL.linkRelay(base).replace(/\/+$/, "")) { var c = await SL.short.put(relay, obj); return { url: SL.short.url(base, c), code: c }; }
+    } catch (e) {}
+    return { url: base + page + "#" + (await SL.pack(obj)), code: "" };
+  };
+
   /* قاعدة الروابط العامة (صفحة التوقيع وصفحة المعلم) */
   SL.base = function (configured) {
     if (configured) return String(configured).replace(/\/?$/, "/");
@@ -1535,14 +1563,15 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var hasParent = (doc.signers || []).some(function (s) { return s.role === "parent"; });
     if (!hasParent) { if (!(await A.confirm("هذا النموذج لا يتضمن توقيع ولي الأمر. إرسال رابط اطلاع وإقرار بالعلم؟"))) return; doc.signers = (doc.signers || []).concat([{ role: "parent", label: "ولي الأمر (إقرار بالعلم)", name: stu.parentName || "" }]); }
     var old = A.pendingFor(ref, fid, "parent");
-    if (old) { old.status = "replaced"; await A.save(old); }
+    if (old) { old.status = "replaced"; await A.save(old); if (old.lk) SL.short.del(cfg.relayUrl, old.lk); }
     var tok = SL.rid(14), key = SL.newKey(), last4 = String(stu.sid || "").replace(/\D/g, "").slice(-4);
     var hash = await A.docHash(A.doc(kind, ref, fid)), exp = Date.now() + (+cfg.linkHours || 72) * 3600e3;
     var g = { id: tok, t: "sig", ref: ref, kind: kind, form: fid, role: "parent", status: "pending", key: key, hash: hash, exp: exp, createdAt: Date.now(), via: "link", stu: stu.id };
     await A.save(g);
     var payload = { v: 1, tok: tok, box: cfg.box, relay: cfg.relayUrl, k: key, exp: exp, school: A.school(stu.school).name, wa: SL.normPhone(cfg.schoolWa),
       h4: last4 ? (await SL.sha256(tok + last4)).slice(0, 12) : "", doc: doc, reply: fid === "F10" };
-    var link = base + "sign.html#" + (await SL.pack(payload));
+    var lk = await SL.makeLink(base, "sign.html", cfg.relayUrl, payload), link = lk.url;
+    if (lk.code) { g.lk = lk.code; await A.save(g); }
     SL.openWa(stu.parentPhone, A.fill(cfg.tpl.sign, vars(stu, { "النموذج": doc.title, "الرابط": link })));
     A.log("إرسال رابط توقيع «" + doc.title + "» لولي أمر " + stu.name, ref);
     A.toast("فُتح واتساب — سيظهر التوقيع تلقائياً فور توقيع ولي الأمر");
@@ -1704,7 +1733,9 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var stages = {}; A.S.settings.schools.forEach(function (z) { if (!x.school || z.id === x.school) stages[R.stageOf(z.stage)] = 1; });
     var payload = { v: 1, kind: "teacher", tid: x.id, name: x.name, subject: x.subject || "", school: x.school ? A.school(x.school).name : A.S.settings.schools.map(function (z) { return z.name; }).join(" و"),
       stage: Object.keys(stages).length === 1 ? Object.keys(stages)[0] : "ms", box: cfg.box, relay: cfg.relayUrl, k: x.key, wa: SL.normPhone(cfg.schoolWa), cls: cls, cst: cst };
-    var link = base + "teacher.html#" + (await SL.pack(payload));
+    if (x.lk) SL.short.del(cfg.relayUrl, x.lk);
+    var lk = await SL.makeLink(base, "teacher.html", cfg.relayUrl, payload), link = lk.url;
+    x.lk = lk.code; await A.save(x);
     SL.openWa(x.phone, A.fill(cfg.tpl.teacherLink, { "المعلم": x.name, "الرابط": link, "المدرسة": payload.school }));
     A.log("إرسال رابط الرصد للمعلم " + x.name);
   };
@@ -2301,6 +2332,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     await A.save(g);
     if (g.form === "F10" && g.kind === "inc" && r.reply != null) { var inc2 = A.byId[g.ref]; inc2.meeting = Object.assign(inc2.meeting || {}, { reply: +r.reply, altDate: r.alt || "" }); await A.save(inc2); }
     await SL.relay.del(cfg.relayUrl, cfg.box, key);
+    if (g.lk) SL.short.del(cfg.relayUrl, g.lk); /* حذف النموذج المشفر من الوسيط بعد التوقيع */
     var stu2 = A.byId[g.stu] || {};
     A.log((g.status === "signed" ? "وقّع" : "رفض التوقيع") + " ولي أمر " + (stu2.name || "") + " على " + (R.FORMS[g.form.split(":")[0]] || {}).t, g.ref);
     A.toast((g.status === "signed" ? "✓ وقّع ولي أمر " : "رفض ولي أمر ") + (stu2.name || "") + " — " + (R.FORMS[g.form.split(":")[0]] || {}).t);
