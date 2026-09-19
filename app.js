@@ -203,6 +203,37 @@
   };
 })();
 
+/* سَمْت — أيقونات خطية موحّدة (SVG) */
+(function () {
+  "use strict";
+  var P = {
+    home: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V20h5v-6h4v6h5V9.5"/>',
+    users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.8c1.9.8 3.1 2.5 3.5 5.2"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    alert: '<path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4.5M12 17.5v.01"/>',
+    more: '<circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/>',
+    star: '<path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+    calendar: '<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+    pen: '<path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"/><path d="m13.5 6.5 4 4"/>',
+    inbox: '<path d="M3.5 13.5 6 5h12l2.5 8.5V19a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 19z"/><path d="M3.5 13.5H8l1.5 2.5h5l1.5-2.5h4.5"/>',
+    check: '<circle cx="12" cy="12" r="9"/><path d="m8 12.3 2.7 2.7L16.2 9.5"/>',
+    doc: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
+    gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M4.2 5.6l2.1 2.1M17.7 16.3l2.1 2.1M2.5 12h3M18.5 12h3M4.2 18.4l2.1-2.1M17.7 7.7l2.1-2.1"/>',
+    upload: '<path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V16"/>',
+    teacher: '<circle cx="12" cy="7" r="3.5"/><path d="M5 21v-2.5A5.5 5.5 0 0 1 10.5 13h3a5.5 5.5 0 0 1 5.5 5.5V21"/>',
+    list: '<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/>',
+    shield: '<path d="M12 3 4.5 6v5.5c0 4.6 3.1 8.2 7.5 9.5 4.4-1.3 7.5-4.9 7.5-9.5V6z"/><path d="m9 12 2.2 2.2L15.5 10"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+    whatsapp: '<path d="M4 20l1.2-3.9A8.5 8.5 0 1 1 8 19z"/><path d="M9 8.8c0 3.4 2.8 6.2 6.2 6.2l1.3-1.5-2-1-1 .9a4.3 4.3 0 0 1-2.9-2.9l.9-1-1-2z"/>',
+    search: '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
+    chevron: '<path d="m14.5 6-6 6 6 6"/>',
+    folder: '<path d="M3.5 6.5A1.5 1.5 0 0 1 5 5h4.5l2 2H19a1.5 1.5 0 0 1 1.5 1.5V18a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18z"/>'
+  };
+  window.SLI = function (name, cls) {
+    return '<svg class="ic ' + (cls || "") + '" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' + (P[name] || "") + "</svg>";
+  };
+})();
+
 (function(){
 "use strict";
 /* قواعد السلوك والمواظبة لطلبة التعليم العام — الإصدار الخامس 1447هـ / 2025م
@@ -1084,16 +1115,18 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     if (FS.supported && !FS.ok) html += '<div class="alert warn">مجلد البيانات <b>sammt</b> غير مربوط — مسح المتصفح قد يُفقد البيانات. <a href="#settings?tab=backup">ربط المجلد الآن</a></div>';
     else if (!FS.supported && (bak === null || bak >= 7)) html += '<div class="alert warn">البيانات محفوظة في هذا المتصفح فقط. ' + (bak === null ? "لم تُنشأ نسخة احتياطية بعد." : "آخر نسخة احتياطية قبل " + bak + " يوماً.") + ' <a href="#settings?tab=backup">إنشاء نسخة الآن</a></div>';
     if (!S.settings.relayUrl) html += '<div class="alert">لتفعيل التوقيع عن بُعد ووصول بلاغات المعلمين تلقائياً أكمل <a href="#settings?tab=links">إعداد الروابط</a>.</div>';
+    var hr = now.getHours(), greet = hr < 12 ? "صباح الخير" : "مساء الخير";
+    html = '<section class="hero"><div class="hero-t"><small>' + e(SL.dayName(now)) + " " + e(SL.hijri(now)) + " — " + e(SL.greg(now)) + "</small><h2>" + greet + '</h2><p>' + e(S.settings.schools.map(function (z) { return z.name; }).filter(Boolean).join(" · ") || "سَمْت — ضبط السلوك والمواظبة") + "</p></div>" +
+      '<div class="hero-a"><a class="btn gold big" href="#new">' + SLI("plus") + ' رصد مخالفة</a><a class="btn ghost big" href="#merit">' + SLI("star") + ' سلوك متميز</a><a class="btn ghost big" href="#absence">' + SLI("calendar") + " الغياب</a></div></section>" + html;
     html += '<div class="stats">' +
-      stat(S.students.length, "طالب", "#students") + stat(monthInc.length, "مخالفة هذا الشهر", "#incidents") +
-      stat(reported.length, "بلاغات معلمين جديدة", "#incidents?f=reported", reported.length ? "hot" : "") +
-      stat(pend.length, "توقيعات بانتظار الرد", "#sigs") + stat(signedToday.length, "وُقّع اليوم عن بُعد", "#sigs") + "</div>";
-    html += '<div class="quick"><a class="btn pri big" href="#new">＋ رصد مخالفة</a><a class="btn big" href="#merit">★ سلوك متميز</a><a class="btn big" href="#absence">غياب (وهج)</a></div>';
-    if (reported.length) html += '<section class="card"><h3>بلاغات المعلمين بانتظار الاعتماد</h3>' + incList(reported) + "</section>";
-    html += '<section class="card"><h3>آخر المخالفات</h3>' + (recent.length ? incList(recent) : '<p class="mut">لا توجد مخالفات مسجلة.</p>') + "</section>";
-    if (low.length) html += '<section class="card"><h3>طلاب درجة سلوكهم أقل من 80</h3><ul class="list">' + low.map(function (s) { return '<li><a href="#student/' + s.id + '">' + A.scoreChip(s) + " " + stuLine(s) + "</a></li>"; }).join("") + "</ul></section>";
+      stat(S.students.length, "طالب", "#students", "", "users") + stat(monthInc.length, "مخالفة هذا الشهر", "#incidents", "", "alert") +
+      stat(reported.length, "بلاغات معلمين جديدة", "#incidents?f=reported", reported.length ? "hot" : "", "inbox") +
+      stat(pend.length, "توقيعات بانتظار الرد", "#sigs", "", "clock") + stat(signedToday.length, "وُقّع اليوم عن بُعد", "#sigs", "", "check") + "</div>";
+    if (reported.length) html += '<section class="card"><h3 class="sec-h">' + SLI("inbox") + ' بلاغات المعلمين بانتظار الاعتماد</h3>' + incList(reported) + "</section>";
+    html += '<section class="card"><h3 class="sec-h">' + SLI("list") + ' آخر المخالفات</h3>' + (recent.length ? incList(recent) : '<p class="mut">لا توجد مخالفات مسجلة.</p>') + "</section>";
+    if (low.length) html += '<section class="card"><h3 class="sec-h">' + SLI("shield") + ' طلاب درجة سلوكهم أقل من 80</h3><ul class="list">' + low.map(function (s) { return '<li><a href="#student/' + s.id + '">' + A.scoreChip(s) + " " + stuLine(s) + "</a></li>"; }).join("") + "</ul></section>";
     main().innerHTML = html;
-    function stat(n, l, href, c) { return '<a class="stat ' + (c || "") + '" href="' + href + '"><b>' + n + "</b><span>" + e(l) + "</span></a>"; }
+    function stat(n, l, href, c, ic) { return '<a class="stat ' + (c || "") + '" href="' + href + '"><span class="stat-i">' + SLI(ic) + "</span><b>" + n + "</b><span>" + e(l) + "</span></a>"; }
   };
   function incList(arr) {
     return '<ul class="list">' + arr.map(function (x) {
@@ -1571,9 +1604,9 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   /* ————— المزيد ————— */
   V.more = function () {
     setTitle("المزيد");
-    main().innerHTML = '<ul class="menu">' +
-      [["#staff", "المعلمون والإدارة"], ["#import", "استيراد من Excel"], ["#merit", "السلوك المتميز"], ["#absence", "الغياب — ربط وهج"], ["#sigs", "التوقيعات عن بُعد"], ["#commit", "الالتزام المدرسي لجميع الطلاب"], ["#settings", "الإعدادات والاشتراك والتحديث"], ["#log", "سجل العمليات"]]
-        .map(function (x) { return '<li><a href="' + x[0] + '">' + e(x[1]) + "</a></li>"; }).join("") + "</ul>" +
+    main().innerHTML = '<div class="tiles">' +
+      [["#staff", "المعلمون والإدارة", "teacher"], ["#import", "استيراد من Excel", "upload"], ["#merit", "السلوك المتميز", "star"], ["#absence", "الغياب — ربط وهج", "calendar"], ["#sigs", "التوقيعات عن بُعد", "pen"], ["#commit", "الالتزام المدرسي", "doc"], ["#settings", "الإعدادات والاشتراك", "gear"], ["#log", "سجل العمليات", "clock"]]
+        .map(function (x) { return '<a class="tile" href="' + x[0] + '"><span class="tile-i">' + SLI(x[2]) + "</span><b>" + e(x[1]) + "</b></a>"; }).join("") + "</div>" +
       '<p class="mut center">سَمْت — الإصدار ' + e(C.version || C.BUILTIN) + " · " + e(C.licLabel(C.lic)) + "</p>";
   };
 
@@ -2201,13 +2234,15 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
 
   function shell() {
     document.getElementById("boot").innerHTML =
-      '<header class="top"><a class="brand" href="#home"><span class="logo">س</span><span>سَمْت</span></a><h1 id="top-title"></h1><a id="top-lic" class="lic" href="#settings?tab=lic"></a><span id="top-sync" class="sync" title="الاستلام التلقائي"></span></header>' +
+      '<header class="top"><a class="brand" href="#home"><span class="logo">س</span><span class="brand-t"><b>سَمْت</b><small id="top-school"></small></span></a><h1 id="top-title"></h1><a id="top-lic" class="lic" href="#settings?tab=lic"></a><span id="top-sync" class="sync" title="الاستلام التلقائي"></span></header>' +
       '<main id="main"></main>' +
-      '<nav class="nav"><a href="#home"><i>⌂</i><span>الرئيسية</span></a><a href="#students"><i>☰</i><span>الطلاب</span></a><a href="#new" class="plus"><i>＋</i><span>رصد</span></a><a href="#incidents"><i>!</i><span>المخالفات</span><b id="nav-badge" hidden></b></a><a href="#more"><i>⋯</i><span>المزيد</span></a></nav>';
+      '<nav class="nav"><a href="#home">' + SLI("home") + '<span>الرئيسية</span></a><a href="#students">' + SLI("users") + '<span>الطلاب</span></a><a href="#new" class="plus"><i>' + SLI("plus") + '</i><span>رصد</span></a><a href="#incidents">' + SLI("alert") + '<span>المخالفات</span><b id="nav-badge" hidden></b></a><a href="#more">' + SLI("more") + '<span>المزيد</span></a>' +
+      '<div class="nav-foot">وفق قواعد السلوك والمواظبة<br>الإصدار الخامس 1447هـ</div></nav>';
     A.drawTop();
   }
   A.drawTop = function () {
     var L = C.lic || {}, el = $("#top-lic"); if (!el) return;
+    var sn = $("#top-school"); if (sn) sn.textContent = A.S.settings.schools.map(function (z) { return z.name; }).filter(Boolean).join(" · ") || "ضبط السلوك والمواظبة";
     el.textContent = L.trial ? "تجريبي: " + L.hours + " ساعة" : L.ok && L.days <= 14 ? "ينتهي بعد " + L.days + " يوماً" : "";
     el.hidden = !el.textContent;
     var n = A.S.incidents.filter(function (x) { return x.status === "reported"; }).length, b = $("#nav-badge");
