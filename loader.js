@@ -325,4 +325,7 @@
   })();
 
   if ("serviceWorker" in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register("sw.js").catch(function () {});
+  /* زر التثبيت داخل التطبيق */
+  window.addEventListener("beforeinstallprompt", function (ev) { ev.preventDefault(); window.__bip = ev; document.documentElement.classList.add("can-install"); });
+  window.addEventListener("appinstalled", function () { window.__bip = null; document.documentElement.classList.remove("can-install"); });
 })();

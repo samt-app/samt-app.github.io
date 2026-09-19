@@ -122,6 +122,8 @@ main { max-width: 920px; margin: 0 auto; padding: 18px 16px 104px; }
 .tile-i { width: 46px; height: 46px; border-radius: 13px; display: flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(145deg, var(--navy-2), var(--pri)); box-shadow: inset 0 0 0 1.5px rgba(193,154,69,.7); }
 .tile-i svg.ic { width: 23px; height: 23px; }
 .tile b { font-size: .98rem; line-height: 1.4; }
+button.tile { font: inherit; text-align: right; cursor: pointer; }
+#mo-inst { border-color: var(--gold); background: var(--gold-soft); }
 .list { list-style: none; margin: 0; padding: 0; }
 .list > li { border-bottom: 1px solid var(--line); }
 .list > li:last-child { border-bottom: 0; }
@@ -216,3 +218,6 @@ details.sub summary { cursor: pointer; font-weight: 600; }
   .top, .nav, .noprint, .toast, .sheet-wrap { display: none !important; }
   main { padding: 0 !important; max-width: none; }
 }
+
+.inst-btn { display: none !important; }
+.can-install .inst-btn { display: inline-flex !important; }

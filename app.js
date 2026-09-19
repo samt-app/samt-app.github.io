@@ -255,6 +255,7 @@
     whatsapp: '<path d="M4 20l1.2-3.9A8.5 8.5 0 1 1 8 19z"/><path d="M9 8.8c0 3.4 2.8 6.2 6.2 6.2l1.3-1.5-2-1-1 .9a4.3 4.3 0 0 1-2.9-2.9l.9-1-1-2z"/>',
     search: '<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/>',
     chevron: '<path d="m14.5 6-6 6 6 6"/>',
+    download: '<path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 16v3.5A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5V16"/>',
     folder: '<path d="M3.5 6.5A1.5 1.5 0 0 1 5 5h4.5l2 2H19a1.5 1.5 0 0 1 1.5 1.5V18a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 18z"/>'
   };
   window.SLI = function (name, cls) {
@@ -1145,7 +1146,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     if (!S.settings.relayUrl) html += '<div class="alert">لتفعيل التوقيع عن بُعد ووصول بلاغات المعلمين تلقائياً أكمل <a href="#settings?tab=links">إعداد الروابط</a>.</div>';
     var hr = now.getHours(), greet = hr < 12 ? "صباح الخير" : "مساء الخير";
     html = '<section class="hero"><div class="hero-t"><small>' + e(SL.dayName(now)) + " " + e(SL.hijri(now)) + " — " + e(SL.greg(now)) + "</small><h2>" + greet + '</h2><p>' + e(S.settings.schools.map(function (z) { return z.name; }).filter(Boolean).join(" · ") || "سَمْت — ضبط السلوك والمواظبة") + "</p></div>" +
-      '<div class="hero-a"><a class="btn gold big" href="#new">' + SLI("plus") + ' رصد مخالفة</a><a class="btn ghost big" href="#merit">' + SLI("star") + ' سلوك متميز</a><a class="btn ghost big" href="#absence">' + SLI("calendar") + " الغياب</a></div></section>" + html;
+      '<div class="hero-a"><a class="btn gold big" href="#new">' + SLI("plus") + ' رصد مخالفة</a><a class="btn ghost big" href="#merit">' + SLI("star") + ' سلوك متميز</a><a class="btn ghost big" href="#absence">' + SLI("calendar") + ' الغياب</a><button class="btn ghost big inst-btn" type="button" id="hm-inst">' + SLI("download") + " تثبيت التطبيق</button></div></section>" + html;
     html += '<div class="stats">' +
       stat(S.students.length, "طالب", "#students", "", "users") + stat(monthInc.length, "مخالفة هذا الشهر", "#incidents", "", "alert") +
       stat(reported.length, "بلاغات معلمين جديدة", "#incidents?f=reported", reported.length ? "hot" : "", "inbox") +
@@ -1154,6 +1155,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     html += '<section class="card"><h3 class="sec-h">' + SLI("list") + ' آخر المخالفات</h3>' + (recent.length ? incList(recent) : '<p class="mut">لا توجد مخالفات مسجلة.</p>') + "</section>";
     if (low.length) html += '<section class="card"><h3 class="sec-h">' + SLI("shield") + ' طلاب درجة سلوكهم أقل من 80</h3><ul class="list">' + low.map(function (s) { return '<li><a href="#student/' + s.id + '">' + A.scoreChip(s) + " " + stuLine(s) + "</a></li>"; }).join("") + "</ul></section>";
     main().innerHTML = html;
+    var hb = $("#hm-inst"); if (hb) hb.onclick = A.install;
     function stat(n, l, href, c, ic) { return '<a class="stat ' + (c || "") + '" href="' + href + '"><span class="stat-i">' + SLI(ic) + "</span><b>" + n + "</b><span>" + e(l) + "</span></a>"; }
   };
   function incList(arr) {
@@ -1635,8 +1637,20 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     setTitle("المزيد");
     main().innerHTML = '<div class="tiles">' +
       [["#staff", "المعلمون والإدارة", "teacher"], ["#import", "استيراد من Excel", "upload"], ["#merit", "السلوك المتميز", "star"], ["#absence", "الغياب — ربط وهج", "calendar"], ["#sigs", "التوقيعات عن بُعد", "pen"], ["#commit", "الالتزام المدرسي", "doc"], ["#settings", "الإعدادات والاشتراك", "gear"], ["#log", "سجل العمليات", "clock"]]
-        .map(function (x) { return '<a class="tile" href="' + x[0] + '"><span class="tile-i">' + SLI(x[2]) + "</span><b>" + e(x[1]) + "</b></a>"; }).join("") + "</div>" +
+        .map(function (x) { return '<a class="tile" href="' + x[0] + '"><span class="tile-i">' + SLI(x[2]) + "</span><b>" + e(x[1]) + "</b></a>"; }).join("") +
+      (A.installed() ? "" : '<button class="tile" type="button" id="mo-inst"><span class="tile-i">' + SLI("download") + "</span><b>تثبيت التطبيق على هذا الجهاز</b></button>") + "</div>" +
       '<p class="mut center">سَمْت — الإصدار ' + e(C.version || C.BUILTIN) + " · " + e(C.licLabel(C.lic)) + "</p>";
+    var ib = $("#mo-inst"); if (ib) ib.onclick = A.install;
+  };
+  A.installed = function () { return window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; };
+  A.install = async function () {
+    if (window.__bip) { var p = window.__bip; p.prompt(); var r = await p.userChoice; window.__bip = null; if (r && r.outcome === "accepted") A.toast("تم تثبيت «سَمْت» — ستجده على سطح المكتب وفي قائمة التطبيقات"); return; }
+    var ua = navigator.userAgent, ios = /iPhone|iPad|iPod/.test(ua), mac = /Macintosh/.test(ua) && !/Chrome|Edg/.test(ua), android = /Android/.test(ua);
+    var steps = ios ? "<ol><li>افتح الرابط في <b>Safari</b>.</li><li>اضغط زر المشاركة ⬆️ أسفل الشاشة.</li><li>اختر <b>إضافة إلى الشاشة الرئيسية</b> ثم <b>إضافة</b>.</li></ol>"
+      : mac ? "<ol><li>في Safari: من قائمة <b>ملف</b> اختر <b>إضافة إلى Dock</b>.</li><li>أو افتح الرابط في <b>Chrome</b> لتثبيته.</li></ol>"
+      : android ? "<ol><li>افتح القائمة ⋮ أعلى Chrome.</li><li>اختر <b>تثبيت التطبيق</b> أو <b>إضافة إلى الشاشة الرئيسية</b>.</li></ol>"
+      : "<ol><li>افتح القائمة ⋮ أعلى يمين Chrome.</li><li>اختر <b>الإرسال والحفظ والمشاركة</b> ← <b>تثبيت الصفحة كتطبيق</b> (أو <b>تثبيت سَمْت</b>).</li><li>في Edge: القائمة … ← <b>التطبيقات</b> ← <b>تثبيت هذا الموقع كتطبيق</b>.</li></ol>";
+    A.sheet("تثبيت التطبيق", '<p>المتصفح لم يعرض نافذة التثبيت تلقائياً. ثبّته يدوياً:</p>' + steps + '<p class="note">إن كان التطبيق مثبتاً مسبقاً على هذا الجهاز فافتحه من سطح المكتب أو قائمة التطبيقات.</p>');
   };
 
   V.log = function () {
