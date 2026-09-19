@@ -209,7 +209,7 @@
     return false;
   }
   async function fsPick() {
-    var h = await window.showDirectoryPicker({ id: "sammt", mode: "readwrite", startIn: "desktop" });
+    var h = await window.showDirectoryPicker({ id: "sammt", mode: "readwrite", startIn: "documents" });
     if (String(h.name).toLowerCase() !== "sammt") h = await h.getDirectoryHandle("sammt", { create: true });
     FS.handle = h; FS.ok = true; await DB.set("dirHandle", h);
     return h;
@@ -274,7 +274,7 @@
       var el = document.getElementById("boot");
       var first = mode === "first";
       el.innerHTML = '<div class="lock"><div class="lock-card"><div class="lock-logo">س</div><h1>سَمْت</h1>' +
-        (first ? "<p><b>مجلد البيانات على جهازك</b></p><p class=\"mut\">اختر <b>القرص الرئيسي</b> (مثل C: أو «Macintosh HD») ثم اضغط «تحديد». سيُنشأ فيه مجلد <b>sammt</b> تُحفظ فيه كل البيانات تلقائياً، فلا يؤثر مسح المتصفح أو حذفه عليها. إن كان لديك مجلد sammt سابق فاختره لاستعادة بياناتك واشتراكك.</p>" +
+        (first ? "<p><b>مجلد البيانات على جهازك</b></p><p class=\"mut\">ستظهر نافذة اختيار مجلد. اختر مجلد <b>المستندات (Documents)</b> ثم اضغط «تحديد» أو «فتح»، فيُنشأ داخله مجلد <b>sammt</b> تلقائياً وتُحفظ فيه كل البيانات، فلا يؤثر مسح المتصفح أو حذفه عليها.</p><p class=\"mut\" style=\"font-size:.85rem\">لا يُسمح باختيار القرص الرئيسي نفسه (C: أو Macintosh HD) لأن المتصفح يحميه. إن كان لديك مجلد sammt سابق فاختره مباشرة لاستعادة بياناتك واشتراكك.</p>" +
           '<button class="btn pri" id="fg-pick" type="button">اختيار مكان مجلد sammt</button><button class="btn" id="fg-skip" type="button">لاحقاً</button>'
         : '<p>اسمح لسَمْت بالوصول إلى مجلد البيانات <b>sammt</b> للمتابعة.</p><button class="btn pri" id="fg-ok" type="button">السماح والمتابعة</button><button class="btn" id="fg-new" type="button">اختيار مجلد آخر</button><button class="btn" id="fg-skip" type="button">المتابعة بدون المجلد</button>') +
         '<p id="fg-m" class="lock-msg err"></p></div></div>';
