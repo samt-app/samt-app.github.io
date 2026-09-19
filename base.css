@@ -1,0 +1,78 @@
+/* سَمْت — الأساس (مشترك بين التطبيق والصفحات العامة) */
+:root {
+  color-scheme: light;
+  --bg: #f4f6f8; --card: #fff; --ink: #1d2733; --mut: #6a7683; --line: #dfe5ea;
+  --pri: #0e6e6a; --pri-2: #0a5552; --pri-soft: #e3f3f1;
+  --wa: #1f9d55; --red: #c62828; --red-soft: #fdecec; --warn: #b26a00; --warn-soft: #fff4e0; --ok: #1e7b45; --ok-soft: #e6f5ec;
+  --d1: #2f855a; --d2: #b7791f; --d3: #dd6b20; --d4: #c53030; --d5: #6b46c1;
+  --r: 12px; --sh: 0 1px 2px rgba(16,24,40,.06), 0 1px 3px rgba(16,24,40,.08);
+  --font: -apple-system, "SF Arabic", "Segoe UI", Tahoma, "Noto Kufi Arabic", "Noto Sans Arabic", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 16px; line-height: 1.6; -webkit-text-size-adjust: 100%; }
+body { direction: rtl; }
+a { color: var(--pri); text-decoration: none; }
+h1, h2, h3 { line-height: 1.35; margin: 0 0 .5em; }
+h2 { font-size: 1.2rem; } h3 { font-size: 1.05rem; }
+p { margin: .4em 0; }
+input, select, textarea, button { font: inherit; color: inherit; }
+input, select, textarea { width: 100%; padding: .6em .75em; border: 1px solid var(--line); border-radius: 10px; background: #fff; min-height: 44px; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--pri); outline-offset: 0; border-color: var(--pri); }
+textarea { resize: vertical; }
+label { display: block; font-size: .92rem; color: var(--mut); margin: .5em 0; }
+label > input, label > select, label > textarea { margin-top: .25em; color: var(--ink); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: .35em; min-height: 44px; padding: .5em 1em; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; font-weight: 600; text-align: center; }
+.btn:hover { border-color: #c5cfd8; }
+.btn.pri { background: var(--pri); border-color: var(--pri); color: #fff; }
+.btn.pri:hover { background: var(--pri-2); }
+.btn.wa { background: var(--wa); border-color: var(--wa); color: #fff; }
+.btn.danger { color: var(--red); border-color: #f2c3c3; }
+.btn.big { min-height: 52px; font-size: 1.05rem; padding: .6em 1.2em; }
+.btn.sm { min-height: 36px; padding: .3em .7em; font-size: .88rem; }
+.btn:disabled { opacity: .5; cursor: default; }
+.link { background: none; border: 0; color: var(--pri); cursor: pointer; padding: .2em .3em; font-size: .9rem; }
+.link.danger { color: var(--red); }
+.mut { color: var(--mut); }
+.center { text-align: center; }
+.red { color: var(--red); }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; margin: 0 0 12px; box-shadow: var(--sh); }
+.alert { background: var(--pri-soft); border: 1px solid #bfe3df; border-radius: 10px; padding: .6em .85em; margin: 0 0 12px; }
+.alert.warn { background: var(--warn-soft); border-color: #f3d39b; }
+.alert.err { background: var(--red-soft); border-color: #f2c3c3; color: #8a1c1c; }
+.alert.ok { background: var(--ok-soft); border-color: #b9e2c8; color: #155d34; }
+.alert.sm { font-size: .9rem; padding: .45em .7em; margin: .4em 0; }
+.note { font-size: .86rem; color: var(--mut); margin: .3em 0; }
+.chip { display: inline-block; font-size: .78rem; padding: .1em .6em; border-radius: 999px; background: #eef1f4; color: #3c4a57; white-space: nowrap; vertical-align: middle; }
+.chip.ok { background: var(--ok-soft); color: var(--ok); }
+.chip.red { background: var(--red-soft); color: var(--red); }
+.chip.warnc { background: var(--warn-soft); color: var(--warn); }
+.chip.pend { background: #e8f0fe; color: #1a56b0; }
+.chip.sec { background: #2b2f36; color: #fff; }
+.deg { display: inline-block; font-size: .78rem; font-weight: 700; padding: .1em .6em; border-radius: 6px; color: #fff; vertical-align: middle; }
+.deg.d1 { background: var(--d1); } .deg.d2 { background: var(--d2); } .deg.d3 { background: var(--d3); } .deg.d4 { background: var(--d4); } .deg.d5 { background: var(--d5); }
+.actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 12px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 12px; }
+@media (max-width: 560px) { .grid2, .grid3 { grid-template-columns: 1fr 1fr; } }
+code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .85em; background: #eef1f4; padding: .1em .35em; border-radius: 4px; word-break: break-all; }
+
+/* لوحة التوقيع */
+.pad-wrap { position: relative; margin: 10px 0; }
+.pad { display: block; width: 100%; height: 190px; border: 2px dashed #b9c4ce; border-radius: 12px; background: #fcfdfe; touch-action: none; }
+.pad-wrap .link { position: absolute; top: 6px; left: 8px; }
+.pad-wrap::after { content: "وقّع هنا"; position: absolute; bottom: 8px; right: 12px; color: #b9c4ce; font-size: .85rem; pointer-events: none; }
+
+/* شاشة القفل */
+.lock { position: fixed; inset: 0; background: linear-gradient(160deg, #e3f3f1, #f4f6f8 60%); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 50; overflow: auto; }
+.lock-card { background: #fff; border-radius: 18px; box-shadow: 0 10px 40px rgba(0,0,0,.08); padding: 24px; width: 100%; max-width: 440px; text-align: center; }
+.lock-logo { width: 64px; height: 64px; border-radius: 18px; background: var(--pri); color: #fff; font-size: 34px; font-weight: 800; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; }
+.lock-card .btn { width: 100%; margin-top: 8px; }
+.lock-why { color: var(--warn); font-weight: 600; }
+.lock-dev { display: flex; align-items: center; justify-content: center; gap: 10px; background: #f4f6f8; border-radius: 12px; padding: 10px; margin: 12px 0; flex-wrap: wrap; }
+.lock-dev b { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 1.25rem; letter-spacing: 1px; direction: ltr; }
+.lock-dev button { border: 0; background: var(--pri-soft); color: var(--pri); border-radius: 8px; padding: .3em .7em; cursor: pointer; }
+.lock-l { text-align: right; }
+.lock-msg { min-height: 1.4em; font-weight: 600; }
+.lock-msg.ok { color: var(--ok); } .lock-msg.err { color: var(--red); }
+.lock details { margin-top: 12px; text-align: right; }
+.lock summary { cursor: pointer; color: var(--mut); }

@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e6e6a">
+<meta name="color-scheme" content="light">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>رصد مشكلة سلوكية — سَمْت</title>
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="pub.css">
+</head>
+<body>
+<div class="pub" id="app"><p class="mut">جارٍ التحميل…</p></div>
+<script src="shared.js"></script>
+<script src="rules.js"></script>
+<script>
+(function () {
+  "use strict";
+  var SL = window.SL, R = window.RULES, e = SL.esc, app = document.getElementById("app"), P = null, LS = "samt_teacher_link";
+  function norm(s) { return String(s || "").replace(/[ً-ْـ]/g, "").replace(/[أإآٱ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه").replace(/\s+/g, " ").trim(); }
+  function fail(m) { app.innerHTML = '<div class="card done"><div class="ic" style="color:#c62828">!</div><h2>' + e(m) + "</h2></div>"; }
+
+  (async function () {
+    var h = location.hash.slice(1);
+    try { if (h) localStorage.setItem(LS, h); else h = localStorage.getItem(LS) || ""; } catch (err) {}
+    if (!h) return fail("الرابط غير مكتمل");
+    try { P = await SL.unpack(h); } catch (err) { return fail("تعذّر قراءة الرابط"); }
+    if (!P || P.kind !== "teacher") return fail("الرابط غير صالح");
+    history.replaceState(null, "", location.pathname);
+    form();
+  })();
+
+  function sentList() { try { return JSON.parse(localStorage.getItem("samt_sent_" + P.tid) || "[]"); } catch (err) { return []; } }
+  function form() {
+    var classes = Object.keys(P.cls || {}).sort(function (a, b) { return a.localeCompare(b, "ar"); });
+    var now = new Date(), local = new Date(now.getTime() - now.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
+    var sent = sentList();
+    app.innerHTML = '<div class="pub-h"><div class="logo">س</div><div><b>رصد مشكلة سلوكية</b><small>' + e(P.name) + " — " + e(P.school) + "</small></div></div>" +
+      '<div class="card"><div class="grid2"><label>الفصل<select id="cl"><option value="">اختر</option>' + classes.map(function (c) { return "<option>" + e(c) + "</option>"; }).join("") + '</select></label>' +
+      '<label>الطالب<select id="st" disabled><option value="">—</option></select></label></div>' +
+      '<label>ابحث عن المشكلة<input id="q" type="search" placeholder="مثال: التأخر، الجوال، الهروب…"></label><div class="degtabs" id="dg"></div><div class="items" id="its"></div>' +
+      '<div class="hint" id="hint" hidden></div>' +
+      '<div class="grid2"><label>التاريخ والوقت<input id="dt" type="datetime-local" value="' + local + '"></label><label>الحصة<input id="pr" placeholder="مثال: الثالثة"></label></div>' +
+      '<label>المكان<input id="pl" placeholder="الفصل، الساحة…"></label><label>وصف مختصر<textarea id="ds" rows="3"></textarea></label>' +
+      '<p id="msg" class="lock-msg err"></p><button class="btn pri big" id="go" type="button">إرسال لوكيل شؤون الطلبة</button></div>' +
+      (sent.length ? '<div class="card"><h3>آخر ما أرسلته</h3><ul class="sent">' + sent.slice(0, 15).map(function (s) { return "<li>" + e(s) + "</li>"; }).join("") + "</ul></div>" : "") +
+      '<p class="note center">لا تُحفظ بيانات الرصد على هذا الجوال؛ تُرسل مشفرة إلى جهاز المدرسة مباشرة.</p>';
+    var sel = { art: null, item: null }, deg = 0;
+    var cl = document.getElementById("cl"), st = document.getElementById("st");
+    cl.onchange = function () {
+      var l = (P.cls[cl.value] || []);
+      st.innerHTML = '<option value="">اختر الطالب</option>' + l.map(function (n) { return "<option>" + e(n) + "</option>"; }).join(""); st.disabled = !l.length; sel = { art: null, item: null }; items();
+    };
+    function items() {
+      var arts = R.articlesFor(((P.cst || {})[cl.value]) || P.stage || "ms"), q = norm(document.getElementById("q").value), html = "";
+      var degs = []; arts.forEach(function (a) { if (degs.indexOf(a.degree) < 0) degs.push(a.degree); }); degs.sort();
+      document.getElementById("dg").innerHTML = '<button type="button" data-d="0" class="' + (!deg ? "on" : "") + '">الكل</button>' + degs.map(function (d) { return '<button type="button" data-d="' + d + '" class="' + (deg === d ? "on" : "") + '">' + R.DEGREE_NAME[d] + "</button>"; }).join("");
+      Array.prototype.forEach.call(document.querySelectorAll("#dg button"), function (b) { b.onclick = function () { deg = +b.dataset.d; items(); }; });
+      arts.forEach(function (a) {
+        if (deg && a.degree !== deg) return;
+        var its = a.items.map(function (t, i) { return [t, i]; }).filter(function (x) { return !q || norm(x[0]).indexOf(q) >= 0; });
+        if (!its.length) return;
+        html += '<div class="art-h">الدرجة ' + R.DEGREE_NAME[a.degree] + (a.stage === "all" ? " — تجاه الهيئة التعليمية والإدارية" : "") + "</div>" +
+          its.map(function (x) { var on = sel.art === a.id && sel.item === x[1]; return '<label class="item' + (on ? " on" : "") + '"><input type="radio" name="it" value="' + a.id + ":" + x[1] + '"' + (on ? " checked" : "") + "> " + e(x[0]) + "</label>"; }).join("");
+      });
+      document.getElementById("its").innerHTML = html || '<p class="mut">لا نتائج.</p>';
+      Array.prototype.forEach.call(document.querySelectorAll("#its input"), function (r) {
+        r.onchange = function () {
+          var z = r.value.split(":"); sel.art = +z[0]; sel.item = +z[1];
+          Array.prototype.forEach.call(document.querySelectorAll("#its .item"), function (l) { l.classList.toggle("on", l.contains(r)); });
+          var a = R.articleById(sel.art), hint = document.getElementById("hint");
+          hint.hidden = false;
+          hint.textContent = a.degree === 1 ? "مشكلات الدرجة الأولى: يباشر المعلم التنبيه الشفهي الأول والثاني وملاحظة الطالب، ثم يرصد المشكلة إن تكررت ويحيلها لإدارة المدرسة (دور المعلم 9)." :
+            "مشكلات الدرجة " + R.DEGREE_NAME[a.degree] + ": يرصدها المعلم ويسلّمها لإدارة المدرسة التي تحدد الإجراء وفق التكرار (دور المعلم 10).";
+        };
+      });
+    }
+    document.getElementById("q").oninput = items; items();
+    document.getElementById("go").onclick = async function () {
+      var m = document.getElementById("msg"), b = this;
+      if (!cl.value || !st.value) return (m.textContent = "اختر الفصل والطالب.");
+      if (sel.art == null) return (m.textContent = "اختر المشكلة السلوكية.");
+      b.disabled = true; b.textContent = "جارٍ الإرسال…"; m.textContent = "";
+      var dt = document.getElementById("dt").value;
+      var obj = { v: 1, kind: "rpt", cls: cl.value, name: st.value, art: sel.art, item: sel.item, date: dt ? new Date(dt).toISOString() : new Date().toISOString(),
+        period: document.getElementById("pr").value, place: document.getElementById("pl").value, desc: document.getElementById("ds").value };
+      try {
+        var key = "R" + P.tid + "-" + SL.rid(8);
+        await SL.relay.put(P.relay, P.box, key, await SL.seal(P.k, obj));
+        var l = sentList(); l.unshift(st.value + " — " + R.articleById(sel.art).items[sel.item] + " (" + SL.hijri(new Date()) + ")");
+        try { localStorage.setItem("samt_sent_" + P.tid, JSON.stringify(l.slice(0, 30))); } catch (err) {}
+        sel = { art: null, item: null };
+        form();
+        var ok = document.createElement("p"); ok.className = "alert ok"; ok.textContent = "✓ تم الإرسال لوكيل شؤون الطلبة."; app.insertBefore(ok, app.children[1]);
+      } catch (err) { b.disabled = false; b.textContent = "إعادة المحاولة"; m.textContent = "تعذّر الإرسال — تحقق من الإنترنت ثم أعد المحاولة."; }
+    };
+  }
+})();
+</script>
+</body>
+</html>

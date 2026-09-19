@@ -1,0 +1,24 @@
+/* سَمْت — صفحتا التوقيع والرصد (تفتحان على جوال ولي الأمر والمعلم) */
+.pub { max-width: 720px; margin: 0 auto; padding: 16px 16px 40px; }
+.pub-h { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.pub-h .logo { width: 40px; height: 40px; border-radius: 12px; background: var(--pri); color: #fff; font-size: 22px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex: none; }
+.pub-h b { display: block; } .pub-h small { color: var(--mut); }
+.pub .paper { padding: 16px 12px; }
+.pub .btn.big { width: 100%; }
+.done { text-align: center; padding: 30px 16px; }
+.done .ic { font-size: 56px; color: var(--ok); }
+.chk { display: flex; gap: 10px; align-items: flex-start; color: var(--ink); font-size: .95rem; }
+.chk input { width: 22px; height: 22px; min-height: 0; flex: none; margin-top: 3px; }
+.radio { display: flex; gap: 8px; align-items: center; color: var(--ink); margin: 6px 0; }
+.radio input { width: auto; min-height: 0; }
+.items { max-height: 50vh; overflow: auto; border: 1px solid var(--line); border-radius: 10px; padding: 4px 8px; background: #fcfdfd; }
+.art-h { font-size: .85rem; color: var(--mut); margin: 10px 0 4px; }
+.item { display: flex; gap: 8px; align-items: flex-start; color: var(--ink); font-size: .95rem; padding: 8px; border-radius: 8px; margin: 2px 0; cursor: pointer; }
+.item input { width: auto; min-height: 0; margin-top: 5px; }
+.item.on { background: var(--pri-soft); }
+.degtabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+.degtabs button { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: .25em .8em; cursor: pointer; min-height: 34px; }
+.degtabs button.on { background: var(--ink); color: #fff; }
+.sent { list-style: none; padding: 0; font-size: .88rem; color: var(--mut); }
+.sent li { border-bottom: 1px dashed var(--line); padding: 4px 0; }
+.hint { background: var(--pri-soft); border-radius: 10px; padding: 8px 10px; font-size: .9rem; margin: 8px 0; }

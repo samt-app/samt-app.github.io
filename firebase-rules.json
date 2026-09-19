@@ -1,0 +1,14 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "relay": {
+      "$box": {
+        ".read": "$box.length >= 20",
+        "$tok": {
+          ".write": "(!data.exists() && newData.isString() && newData.val().length < 30000) || (data.exists() && !newData.exists())"
+        }
+      }
+    }
+  }
+}

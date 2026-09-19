@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e6e6a">
+<meta name="color-scheme" content="light">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>توقيع نموذج — سَمْت</title>
+<link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="doc.css">
+<link rel="stylesheet" href="pub.css">
+</head>
+<body>
+<div class="pub" id="app"><p class="mut">جارٍ فتح النموذج…</p></div>
+<script src="shared.js"></script>
+<script>
+(function () {
+  "use strict";
+  var SL = window.SL, e = SL.esc, app = document.getElementById("app"), P = null;
+  function head() { return '<div class="pub-h"><div class="logo">س</div><div><b>' + e(P.school || "") + '</b><small>توقيع إلكتروني لنموذج من المدرسة</small></div></div>'; }
+  function fail(msg) { app.innerHTML = '<div class="card done"><div class="ic" style="color:#c62828">!</div><h2>' + e(msg) + "</h2><p class=\"mut\">تواصل مع المدرسة إن احتجت رابطاً جديداً.</p></div>"; }
+  function doneKey() { return "samt_signed_" + P.tok; }
+
+  (async function () {
+    var h = location.hash.slice(1);
+    try { if (h) sessionStorage.setItem("samt_p", h); else h = sessionStorage.getItem("samt_p") || ""; } catch (err) {}
+    if (!h) return fail("الرابط غير مكتمل");
+    try { P = await SL.unpack(h); } catch (err) { return fail("تعذّر قراءة الرابط — تأكد من فتحه كاملاً"); }
+    history.replaceState(null, "", location.pathname); /* لا يبقى محتوى النموذج في شريط العنوان */
+    window.__payload = P;
+    if (!P || !P.doc || !P.tok) return fail("الرابط غير صالح");
+    try { if (localStorage.getItem(doneKey())) return showDone(true); } catch (err) {}
+    if (P.exp && Date.now() > P.exp) return fail("انتهت صلاحية رابط التوقيع");
+    if (P.h4) verify(); else render();
+  })();
+
+  function verify() {
+    app.innerHTML = head() + '<div class="card"><h2>التحقق</h2><p>للحفاظ على خصوصية بيانات الطالب، أدخل <b>آخر 4 أرقام</b> من السجل المدني (الهوية) للطالب.</p>' +
+      '<label>آخر 4 أرقام<input id="v4" inputmode="numeric" maxlength="4" dir="ltr" autocomplete="off"></label><p id="vm" class="lock-msg err"></p>' +
+      '<button class="btn pri big" id="vb" type="button">متابعة</button></div>';
+    var tries = 0, inp = document.getElementById("v4");
+    async function go() {
+      var v = inp.value.replace(/[٠-٩]/g, function (d) { return "٠١٢٣٤٥٦٧٨٩".indexOf(d); }).replace(/\D/g, "");
+      if ((await SL.sha256(P.tok + v)).slice(0, 12) === P.h4) return render();
+      tries++; document.getElementById("vm").textContent = tries >= 5 ? "تجاوزت عدد المحاولات. تواصل مع المدرسة." : "الرقم غير صحيح.";
+      if (tries >= 5) document.getElementById("vb").disabled = true;
+    }
+    document.getElementById("vb").onclick = go; inp.onkeydown = function (ev) { if (ev.key === "Enter") go(); };
+  }
+
+  function render() {
+    var parent = (P.doc.signers || []).find(function (s) { return s.role === "parent"; }) || { name: "" };
+    app.innerHTML = head() +
+      '<div class="paper">' + SL.renderDoc(P.doc, { header: { school: P.school }, compact: false }) + "</div>" +
+      '<div class="card"><h2>توقيع ولي الأمر</h2>' +
+      (P.reply ? '<div><label class="radio"><input type="radio" name="rp" value="0" checked> أقر بالعلم، وسأحضر في الموعد المحدد.</label><label class="radio"><input type="radio" name="rp" value="1"> أقر بالعلم، وأرغب بتغيير الموعد (خلال نفس الأسبوع).</label><label id="alt-w" hidden>الموعد المقترح<input id="alt" placeholder="مثال: الأحد القادم الساعة 9 صباحاً"></label></div>' : "") +
+      '<label>اسم ولي الأمر<input id="nm" value="' + e(parent.name || "") + '"></label>' +
+      '<div class="pad-wrap"><canvas id="pad" class="pad"></canvas><button class="link" type="button" id="clr">مسح</button></div>' +
+      '<label class="chk"><input type="checkbox" id="ack"> اطلعت على محتوى النموذج أعلاه وأقر بالعلم بما ورد فيه.</label>' +
+      '<p id="msg" class="lock-msg err"></p><button class="btn pri big" id="send" type="button">إرسال التوقيع للمدرسة</button>' +
+      '<details style="margin-top:12px"><summary class="mut">لا أرغب بالتوقيع</summary><label>ملاحظتك للمدرسة<textarea id="rnote" rows="2"></textarea></label><button class="btn danger" id="refuse" type="button">إرسال عدم الموافقة</button></details></div>';
+    var pad = new SL.SigPad(document.getElementById("pad"));
+    document.getElementById("clr").onclick = function () { pad.clear(); };
+    if (P.reply) Array.prototype.forEach.call(document.querySelectorAll("[name=rp]"), function (r) { r.onchange = function () { document.getElementById("alt-w").hidden = r.value !== "1" || !r.checked; }; });
+    document.getElementById("send").onclick = function () {
+      var m = document.getElementById("msg");
+      if (!document.getElementById("nm").value.trim()) return (m.textContent = "اكتب الاسم.");
+      if (pad.isEmpty()) return (m.textContent = "وقّع داخل المربع.");
+      if (!document.getElementById("ack").checked) return (m.textContent = "ضع علامة الإقرار بالاطلاع.");
+      var rp = document.querySelector("[name=rp]:checked");
+      submit({ sig: pad.encode(), reply: rp ? +rp.value : null, alt: rp && rp.value === "1" ? document.getElementById("alt").value : "" });
+    };
+    document.getElementById("refuse").onclick = function () { submit({ refused: true, note: document.getElementById("rnote").value }); };
+  }
+
+  async function submit(x) {
+    var btn = document.getElementById("send"), m = document.getElementById("msg");
+    btn.disabled = true; btn.textContent = "جارٍ الإرسال…"; m.textContent = "";
+    var obj = Object.assign({ v: 1, tok: P.tok, role: "parent", name: document.getElementById("nm").value.trim(), at: Date.now(), ua: navigator.userAgent.slice(0, 140) }, x);
+    var sealed = await SL.seal(P.k, obj);
+    try {
+      await SL.relay.put(P.relay, P.box, P.tok, sealed);
+      try { localStorage.setItem(doneKey(), "1"); } catch (err) {}
+      showDone(false, x.refused);
+    } catch (err) {
+      btn.disabled = false; btn.textContent = "إعادة المحاولة";
+      m.innerHTML = "تعذّر الإرسال — تحقق من الاتصال بالإنترنت ثم أعد المحاولة." + (P.wa ? '<br><a class="btn wa" style="margin-top:8px" href="' + SL.wa(P.wa, "رد توقيع — سَمْت (لا تعدّل النص)\nSAMT:" + P.tok + ":" + sealed) + '">أو أرسله عبر واتساب المدرسة</a>' : "");
+    }
+  }
+  function showDone(already, refused) {
+    app.innerHTML = (P ? head() : "") + '<div class="card done"><div class="ic">✓</div><h2>' + (already ? "تم التوقيع على هذا النموذج سابقاً" : refused ? "تم إرسال ردك للمدرسة" : "تم إرسال توقيعكم للمدرسة") + '</h2><p class="mut">شكراً لتعاونكم. يمكنكم إغلاق هذه الصفحة.</p></div>';
+  }
+})();
+</script>
+</body>
+</html>
