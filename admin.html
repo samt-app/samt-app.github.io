@@ -91,6 +91,7 @@ tr.det td { background: var(--bg-2); white-space: normal; }
       <button data-f="trial" type="button">تجريبي</button>
       <button data-f="end" type="button">منتهٍ</button>
       <button data-f="idle" type="button">غير نشط</button>
+      <button data-f="stop" type="button">موقوف</button>
     </div>
   </div>
 
@@ -119,7 +120,7 @@ tr.det td { background: var(--bg-2); white-space: normal; }
   "use strict";
   var SL = window.SL, e = SL.esc, $ = function (s) { return document.querySelector(s); };
   var DB = SL.DEFAULT_RELAY, KEY = "AIzaSyAUfytIrA1q-RRqwGqKiJvyhuGyn_4IdvI", ROWS = [], sortBy = "end", sortDir = 1, filter = "all", timer = null;
-  try { KEY = localStorage.getItem("samt_admin_key") || KEY; } catch (err) {}
+  try { var sk = localStorage.getItem("samt_admin_key"); if (/^AIza/.test(sk || "")) KEY = sk; } catch (err) {}
   document.querySelectorAll(".lg, .lock-logo").forEach(function (el) { el.innerHTML = SL.LOGO; });
   $("#ak").value = KEY; $("#keybox").hidden = false;
 
@@ -140,7 +141,8 @@ tr.det td { background: var(--bg-2); white-space: normal; }
   function save(t) { try { localStorage.setItem("samt_admin_rt", t.refreshToken); } catch (err) {} window.__tok = t.idToken; }
 
   $("#go").onclick = async function () {
-    var m = $("#msg"); m.textContent = ""; KEY = $("#ak").value.trim() || KEY;
+    var m = $("#msg"); m.textContent = ""; var typed = $("#ak").value.trim();
+    if (/^AIza/.test(typed)) KEY = typed; else if (typed && typed !== KEY) { m.textContent = "ما في خانة المفتاح ليس Web API Key (يبدأ بـ AIza) — أزلته وأكملت بالمفتاح الصحيح."; $("#ak").value = KEY; }
     if (!KEY) { m.textContent = "أدخل Web API Key من إعدادات مشروع Firebase."; $("#keybox").open = true; return; }
     try { localStorage.setItem("samt_admin_key", KEY); } catch (err) {}
     this.disabled = true; this.textContent = "جارٍ الدخول…";
@@ -163,13 +165,22 @@ tr.det td { background: var(--bg-2); white-space: normal; }
     try {
       var r = await fetch(DB + "/reg.json?auth=" + encodeURIComponent(window.__tok), { cache: "no-store" });
       if (r.status === 401) { var rt = localStorage.getItem("samt_admin_rt"); save(await refresh(rt)); return load(); }
-      var box = (await r.json()) || {};
+      var box = (await r.json()) || {}, cmds = {};
+      try {
+        var rc = await fetch(DB + "/cmd.json?auth=" + encodeURIComponent(window.__tok), { cache: "no-store" });
+        if (rc.ok) {
+          var raw = (await rc.json()) || {};
+          Object.keys(raw).forEach(function (k) { try { cmds[k] = typeof raw[k] === "string" ? JSON.parse(raw[k]) : raw[k]; } catch (err) {} });
+        }
+      } catch (err) {}
       ROWS = Object.keys(box).map(function (k) {
         var o = {}; try { o = typeof box[k] === "string" ? JSON.parse(box[k]) : box[k] || {}; } catch (err) {}
         var logins = o.logins || [], last = logins[logins.length - 1] || o.at || 0;
         var endT = o.end ? new Date(o.end + "T23:59:59").getTime() : 0;
         var days = o.trial ? Math.ceil((o.hours || 0) / 24) : endT ? Math.ceil((endT - Date.now()) / 864e5) : 0;
-        return { dev: o.dev || k, school: o.school || "—", region: o.region || "", admin: o.admin || "", ver: o.ver || "—",
+        var cm = cmds[o.dev || k] || {};
+        if (cm.end) { var ce = new Date(cm.end + "T23:59:59").getTime(); if (ce > endT) { endT = ce; days = Math.ceil((ce - Date.now()) / 864e5); o.trial = false; } }
+        return { stopped: !!cm.stop, cmdEnd: cm.end || "", dev: o.dev || k, school: o.school || "—", region: o.region || "", admin: o.admin || "", ver: o.ver || "—",
           trial: !!o.trial, end: o.end || "", endT: endT, days: days, last: last, logins: logins, first: o.first || 0,
           stu: (o.n || {}).stu || 0, inc: (o.n || {}).inc || 0, sig: (o.n || {}).sig || 0, stf: (o.n || {}).stf || 0, mer: (o.n || {}).mer || 0, ua: o.ua || "" };
       });
@@ -179,12 +190,13 @@ tr.det td { background: var(--bg-2); white-space: normal; }
   }
   function state(r) {
     var idle = Date.now() - r.last > 14 * 864e5;
+    if (r.stopped) return "stop";
     if (r.trial) return r.days > 0 ? "trial" : "end";
     if (!r.endT || r.endT < Date.now()) return "end";
     if (r.days <= 14) return "soon";
     return idle ? "idle" : "ok";
   }
-  var LBL = { ok: ["فعّال", "p-ok"], soon: ["ينتهي بعد " , "p-soon"], trial: ["تجريبي", "p-trial"], end: ["منتهٍ", "p-end"], idle: ["فعّال — غير نشط", "p-idle"] };
+  var LBL = { stop: ["موقوف", "p-end"], ok: ["فعّال", "p-ok"], soon: ["ينتهي بعد " , "p-soon"], trial: ["تجريبي", "p-trial"], end: ["منتهٍ", "p-end"], idle: ["فعّال — غير نشط", "p-idle"] };
   function ago(t) {
     if (!t) return "—";
     var m = Math.floor((Date.now() - t) / 6e4);
@@ -209,7 +221,7 @@ tr.det td { background: var(--bg-2); white-space: normal; }
     var stu = ROWS.reduce(function (s, r) { return s + r.stu; }, 0), inc = ROWS.reduce(function (s, r) { return s + r.inc; }, 0);
     $("#kpis").innerHTML =
       kpi(n, "جهاز مسجّل", "") + kpi(ok + soon + idle, "اشتراك فعّال", "ok") + kpi(soon, "ينتهي خلال 14 يوماً", "warn") +
-      kpi(tri, "قيد التجربة", "") + kpi(end, "منتهٍ", "red") + kpi(idle, "لم يدخل منذ أسبوعين", "") +
+      kpi(tri, "قيد التجربة", "") + kpi(end, "منتهٍ", "red") + kpi(idle, "لم يدخل منذ أسبوعين", "") + kpi(ROWS.filter(function (r) { return state(r) === "stop"; }).length, "موقوف", "red") +
       kpi(stu.toLocaleString("ar-SA"), "طالب في كل المدارس", "") + kpi(inc.toLocaleString("ar-SA"), "مخالفة مسجّلة", "");
     $("#rows").innerHTML = list.length ? list.map(function (r, i) {
       var st = state(r), lb = LBL[st], txt = st === "soon" ? "ينتهي بعد " + r.days + " يوماً" : st === "trial" ? "تجريبي — " + r.days + " يوم" : lb[0];
@@ -224,13 +236,57 @@ tr.det td { background: var(--bg-2); white-space: normal; }
           "<div><b>أرقام</b><ul class=\"logins\"><li>الطلاب: " + r.stu + "</li><li>المنسوبون: " + r.stf + "</li><li>المخالفات: " + r.inc + "</li><li>السلوك المتميز: " + r.mer + "</li><li>روابط التوقيع: " + r.sig + "</li></ul></div>" +
           '<div><b>معلومات</b><ul class="logins"><li>أول تشغيل: ' + e(r.first ? SL.hijri(r.first) : "—") + "</li><li>إدارة التعليم: " + e(r.admin || "—") + "</li><li>الجهاز: " + e(r.ua || "—") + "</li></ul></div>" +
           '</div><div class="tools"><button class="btn sm" data-copy="' + e(r.dev) + '" type="button">نسخ رقم الجهاز</button>' +
-          '<button class="btn sm" data-wa="' + e(r.dev) + '" type="button">رسالة تجديد جاهزة</button></div>' +
+          '<button class="btn sm" data-wa="' + e(r.dev) + '" type="button">رسالة تجديد جاهزة</button>' +
+          '<button class="btn sm pri" data-ext="' + e(r.dev) + '" data-m="3" type="button">تمديد 3 أشهر</button>' +
+          '<button class="btn sm pri" data-ext="' + e(r.dev) + '" data-m="12" type="button">تمديد سنة</button>' +
+          '<button class="btn sm" data-extd="' + e(r.dev) + '" type="button">تمديد حتى تاريخ…</button>' +
+          (r.stopped ? '<button class="btn sm" data-run="' + e(r.dev) + '" type="button">إلغاء الإيقاف</button>'
+                     : '<button class="btn sm danger" data-stop="' + e(r.dev) + '" type="button">إيقاف الاشتراك</button>') +
+          (r.cmdEnd ? '<span class="pill p-ok">أمر ساري: حتى ' + e(r.cmdEnd) + "</span>" : "") + "</div>" +
         "</td></tr>";
     }).join("") : '<tr><td colspan="8"><div class="empty"><p>لا توجد أجهزة مطابقة.</p></div></td></tr>';
     document.querySelectorAll(".row").forEach(function (tr) {
       tr.onclick = function () { var d = document.querySelector('[data-d="' + tr.dataset.i + '"]'); if (d) d.classList.toggle("hide"); };
     });
     document.querySelectorAll("[data-copy]").forEach(function (b) { b.onclick = function (ev) { ev.stopPropagation(); navigator.clipboard.writeText(b.dataset.copy); b.textContent = "تم النسخ"; }; });
+    function iso(d) { return new Date(d).toISOString().slice(0, 10); }
+    async function cmd(dev, body, btn, label) {
+      btn.disabled = true; var old = btn.textContent; btn.textContent = "جارٍ…";
+      try {
+        var r = await fetch(DB + "/cmd/" + encodeURIComponent(dev) + ".json?auth=" + encodeURIComponent(window.__tok),
+          { method: "PUT", body: JSON.stringify(body ? JSON.stringify(body) : null) });
+        if (r.status === 401) { save(await refresh(localStorage.getItem("samt_admin_rt"))); btn.disabled = false; btn.textContent = old; return cmd(dev, body, btn, label); }
+        if (!r.ok) throw new Error(r.status);
+        btn.textContent = label; await load();
+      } catch (err) { btn.textContent = "تعذّر — أعد المحاولة"; btn.disabled = false; }
+    }
+    document.querySelectorAll("[data-ext]").forEach(function (b) {
+      b.onclick = function (ev) {
+        ev.stopPropagation();
+        var r = ROWS.find(function (x) { return x.dev === b.dataset.ext; }) || {};
+        var base = Math.max(Date.now(), r.endT || 0, r.cmdEnd ? new Date(r.cmdEnd + "T23:59:59").getTime() : 0);
+        var d = new Date(base); d.setMonth(d.getMonth() + (+b.dataset.m));
+        cmd(b.dataset.ext, { end: iso(d), by: "admin", at: Date.now() }, b, "تم حتى " + iso(d));
+      };
+    });
+    document.querySelectorAll("[data-extd]").forEach(function (b) {
+      b.onclick = function (ev) {
+        ev.stopPropagation();
+        var v = prompt("تاريخ نهاية الاشتراك (YYYY-MM-DD):", iso(Date.now() + 365 * 864e5));
+        if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v.trim())) return;
+        cmd(b.dataset.extd, { end: v.trim(), by: "admin", at: Date.now() }, b, "تم حتى " + v.trim());
+      };
+    });
+    document.querySelectorAll("[data-stop]").forEach(function (b) {
+      b.onclick = function (ev) {
+        ev.stopPropagation();
+        if (!confirm("إيقاف الاشتراك لهذا الجهاز؟ سيُقفل التطبيق عند أول تشغيل متصل بالإنترنت.")) return;
+        cmd(b.dataset.stop, { stop: true, by: "admin", at: Date.now() }, b, "أُوقف");
+      };
+    });
+    document.querySelectorAll("[data-run]").forEach(function (b) {
+      b.onclick = function (ev) { ev.stopPropagation(); cmd(b.dataset.run, null, b, "أُلغي الإيقاف"); };
+    });
     document.querySelectorAll("[data-wa]").forEach(function (b) {
       b.onclick = function (ev) {
         ev.stopPropagation();

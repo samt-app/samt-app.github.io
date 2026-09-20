@@ -93,17 +93,36 @@
     if (Date.now() > end) return { ok: false, expired: true, end: end, why: "انتهى الاشتراك بتاريخ " + fmt(end) + "." };
     return { ok: true, end: end, days: Math.ceil((end - Date.now()) / 864e5) };
   }
+  /* ————— أوامر المزوّد: تمديد أو إيقاف الاشتراك عن بُعد (يكتبها المزوّد وحده) ————— */
+  var REG = typeof self.SAMT_REG === "string" ? self.SAMT_REG : "https://samt-app-4132d-default-rtdb.europe-west1.firebasedatabase.app";
+  async function remoteFetch(dev) {
+    if (!REG) return await DB.get("remote");
+    try {
+      var c = new AbortController(), t = setTimeout(function () { c.abort(); }, 3000);
+      var r = await fetch(REG + "/cmd/" + encodeURIComponent(dev) + ".json", { cache: "no-store", signal: c.signal });
+      clearTimeout(t);
+      if (!r.ok) return await DB.get("remote");
+      var v = await r.json();
+      if (!v) { await DB.set("remote", null); return null; }
+      var o = typeof v === "string" ? JSON.parse(v) : v;
+      o.at = Date.now(); await DB.set("remote", o); return o;
+    } catch (e) { return await DB.get("remote"); }
+  }
   async function license() {
     var dev = await deviceId(), now = Date.now();
+    var rem = await remoteFetch(dev);
+    if (rem && rem.stop) return { ok: false, dev: dev, stopped: true, why: rem.why || "أُوقف الاشتراك من المزوّد. تواصل مع متجر تقناس لتفعيله." };
     var last = (await DB.get("lastSeen")) || 0;
     if (last && now < last - 3 * 3600e3) return { ok: false, dev: dev, why: "تاريخ الجهاز أقدم من آخر استخدام. صحّح تاريخ ووقت الجهاز ثم أعد فتح التطبيق.", clock: true };
     await DB.set("lastSeen", Math.max(now, last));
+    var remEnd = rem && rem.end ? new Date(rem.end + "T23:59:59").getTime() : 0;
     var code = await DB.get("license");
     if (code) {
       var r = await verifyCode(code, dev); r.dev = dev; r.code = code;
-      if (r.ok) return r;
+      if (remEnd > now && (!r.ok || remEnd > +new Date(r.end || 0))) return { ok: true, dev: dev, end: new Date(remEnd), days: Math.ceil((remEnd - now) / 864e5), remote: true };
       return r;
     }
+    if (remEnd > now) return { ok: true, dev: dev, end: new Date(remEnd), days: Math.ceil((remEnd - now) / 864e5), remote: true };
     var start = await DB.get("trialStart");
     if (!start) { start = now; await DB.set("trialStart", start); }
     var end = new Date(start + TRIAL_HOURS * 3600e3), left = end - now;
