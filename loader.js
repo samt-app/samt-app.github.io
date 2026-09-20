@@ -195,7 +195,7 @@
       '<p class="lock-why">' + esc(L.why || "") + "</p>" +
       '<div class="lock-dev"><span>رقم الجهاز</span><b id="lk-dev">' + esc(L.dev) + '</b><button id="lk-copy" type="button">نسخ</button></div>' +
       '<p class="lock-hint">أرسل رقم الجهاز إلى ' + esc(VENDOR.name) + " للحصول على كود الاشتراك.</p>" +
-      (wa ? '<a class="btn wa" href="' + wa + '" target="_blank" rel="noopener">طلب الاشتراك عبر واتساب</a>' : "") +
+      (wa ? '<a class="btn wa" href="' + wa + '" rel="noopener">طلب الاشتراك عبر واتساب</a>' : "") +
       '<label class="lock-l">كود الاشتراك<textarea id="lk-code" rows="3" dir="ltr" placeholder="SL1.XXXXX-XXXXX.YYYYMMDD.…"></textarea></label>' +
       '<button class="btn pri" id="lk-act" type="button">تفعيل</button><p id="lk-msg" class="lock-msg"></p>' +
       '<details><summary>خيارات أخرى</summary>' +

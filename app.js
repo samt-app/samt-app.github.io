@@ -40,7 +40,8 @@
     var n = SL.normPhone(phone);
     return "https://wa.me/" + (n || "") + "?text=" + encodeURIComponent(text || "");
   };
-  SL.openWa = function (phone, text) { var w = window.open(SL.wa(phone, text), "_blank"); if (!w) location.href = SL.wa(phone, text); };
+  /* واتساب يفتح في التبويب نفسه — لا تُفتح تبويبات جديدة داخل المنصة */
+  SL.openWa = function (phone, text) { var u = SL.wa(phone, text); if (!window.open(u, "_self")) location.href = u; };
 
   /* ————— عشوائي وبصمات ————— */
   var B32 = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
