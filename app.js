@@ -1265,48 +1265,68 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     }).join("") + "</ul>";
   }
 
-  /* ————— الطلاب ————— */
-  V.students = function (p, q) {
-    setTitle("الطلاب");
-    var S = A.S;
-    var schools = S.settings.schools;
-    main().innerHTML = '<div class="toolbar"><input id="st-q" type="search" placeholder="بحث بالاسم أو السجل المدني أو الجوال" value="' + e(q.q || "") + '">' +
-      (schools.length > 1 ? '<select id="st-sc"><option value="">كل المدارس</option>' + schools.map(function (s) { return '<option value="' + e(s.id) + '">' + e(s.name) + "</option>"; }).join("") + "</select>" : "") +
-      '<select id="st-stg"></select><select id="st-cl"></select></div><div id="st-list"></div>' +
-      '<div class="toolbar end"><button class="btn pri" id="st-stages" type="button">تحديد مراحل الطلاب</button><a class="btn" href="#import">استيراد من Excel</a><button class="btn" id="st-add" type="button">إضافة طالب</button></div>';
-    /* المرشحات مرتبطة: المرحلة تتبع المدرسة، والفصل يتبع المدرسة والمرحلة */
+  /* ————— مرشحات مرتبطة: المدرسة ← المرحلة ← الصف (تُستخدم في أكثر من شاشة) ————— */
+  function scopeHTML(id) {
+    var schools = A.S.settings.schools;
+    return (schools.length > 1 ? '<select id="' + id + '-sc"><option value="">كل المدارس</option>' + schools.map(function (s) { return '<option value="' + e(s.id) + '">' + e(s.name) + "</option>"; }).join("") + "</select>" : "") +
+      '<select id="' + id + '-stg"></select><select id="' + id + '-cl"></select>';
+  }
+  function scopeBind(id, onChange) {
+    var ORD = { "ابتدائي": 1, "متوسط": 2, "ثانوي": 3 };
+    function val(k) { var el = $("#" + id + "-" + k); return el ? el.value : ""; }
     function fill(el, all, opts, keep) {
       var v = opts.indexOf(keep) >= 0 ? keep : "";
-      el.innerHTML = '<option value="">' + all + "</option>" + opts.map(function (o) { return '<option' + (o === v ? " selected" : "") + ">" + e(o) + "</option>"; }).join("");
+      el.innerHTML = '<option value="">' + all + "</option>" + opts.map(function (o) { return "<option" + (o === v ? " selected" : "") + ">" + e(o) + "</option>"; }).join("");
       el.value = v; el.disabled = !opts.length;
       return v;
     }
     function sync() {
-      var sc = $("#st-sc") ? $("#st-sc").value : "";
-      var inSc = S.students.filter(function (s) { return !sc || s.school === sc; });
+      var sc = val("sc"), inSc = A.S.students.filter(function (s) { return !sc || s.school === sc; });
       var st = {}; inSc.forEach(function (s) { st[A.stageText(s)] = 1; });
-      var sg = fill($("#st-stg"), "كل المراحل", ["ابتدائي", "متوسط", "ثانوي"].filter(function (x) { return st[x]; }), $("#st-stg").value);
-      var cls = {}, ord = { "ابتدائي": 1, "متوسط": 2, "ثانوي": 3 };
-      inSc.forEach(function (s) { if (!sg || A.stageText(s) === sg) cls[A.classKey(s)] = (ord[A.stageText(s)] || 9) * 100 + A.gradeNum(String(A.classKey(s)).split(" / ")[0]); });
-      fill($("#st-cl"), "كل الفصول", Object.keys(cls).sort(function (a, b) {
-        return (cls[a] - cls[b]) || a.localeCompare(b, "ar");
-      }), $("#st-cl").value);
+      var sg = fill($("#" + id + "-stg"), "كل المراحل", ["ابتدائي", "متوسط", "ثانوي"].filter(function (x) { return st[x]; }), val("stg"));
+      var cls = {};
+      inSc.forEach(function (s) { if (!sg || A.stageText(s) === sg) cls[A.classKey(s)] = (ORD[A.stageText(s)] || 9) * 100 + A.gradeNum(String(A.classKey(s)).split(" / ")[0]); });
+      fill($("#" + id + "-cl"), "كل الفصول", Object.keys(cls).sort(function (a, b) { return (cls[a] - cls[b]) || a.localeCompare(b, "ar"); }), val("cl"));
     }
+    ["sc", "stg"].forEach(function (k) { var el = $("#" + id + "-" + k); if (el) el.addEventListener("input", function () { sync(); onChange(); }); });
+    var c = $("#" + id + "-cl"); if (c) c.addEventListener("input", onChange);
+    sync();
+    return function (s) {
+      var sc = val("sc"), sg = val("stg"), cl = val("cl");
+      return (!sc || s.school === sc) && (!sg || A.stageText(s) === sg) && (!cl || A.classKey(s) === cl);
+    };
+  }
+  function byClassName(a, b) { return A.classKey(a).localeCompare(A.classKey(b), "ar") || a.name.localeCompare(b.name, "ar"); }
+  /* ضبط المرشحات على مدرسة الطالب ومرحلته وفصله */
+  function scopeSet(id, s) {
+    [["sc", s.school], ["stg", A.stageText(s)], ["cl", A.classKey(s)]].forEach(function (kv) {
+      var el = $("#" + id + "-" + kv[0]); if (!el) return;
+      el.value = kv[1] || ""; el.dispatchEvent(new Event("input"));
+    });
+  }
+
+  /* ————— الطلاب ————— */
+  V.students = function (p, q) {
+    setTitle("الطلاب");
+    var S = A.S;
+    main().innerHTML = '<div class="toolbar"><input id="st-q" type="search" placeholder="بحث بالاسم أو السجل المدني أو الجوال" value="' + e(q.q || "") + '">' +
+      scopeHTML("st") + '</div><div id="st-list"></div>' +
+      '<div class="toolbar end"><button class="btn pri" id="st-stages" type="button">تحديد مراحل الطلاب</button><a class="btn" href="#import">استيراد من Excel</a><button class="btn" id="st-add" type="button">إضافة طالب</button></div>';
     function draw() {
-      var qq = A.norm($("#st-q").value), sc = $("#st-sc") ? $("#st-sc").value : "", cl = $("#st-cl").value, sg = $("#st-stg").value;
+      var qq = A.norm($("#st-q").value);
       var list = S.students.filter(function (s) {
-        if (sc && s.school !== sc) return false; if (cl && A.classKey(s) !== cl) return false; if (sg && A.stageText(s) !== sg) return false;
+        if (!inScope(s)) return false;
         if (!qq) return true; return A.norm(s.name).indexOf(qq) >= 0 || String(s.sid || "").indexOf(qq) >= 0 || SL.normPhone(s.parentPhone).indexOf(SL.normPhone(qq) || "@") >= 0;
-      }).sort(function (a, b) { return A.classKey(a).localeCompare(A.classKey(b), "ar") || a.name.localeCompare(b.name, "ar"); });
+      }).sort(byClassName);
       $("#st-list").innerHTML = list.length ? '<p class="mut">' + list.length + ' طالب</p><ul class="list">' + list.slice(0, 400).map(function (s) {
         return '<li><a href="#student/' + s.id + '">' + A.scoreChip(s) + " " + stuLine(s) + (SL.validPhone(s.parentPhone) ? "" : ' <span class="chip warnc">بلا جوال</span>') + "</a></li>";
       }).join("") + "</ul>" : empty(S.students.length ? "لا نتائج." : "لا يوجد طلاب بعد.", '<a class="btn pri" href="#import">استيراد من Excel</a>');
     }
-    ["#st-q", "#st-cl"].forEach(function (s) { var el = $(s); if (el) el.addEventListener("input", draw); });
-    ["#st-sc", "#st-stg"].forEach(function (s) { var el = $(s); if (el) el.addEventListener("input", function () { sync(); draw(); }); });
+    var inScope = scopeBind("st", draw);
+    $("#st-q").addEventListener("input", draw);
     $("#st-stages").onclick = stagesTool;
     $("#st-add").onclick = function () { editStudent(null); };
-    sync(); draw();
+    draw();
   };
 
   /* تحديد مرحلة الطلاب حسب الفصل — تختلف المواد والإجراءات بين الابتدائي (6–9) والمتوسط/الثانوي (10–14) */
@@ -1436,11 +1456,15 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   V["new"] = function (p, q) {
     setTitle("رصد مخالفة");
     if (!A.S.students.length) { main().innerHTML = empty("استورد الطلاب أولاً.", '<a class="btn pri" href="#import">استيراد</a>'); return; }
-    var stu = q.s ? A.byId[q.s] : null;
+    var sel = {}, shown = [], one = q.s ? A.byId[q.s] : null;
+    if (one) sel[one.id] = 1;
     var st = { art: null, item: null };
     var now = new Date(), local = new Date(now.getTime() - now.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
     var staffOpts = A.S.staff.slice().sort(function (a, b) { return a.name.localeCompare(b.name, "ar"); }).map(function (x) { return '<option value="' + e(x.id) + '">' + e(x.name) + " — " + e(ROLE[x.role] || "") + "</option>"; }).join("");
-    main().innerHTML = '<form class="form card" id="fn">' +
+    main().innerHTML = '<section class="card" id="fn-pick"><div class="toolbar"><input id="fn-s" type="search" placeholder="ابحث عن طالب بالاسم أو السجل المدني">' + scopeHTML("fn") + "</div>" +
+      '<div class="actions"><button class="btn" id="fn-all" type="button">تحديد المعروض</button><button class="btn" id="fn-none" type="button">إلغاء التحديد</button></div>' +
+      '<p id="fn-n" class="mut"></p><ul class="list" id="fn-l"></ul></section>' +
+      '<form class="form card" id="fn">' +
       '<div class="picked" id="fn-stu"></div>' +
       '<label>ابحث عن المخالفة<input id="fn-q" type="search" placeholder="مثال: التأخر، الهروب، الجوال، التصوير…"></label>' +
       '<div class="degtabs" id="fn-deg"></div><div id="fn-items" class="items"></div>' +
@@ -1451,12 +1475,31 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       '<label>الراصد<select name="by"><option value="">— وكيل شؤون الطلبة —</option>' + staffOpts + "</select></label>" +
       '<div class="actions"><button class="btn pri big" type="submit">حفظ واعتماد الإجراء</button></div></form>';
     var degSel = 0;
+    function picked() { return A.S.students.filter(function (s) { return sel[s.id]; }); }
+    function stages(l) { var o = {}; l.forEach(function (s) { o[A.stageText(s)] = 1; }); return Object.keys(o); }
+    function drawList() {
+      var qq = A.norm($("#fn-s").value);
+      shown = A.S.students.filter(function (s) {
+        if (!inScope(s)) return false;
+        return !qq || A.norm(s.name).indexOf(qq) >= 0 || String(s.sid || "").indexOf(qq) >= 0;
+      }).sort(byClassName);
+      $("#fn-l").innerHTML = shown.slice(0, 300).map(function (s) {
+        return '<li class="frow selrow' + (sel[s.id] ? " on" : "") + '"><label class="sel"><input type="checkbox" data-pick="' + e(s.id) + '"' + (sel[s.id] ? " checked" : "") + "><span>" + A.scoreChip(s) + " " + stuLine(s) + "</span></label></li>";
+      }).join("") || '<li class="mut">لا طلاب ضمن هذه التصفية.</li>';
+      $$("#fn-l [data-pick]").forEach(function (b) {
+        b.onchange = function () { if (b.checked) sel[b.dataset.pick] = 1; else delete sel[b.dataset.pick]; drawStu(); drawItems(); drawPlan(); drawList(); };
+      });
+      $("#fn-n").innerHTML = shown.length + " طالباً معروضاً" + (shown.length > 300 ? " (يُعرض أول ٣٠٠)" : "") + " · <b>" + picked().length + "</b> محدَّد.";
+    }
     function drawStu() {
-      $("#fn-stu").innerHTML = stu ? '<div class="stu-mini">' + A.scoreChip(stu) + " <b>" + e(stu.name) + '</b> <small class="mut">' + e(A.classKey(stu)) + '</small> <button class="link" type="button" id="fn-chg">تغيير</button></div>'
-        : '<button class="btn pri big" type="button" id="fn-pick">اختر الطالب</button>';
-      var b = $("#fn-pick") || $("#fn-chg"); b.onclick = function () { pickStudent(function (s) { stu = s; drawStu(); drawItems(); drawPlan(); }); };
+      var l = picked(), sg = stages(l);
+      $("#fn-stu").innerHTML = !l.length ? '<p class="mut">حدّد طالباً أو أكثر من القائمة أعلاه.</p>'
+        : l.length === 1 ? '<div class="stu-mini">' + A.scoreChip(l[0]) + " <b>" + e(l[0].name) + '</b> <small class="mut">' + e(A.classKey(l[0])) + "</small></div>"
+        : '<div class="stu-mini"><b>رصد جماعي لـ ' + l.length + " طالباً</b> <small class=\"mut\">" + e(l.slice(0, 3).map(function (s) { return s.name; }).join("، ")) + (l.length > 3 ? " و" + (l.length - 3) + " غيرهم" : "") + "</small></div>" +
+          (sg.length > 1 ? '<p class="alert warn sm">التحديد يشمل مراحل مختلفة (' + e(sg.join("، ")) + ") — الإجراءات تختلف بين المراحل، اختر مرحلة واحدة." : "");
     }
     function drawItems() {
+      var l = picked(), stu = l[0];
       var arts = R.articlesFor(stu ? A.stageOf(stu) : R.stageOf(A.school().stage));
       var degs = []; arts.forEach(function (a) { if (degs.indexOf(a.degree) < 0) degs.push(a.degree); }); degs.sort();
       $("#fn-deg").innerHTML = '<button type="button" data-d="0" class="' + (degSel === 0 ? "on" : "") + '">الكل</button>' + degs.map(function (d) { return '<button type="button" data-d="' + d + '" class="d' + d + (degSel === d ? " on" : "") + '">' + R.DEGREE_NAME[d] + "</button>"; }).join("");
@@ -1473,24 +1516,37 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       $$("#fn-items input").forEach(function (r) { r.onchange = function () { var z = r.value.split(":"); st.art = +z[0]; st.item = +z[1]; $$("#fn-items .item").forEach(function (l) { l.classList.toggle("on", l.contains(r)); }); drawPlan(); }; });
     }
     function drawPlan() {
-      var box = $("#fn-plan");
-      if (!stu || st.art == null) { box.innerHTML = ""; return; }
-      box.innerHTML = planCard(A.plan(stu, st.art, st.item, $("[name=date]").value));
+      var box = $("#fn-plan"), l = picked();
+      if (!l.length || st.art == null) { box.innerHTML = ""; return; }
+      box.innerHTML = (l.length > 1 ? '<p class="mut">الإجراء يُحسب لكل طالب حسب تكراره — المعروض أدناه للطالب «' + e(l[0].name) + "».</p>" : "") +
+        planCard(A.plan(l[0], st.art, st.item, $("[name=date]").value));
     }
+    function refresh() { drawStu(); drawItems(); drawPlan(); drawList(); }
+    var inScope = scopeBind("fn", function () { drawList(); drawStu(); drawItems(); drawPlan(); });
+    if (one) scopeSet("fn", one);
+    $("#fn-s").addEventListener("input", drawList);
+    $("#fn-all").onclick = function () { shown.slice(0, 300).forEach(function (s) { sel[s.id] = 1; }); refresh(); };
+    $("#fn-none").onclick = function () { sel = {}; refresh(); };
     $("#fn-q").addEventListener("input", drawItems);
     $("[name=date]").addEventListener("change", drawPlan);
-    drawStu(); drawItems();
+    refresh();
     $("#fn").onsubmit = async function (ev) {
       ev.preventDefault();
-      if (!stu) return A.toast("اختر الطالب", "err");
+      var l = picked();
+      if (!l.length) return A.toast("حدّد طالباً أو أكثر", "err");
       if (st.art == null) return A.toast("اختر المخالفة", "err");
-      var f = new FormData(this), pl = A.plan(stu, st.art, st.item, f.get("date"));
-      var by = A.byId[f.get("by")];
-      var inc = { id: "I" + SL.rid(10), t: "inc", stu: stu.id, art: st.art, item: st.item, itemText: pl.art.items[st.item], degree: pl.art.degree,
-        stepIdx: pl.stepIdx, prior: pl.prior, deduct: pl.deduct, date: new Date(f.get("date")).toISOString(), period: f.get("period"), place: f.get("place"), desc: f.get("desc"),
-        by: by ? by.id : "", byName: by ? by.name : A.staffName("deputy", stu.school), status: "open", done: {}, createdAt: Date.now(), approvedAt: Date.now(), src: "app" };
-      await A.save(inc); A.log("رصد مخالفة: " + stu.name + " — " + inc.itemText, inc.id);
-      A.toast("تم الحفظ — " + pl.step.title); A.go("inc/" + inc.id);
+      if (stages(l).length > 1) return A.toast("التحديد يشمل مراحل مختلفة — اختر مرحلة واحدة", "err");
+      var f = new FormData(this), by = A.byId[f.get("by")], last = null, when = new Date(f.get("date")).toISOString();
+      for (var i = 0; i < l.length; i++) {
+        var s = l[i], pl = A.plan(s, st.art, st.item, f.get("date"));
+        var inc = { id: "I" + SL.rid(10), t: "inc", stu: s.id, art: st.art, item: st.item, itemText: pl.art.items[st.item], degree: pl.art.degree,
+          stepIdx: pl.stepIdx, prior: pl.prior, deduct: pl.deduct, date: when, period: f.get("period"), place: f.get("place"), desc: f.get("desc"),
+          by: by ? by.id : "", byName: by ? by.name : A.staffName("deputy", s.school), status: "open", done: {}, createdAt: Date.now(), approvedAt: Date.now(), src: "app" };
+        await A.save(inc); A.log("رصد مخالفة: " + s.name + " — " + inc.itemText, inc.id);
+        last = { inc: inc, pl: pl };
+      }
+      if (l.length === 1) { A.toast("تم الحفظ — " + last.pl.step.title); return A.go("inc/" + last.inc.id); }
+      A.toast("تم رصد المخالفة لـ " + l.length + " طلاب"); A.go("incidents");
     };
   };
 
@@ -1778,17 +1834,43 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   /* ————— الالتزام المدرسي بالجملة ————— */
   V.commit = function () {
     setTitle("الالتزام المدرسي");
-    var l = A.S.students.slice().sort(function (a, b) { return A.classKey(a).localeCompare(A.classKey(b), "ar") || a.name.localeCompare(b.name, "ar"); });
-    var signed = l.filter(function (s) { return A.sigFor(s.id, "F1", "parent"); }).length;
-    main().innerHTML = '<section class="card"><p>يؤخذ توقيع الطالب وولي الأمر على نموذج الالتزام المدرسي في بداية العام الدراسي. اضغط «إرسال» لكل ولي أمر، أو استخدم «التالي» للتنقل السريع.</p>' +
-      '<p><b>' + signed + "</b> من " + l.length + ' وقّعوا.</p><div class="actions"><button class="btn wa" id="cm-next" type="button">إرسال للتالي غير الموقّع</button></div></section><ul class="list" id="cm-l">' +
-      l.map(function (s) { var g = A.sigFor(s.id, "F1", "parent"), pd = A.pendingFor(s.id, "F1", "parent");
-        return '<li class="frow"><div class="row1">' + stuLine(s) + '</div><div class="row3">' + (g ? '<span class="chip ok">وقّع</span>' : pd ? '<span class="chip pend">أُرسل</span>' : SL.validPhone(s.parentPhone) ? '<button class="btn sm wa" type="button" data-sign-send="stu|' + s.id + '|F1">إرسال</button>' : '<span class="chip warnc">بلا جوال</span>') + "</div></li>"; }).join("") + "</ul>";
-    bindFormRows();
-    $("#cm-next").onclick = function () {
-      var n = l.find(function (s) { return SL.validPhone(s.parentPhone) && !A.sigFor(s.id, "F1", "parent") && !A.pendingFor(s.id, "F1", "parent"); });
-      if (!n) return A.toast("أُرسل للجميع"); A.sendSign("stu", n.id, "F1");
+    var SEL = "samt_commit_sel", sel = {}, shown = [];
+    try { sel = JSON.parse(localStorage.getItem(SEL) || "{}") || {}; } catch (er) { sel = {}; }
+    function keep() { try { localStorage.setItem(SEL, JSON.stringify(sel)); } catch (er) {} }
+    function can(s) { return SL.validPhone(s.parentPhone) && !A.sigFor(s.id, "F1", "parent"); } /* يُرسل له: لديه جوال ولم يوقّع */
+    function picked() { return shown.filter(function (s) { return sel[s.id] && can(s); }); }
+    main().innerHTML = '<section class="card"><p>يؤخذ توقيع الطالب وولي الأمر على نموذج الالتزام المدرسي في بداية العام الدراسي. رشّح المدرسة والمرحلة والصف، حدّد الطلاب، ثم اضغط «إرسال». يُفتح واتساب لولي أمر واحد في كل مرة — ارجع للمنصة واضغط «إرسال» للتالي.</p>' +
+      '<div class="toolbar">' + scopeHTML("cm") + '</div>' +
+      '<p id="cm-n"></p>' +
+      '<div class="actions"><button class="btn wa" id="cm-send" type="button">' + SLI("whatsapp") + ' إرسال</button>' +
+      '<button class="btn" id="cm-all" type="button">تحديد المعروض</button>' +
+      '<button class="btn" id="cm-none" type="button">إلغاء التحديد</button></div></section><ul class="list" id="cm-l"></ul>';
+    function draw() {
+      shown = A.S.students.filter(inScope).sort(byClassName);
+      var signed = shown.filter(function (s) { return A.sigFor(s.id, "F1", "parent"); }).length, n = picked().length;
+      $("#cm-n").innerHTML = "<b>" + signed + "</b> من " + shown.length + " وقّعوا" + (n ? ' · <b>' + n + "</b> محدَّد للإرسال" : "") + ".";
+      $("#cm-send").disabled = !n;
+      $("#cm-send").innerHTML = SLI("whatsapp") + " إرسال" + (n ? " (" + n + ")" : "");
+      $("#cm-l").innerHTML = shown.length ? shown.map(function (s) {
+        var g = A.sigFor(s.id, "F1", "parent"), pd = A.pendingFor(s.id, "F1", "parent"), ok = can(s);
+        return '<li class="frow selrow' + (ok && sel[s.id] ? " on" : "") + '"><label class="sel"><input type="checkbox" data-pick="' + e(s.id) + '"' + (ok && sel[s.id] ? " checked" : "") + (ok ? "" : " disabled") + '><span>' + stuLine(s) + "</span></label>" +
+          '<div class="row3">' + (g ? '<span class="chip ok">وقّع</span>' : pd ? '<span class="chip pend">أُرسل</span>' : SL.validPhone(s.parentPhone) ? "" : '<span class="chip warnc">بلا جوال</span>') + "</div></li>";
+      }).join("") : "<li>" + empty("لا طلاب ضمن هذا التصفية.") + "</li>";
+      $$("[data-pick]").forEach(function (b) {
+        b.onchange = function () { sel[b.dataset.pick] = b.checked; if (!b.checked) delete sel[b.dataset.pick]; keep(); draw(); };
+      });
+    }
+    var inScope = scopeBind("cm", draw);
+    $("#cm-all").onclick = function () { shown.forEach(function (s) { if (can(s)) sel[s.id] = 1; }); keep(); draw(); };
+    $("#cm-none").onclick = function () { shown.forEach(function (s) { delete sel[s.id]; }); keep(); draw(); };
+    $("#cm-send").onclick = function () {
+      var q = picked();
+      if (!q.length) return A.toast("حدّد طالباً واحداً على الأقل", "err");
+      var n = q[0]; delete sel[n.id]; keep();
+      if (q.length > 1) A.toast("بقي " + (q.length - 1) + " بعد هذا — ارجع واضغط «إرسال»");
+      A.sendSign("stu", n.id, "F1");
     };
+    draw();
   };
 })();
 
@@ -1806,28 +1888,46 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var order = ["principal", "deputy", "deputyEdu", "counselor", "activity", "admin", "teacher"];
     var l = A.S.staff.slice().sort(function (a, b) { return order.indexOf(a.role) - order.indexOf(b.role) || a.name.localeCompare(b.name, "ar"); });
     var missing = ["principal", "deputy", "counselor"].filter(function (r) { return !A.S.staff.some(function (x) { return x.role === r; }); });
+    var SEL = "samt_staff_sel", sel = {};
+    try { sel = JSON.parse(localStorage.getItem(SEL) || "{}") || {}; } catch (er) { sel = {}; }
+    function keep() { try { localStorage.setItem(SEL, JSON.stringify(sel)); } catch (er) {} }
+    function can(x) { return SL.validPhone(x.phone) && x.role !== "principal"; } /* رابط الرصد: لكل من لديه جوال عدا مدير المدرسة */
+    function picked() { return l.filter(function (x) { return sel[x.id] && can(x); }); }
     main().innerHTML = (missing.length ? '<div class="alert warn">لم يُحدد بعد: ' + missing.map(function (r) { return ROLE[r]; }).join("، ") + " — تظهر أسماؤهم في النماذج.</div>" : "") +
       '<div class="toolbar"><button class="btn pri" id="sf-add" type="button">إضافة</button><a class="btn" href="#import">استيراد من Excel</a>' +
-      '<button class="btn wa" id="sf-links" type="button">إرسال روابط الرصد للمعلمين</button></div>' +
-      (l.length ? '<ul class="list">' + l.map(function (x) {
-        return '<li class="frow"><div class="row1"><b>' + e(x.name) + '</b> <span class="chip">' + e(ROLE[x.role] || x.role) + "</span>" + (x.subject ? ' <small class="mut">' + e(x.subject) + "</small>" : "") + "</div>" +
-          '<div class="row3">' + (SL.validPhone(x.phone) ? '<span dir="ltr">' + e(SL.showPhone(x.phone)) + "</span>" : '<span class="chip warnc">بلا جوال</span>') + (x.classes ? ' <small class="mut">الفصول: ' + e(x.classes) + "</small>" : "") + "</div>" +
-          '<div class="actions wrap"><button class="btn sm" type="button" data-ed="' + x.id + '">تعديل</button>' +
-          (SL.validPhone(x.phone) ? '<button class="btn sm wa" type="button" data-link="' + x.id + '">' + (x.role === "counselor" ? "رابط الموجه" : "رابط الرصد") + '</button><button class="btn sm" type="button" data-msg="' + x.id + '">رسالة</button>' : "") + "</div></li>";
-      }).join("") + "</ul>" : '<div class="empty"><p>لا توجد بيانات.</p></div>');
+      '<button class="btn wa" id="sf-send" type="button">إرسال روابط الرصد</button>' +
+      '<button class="btn" id="sf-all" type="button">تحديد الكل</button><button class="btn" id="sf-none" type="button">إلغاء التحديد</button></div>' +
+      '<p class="mut" id="sf-n"></p><div id="sf-l"></div>';
+    function draw() {
+      var n = picked().length;
+      $("#sf-n").innerHTML = l.length + " منسوباً" + (n ? " · <b>" + n + "</b> محدَّد لإرسال رابط الرصد" : "") + ".";
+      $("#sf-send").disabled = !n;
+      $("#sf-send").innerHTML = SLI("whatsapp") + " إرسال روابط الرصد" + (n ? " (" + n + ")" : "");
+      $("#sf-l").innerHTML = l.length ? '<ul class="list">' + l.map(function (x) {
+        var ok = can(x);
+        return '<li class="frow selrow' + (ok && sel[x.id] ? " on" : "") + '"><label class="sel"><input type="checkbox" data-pick="' + e(x.id) + '"' + (ok && sel[x.id] ? " checked" : "") + (ok ? "" : " disabled") + ">" +
+          '<span class="row1"><b>' + e(x.name) + '</b> <span class="chip">' + e(ROLE[x.role] || x.role) + "</span>" +
+          (x.subject ? ' <small class="mut">' + e(x.subject) + "</small>" : "") +
+          (x.classes ? ' <small class="mut">' + e(x.classes) + "</small>" : "") +
+          (SL.validPhone(x.phone) ? ' <small class="mut" dir="ltr">' + e(SL.showPhone(x.phone)) + "</small>" : ' <span class="chip warnc">بلا جوال</span>') + "</span></label>" +
+          '<div class="row3"><button class="btn sm" type="button" data-ed="' + x.id + '">تعديل</button>' +
+          (SL.validPhone(x.phone) ? '<button class="btn sm" type="button" data-msg="' + x.id + '">رسالة</button>' : "") + "</div></li>";
+      }).join("") + "</ul>" : '<div class="empty"><p>لا توجد بيانات.</p></div>';
+      $$("[data-ed]").forEach(function (b) { b.onclick = function () { editStaff(A.byId[b.dataset.ed]); }; });
+      $$("[data-msg]").forEach(function (b) { b.onclick = function () { var x = A.byId[b.dataset.msg]; SL.openWa(x.phone, "الأستاذ " + x.name + "\n"); }; });
+      $$("[data-pick]").forEach(function (b) { b.onchange = function () { if (b.checked) sel[b.dataset.pick] = 1; else delete sel[b.dataset.pick]; keep(); draw(); }; });
+    }
     $("#sf-add").onclick = function () { editStaff(null); };
-    $$("[data-ed]").forEach(function (b) { b.onclick = function () { editStaff(A.byId[b.dataset.ed]); }; });
-    $$("[data-link]").forEach(function (b) { b.onclick = function () { A.sendTeacherLink(A.byId[b.dataset.link]); }; });
-    $$("[data-msg]").forEach(function (b) { b.onclick = function () { var x = A.byId[b.dataset.msg]; SL.openWa(x.phone, "الأستاذ " + x.name + "\n"); }; });
-    $("#sf-links").onclick = function () {
-      var ts = A.S.staff.filter(function (x) { return SL.validPhone(x.phone) && x.role !== "principal"; });
-      if (!ts.length) return A.toast("لا يوجد منسوبون بأرقام جوال", "err");
-      var i = 0;
-      var sh = A.sheet("إرسال روابط الرصد", '<p>سيُفتح واتساب لكل منسوب على حدة. بعد الإرسال ارجع هنا واضغط «التالي».</p><p id="tl-n"></p><div class="actions"><button class="btn wa" id="tl-go" type="button">إرسال</button></div>');
-      function upd() { $("#tl-n", sh.body).textContent = i < ts.length ? (i + 1) + " من " + ts.length + ": " + ts[i].name : "تم الإرسال للجميع."; $("#tl-go", sh.body).textContent = i < ts.length ? (i ? "التالي" : "إرسال") : "إغلاق"; }
-      $("#tl-go", sh.body).onclick = function () { if (i >= ts.length) return sh.close(); A.sendTeacherLink(ts[i]); i++; upd(); };
-      upd();
+    $("#sf-all").onclick = function () { l.forEach(function (x) { if (can(x)) sel[x.id] = 1; }); keep(); draw(); };
+    $("#sf-none").onclick = function () { l.forEach(function (x) { delete sel[x.id]; }); keep(); draw(); };
+    $("#sf-send").onclick = function () {
+      var q = picked();
+      if (!q.length) return A.toast("حدّد منسوباً واحداً على الأقل", "err");
+      var x = q[0]; delete sel[x.id]; keep();
+      if (q.length > 1) A.toast("بقي " + (q.length - 1) + " بعد هذا — ارجع واضغط «إرسال»");
+      A.sendTeacherLink(x);
     };
+    draw();
   };
   function editStaff(x) {
     var s = x || { role: "teacher", school: (A.S.settings.schools[0] || {}).id };

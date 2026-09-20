@@ -270,6 +270,14 @@ button.tile { font: inherit; text-align: right; cursor: pointer; }
 .list > li > a:hover, .list .pick:hover { background: var(--bg-2); }
 .list > li > a, .list > li > .pick { border-radius: 14px; padding-inline: 12px !important; transition: background .15s, transform .15s; }
 .list > li > a:hover { transform: translateX(-2px); }
+/* صفوف قابلة للتحديد (الالتزام المدرسي) */
+.list > li.frow.selrow { display: flex; align-items: center; gap: 10px; justify-content: space-between; padding-inline: 10px; }
+.selrow .sel { display: flex; align-items: center; gap: 10px; margin: 0; cursor: pointer; flex: 1; min-width: 0; }
+.selrow .sel input { width: 22px; height: 22px; min-height: 0; flex: none; margin: 0; accent-color: var(--pri); }
+.selrow .sel input:disabled { opacity: .4; cursor: default; }
+.selrow .sel > span { min-width: 0; }
+.selrow > .row3 { flex: none; }
+.selrow.on { background: var(--pri-soft); border-radius: 14px; }
 main > .list, main > #st-list > .list, main > #inc-list > .list { background: #fff; border: 1px solid var(--line); border-radius: var(--r); padding: 8px; box-shadow: var(--sh); }
 .row1 { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .row1 b { color: var(--navy); }
