@@ -23,3 +23,9 @@ body:has(.pub) { background: linear-gradient(180deg, var(--navy) 0, #0e4447 150p
 .sent { list-style: none; padding: 0; font-size: .88rem; color: var(--mut); }
 .sent li { border-bottom: 1px dashed var(--line); padding: 4px 0; }
 .hint { background: var(--pri-soft); border-radius: 10px; padding: 8px 10px; font-size: .9rem; margin: 8px 0; }
+.sres { display: flex; flex-direction: column; gap: 4px; margin: -4px 0 10px; padding: 6px; border: 1px solid var(--line); border-radius: 14px; background: #fff; box-shadow: var(--sh); }
+.sres button { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 12px; border: 0; border-radius: 10px; background: none; cursor: pointer; text-align: right; }
+.sres button:hover { background: var(--bg-2); }
+.sres small { color: var(--mut); font-size: .8rem; }
+.sres p { margin: 6px; }
+.sres[hidden] { display: none; }

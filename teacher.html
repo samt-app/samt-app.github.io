@@ -37,18 +37,32 @@
     var classes = Object.keys(P.cls || {}).sort(function (a, b) { return a.localeCompare(b, "ar"); });
     var now = new Date(), local = new Date(now.getTime() - now.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
     var sent = sentList();
-    app.innerHTML = '<div class="pub-h"><div class="logo">س</div><div><b>رصد مشكلة سلوكية</b><small>' + e(P.name) + " — " + e(P.school) + "</small></div></div>" +
-      '<div class="card"><div class="grid2"><label>الفصل<select id="cl"><option value="">اختر</option>' + classes.map(function (c) { return "<option>" + e(c) + "</option>"; }).join("") + '</select></label>' +
+    var isC = P.role === "counselor", to = isC ? "إدارة المدرسة للاعتماد" : "وكيل شؤون الطلبة";
+    app.innerHTML = '<div class="pub-h"><div class="logo">س</div><div><b>' + (isC ? "رصد الموجه الطلابي" : "رصد مشكلة سلوكية") + "</b><small>" + e(P.name) + " — " + e(P.school) + "</small></div></div>" +
+      '<div class="card">' + (isC ? '<label>ابحث عن الطالب بالاسم<input id="sq" type="search" autocomplete="off" placeholder="اكتب جزءاً من اسم الطالب…"></label><div id="sr" class="sres" hidden></div>' : "") + '<div class="grid2"><label>الفصل<select id="cl"><option value="">اختر</option>' + classes.map(function (c) { return "<option>" + e(c) + "</option>"; }).join("") + '</select></label>' +
       '<label>الطالب<select id="st" disabled><option value="">—</option></select></label></div>' +
       '<label>ابحث عن المشكلة<input id="q" type="search" placeholder="مثال: التأخر، الجوال، الهروب…"></label><div class="degtabs" id="dg"></div><div class="items" id="its"></div>' +
       '<div class="hint" id="hint" hidden></div>' +
       '<div class="grid2"><label>التاريخ والوقت<input id="dt" type="datetime-local" value="' + local + '"></label><label>الحصة<input id="pr" placeholder="مثال: الثالثة"></label></div>' +
       '<label>المكان<input id="pl" placeholder="الفصل، الساحة…"></label><label>وصف مختصر<textarea id="ds" rows="3"></textarea></label>' +
-      '<p id="msg" class="lock-msg err"></p><button class="btn pri big" id="go" type="button">إرسال لوكيل شؤون الطلبة</button></div>' +
+      '<p id="msg" class="lock-msg err"></p><button class="btn pri big" id="go" type="button">إرسال إلى ' + to + '</button></div>' +
       (sent.length ? '<div class="card"><h3>آخر ما أرسلته</h3><ul class="sent">' + sent.slice(0, 15).map(function (s) { return "<li>" + e(s) + "</li>"; }).join("") + "</ul></div>" : "") +
       '<p class="note center">لا تُحفظ بيانات الرصد على هذا الجوال؛ تُرسل مشفرة إلى جهاز المدرسة مباشرة.</p>';
     var sel = { art: null, item: null }, deg = 0;
     var cl = document.getElementById("cl"), st = document.getElementById("st");
+    var sq = document.getElementById("sq");
+    if (sq) {
+      var all = []; classes.forEach(function (c) { (P.cls[c] || []).forEach(function (n) { all.push([n, c]); }); });
+      sq.oninput = function () {
+        var q = norm(sq.value), box = document.getElementById("sr");
+        var hits = q ? all.filter(function (x) { return norm(x[0]).indexOf(q) >= 0; }).slice(0, 8) : [];
+        box.hidden = !q;
+        box.innerHTML = hits.length ? hits.map(function (x, i) { return '<button type="button" data-i="' + i + '"><b>' + e(x[0]) + "</b><small>" + e(x[1]) + "</small></button>"; }).join("") : '<p class="mut">لا يوجد طالب بهذا الاسم.</p>';
+        Array.prototype.forEach.call(box.querySelectorAll("button"), function (b) {
+          b.onclick = function () { var x = hits[+b.dataset.i]; cl.value = x[1]; cl.onchange(); st.value = x[0]; sq.value = ""; box.hidden = true; };
+        });
+      };
+    }
     cl.onchange = function () {
       var l = (P.cls[cl.value] || []);
       st.innerHTML = '<option value="">اختر الطالب</option>' + l.map(function (n) { return "<option>" + e(n) + "</option>"; }).join(""); st.disabled = !l.length; sel = { art: null, item: null }; items();
@@ -71,7 +85,7 @@
           var z = r.value.split(":"); sel.art = +z[0]; sel.item = +z[1];
           Array.prototype.forEach.call(document.querySelectorAll("#its .item"), function (l) { l.classList.toggle("on", l.contains(r)); });
           var a = R.articleById(sel.art), hint = document.getElementById("hint");
-          hint.hidden = false;
+          hint.hidden = isC;
           hint.textContent = a.degree === 1 ? "مشكلات الدرجة الأولى: يباشر المعلم التنبيه الشفهي الأول والثاني وملاحظة الطالب، ثم يرصد المشكلة إن تكررت ويحيلها لإدارة المدرسة (دور المعلم 9)." :
             "مشكلات الدرجة " + R.DEGREE_NAME[a.degree] + ": يرصدها المعلم ويسلّمها لإدارة المدرسة التي تحدد الإجراء وفق التكرار (دور المعلم 10).";
         };
@@ -93,7 +107,7 @@
         try { localStorage.setItem("samt_sent_" + P.tid, JSON.stringify(l.slice(0, 30))); } catch (err) {}
         sel = { art: null, item: null };
         form();
-        var ok = document.createElement("p"); ok.className = "alert ok"; ok.textContent = "✓ تم الإرسال لوكيل شؤون الطلبة."; app.insertBefore(ok, app.children[1]);
+        var ok = document.createElement("p"); ok.className = "alert ok"; ok.textContent = "✓ تم الإرسال إلى " + (P.role === "counselor" ? "إدارة المدرسة — يُعتمد من جهاز المدرسة." : "وكيل شؤون الطلبة."); app.insertBefore(ok, app.children[1]);
       } catch (err) { b.disabled = false; b.textContent = "إعادة المحاولة"; m.textContent = "تعذّر الإرسال — تحقق من الإنترنت ثم أعد المحاولة."; }
     };
   }

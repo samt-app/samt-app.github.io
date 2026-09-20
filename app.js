@@ -870,6 +870,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         sign: "المكرم ولي أمر الطالب {الطالب}\nالسلام عليكم ورحمة الله وبركاته\nنأمل التكرم بالاطلاع على «{النموذج}» والتوقيع عليه عبر الرابط التالي:\n{الرابط}\nللتحقق يُطلب آخر 4 أرقام من السجل المدني للطالب، والرابط صالح {المدة} ساعة.\n{المدرسة}",
         notify: "المكرم ولي أمر الطالب {الطالب}\nالسلام عليكم ورحمة الله وبركاته\nنفيدكم بوجود ملاحظة سلوكية تخص ابنكم، نأمل التواصل مع وكيل شؤون الطلبة أو مراجعة المدرسة.\n{المدرسة}",
         absence: "المكرم ولي أمر الطالب {الطالب}\nالسلام عليكم ورحمة الله وبركاته\nنفيدكم بأن غياب ابنكم {النوع} بلغ {العدد} أيام، ونأمل مراجعة المدرسة لمقابلة الموجه الطلابي وفق قواعد السلوك والمواظبة.\n{المدرسة}",
+        counselorLink: "الأستاذ {المعلم} — الموجه الطلابي\nالسلام عليكم ورحمة الله وبركاته\nهذا رابط الرصد الخاص بك، ويشمل جميع طلاب المدرسة. ما ترصده يصل إلى جهاز المدرسة ويُعتمد من الإدارة:\n{الرابط}\n{المدرسة}",
         teacherLink: "الأستاذ {المعلم}\nالسلام عليكم ورحمة الله وبركاته\nهذا رابط رصد المشكلات السلوكية الخاص بك — يصل الرصد مباشرة إلى وكيل شؤون الطلبة:\n{الرابط}\n{المدرسة}",
         teacherDone: "الأستاذ {المعلم}\nتم اعتماد رصدك للطالب {الطالب} ({المشكلة}) واتخاذ: {الإجراء}.\nشكراً لتعاونك.\n{المدرسة}",
         referral: "المكرم الموجه الطلابي {الموجه}\nتمت إحالة الطالب {الطالب} ({الصف}) إليكم لدراسة حالته وفق قواعد السلوك والمواظبة. تفاصيل الإحالة لدى وكيل شؤون الطلبة.\n{المدرسة}"
@@ -1109,6 +1110,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   function fmtDate(d) { return SL.hijri(d) + ' <small class="mut">' + SL.greg(d) + "</small>"; }
   function statusChip(x) {
     var m = { reported: ["بلاغ معلم — بانتظار الاعتماد", "st-rep"], open: ["قيد المتابعة", "st-open"], closed: ["مغلقة", "st-closed"], void: ["ملغاة", "st-void"] }[x.status] || ["", ""];
+    if (x.status === "reported" && x.src === "counselor") m = ["بلاغ الموجه — بانتظار الاعتماد", "st-rep"];
     return '<span class="chip ' + m[1] + '">' + m[0] + "</span>";
   }
 
@@ -1183,7 +1185,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
 
     html += '<section class="card span2"><div class="c-h"><div><h3>آخر المخالفات</h3><small>تُحدَّث تلقائياً</small></div><a class="more" href="#incidents">عرض الكل ' + SLI("chevron") + "</a></div>" + (recent.length ? rowList(recent) : '<div class="empty-s">' + SLI("check") + "<p>لا توجد مخالفات مسجلة.</p></div>") + "</section>";
 
-    html += '<section class="card"><div class="c-h"><div><h3>بلاغات المعلمين</h3><small>' + (reported.length ? reported.length + " بانتظار الاعتماد" : "لا بلاغات جديدة") + "</small></div></div>" + (reported.length ? '<ul class="reps">' + reported.slice(0, 5).map(function (x) {
+    html += '<section class="card"><div class="c-h"><div><h3>بلاغات المعلمين والموجه</h3><small>' + (reported.length ? reported.length + " بانتظار الاعتماد" : "لا بلاغات جديدة") + "</small></div></div>" + (reported.length ? '<ul class="reps">' + reported.slice(0, 5).map(function (x) {
       var st = A.byId[x.stu] || { name: x.stuName || "؟" };
       return '<li><a href="#inc/' + x.id + '"><span class="av sm">' + e((x.byName || "م").trim().charAt(0)) + "</span><span><b>" + e(x.byName || "معلم") + " ← " + e(st.name) + "</b><small>" + e(x.itemText) + '</small></span><span class="go">' + SLI("chevron") + "</span></a></li>";
     }).join("") + "</ul>" : '<div class="empty-s">' + SLI("inbox") + "<p>تصل بلاغات المعلمين هنا تلقائياً عبر روابطهم.</p></div>") + "</section>";
@@ -1519,7 +1521,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var html = '<section class="card"><div class="row1">' + A.degChip(x.degree) + " المادة (" + art.id + ") " + statusChip(x) + "</div>" +
       '<h2 class="inc-t">' + e(x.itemText) + "</h2>" +
       '<p><a href="#student/' + s.id + '"><b>' + e(s.name) + '</b></a> <small class="mut">' + e(A.classKey(s)) + "</small> " + A.scoreChip(s) + "</p>" +
-      '<p class="mut">' + fmtDate(x.date) + " " + e(SL.time(x.date)) + (x.period ? " · الحصة: " + e(x.period) : "") + (x.place ? " · " + e(x.place) : "") + " · الراصد: " + e(x.byName || "—") + (x.src === "teacher" ? " (عبر رابط المعلم)" : "") + "</p>" +
+      '<p class="mut">' + fmtDate(x.date) + " " + e(SL.time(x.date)) + (x.period ? " · الحصة: " + e(x.period) : "") + (x.place ? " · " + e(x.place) : "") + " · الراصد: " + e(x.byName || "—") + (x.src === "teacher" ? " (عبر رابط المعلم)" : x.src === "counselor" ? " (عبر رابط الموجه الطلابي)" : "") + "</p>" +
       (x.desc ? '<p class="desc">' + e(x.desc) + "</p>" : "") + "</section>";
 
     if (x.status === "reported") {
@@ -1792,7 +1794,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         return '<li class="frow"><div class="row1"><b>' + e(x.name) + '</b> <span class="chip">' + e(ROLE[x.role] || x.role) + "</span>" + (x.subject ? ' <small class="mut">' + e(x.subject) + "</small>" : "") + "</div>" +
           '<div class="row3">' + (SL.validPhone(x.phone) ? '<span dir="ltr">' + e(SL.showPhone(x.phone)) + "</span>" : '<span class="chip warnc">بلا جوال</span>') + (x.classes ? ' <small class="mut">الفصول: ' + e(x.classes) + "</small>" : "") + "</div>" +
           '<div class="actions wrap"><button class="btn sm" type="button" data-ed="' + x.id + '">تعديل</button>' +
-          (SL.validPhone(x.phone) ? '<button class="btn sm wa" type="button" data-link="' + x.id + '">رابط الرصد</button><button class="btn sm" type="button" data-msg="' + x.id + '">رسالة</button>' : "") + "</div></li>";
+          (SL.validPhone(x.phone) ? '<button class="btn sm wa" type="button" data-link="' + x.id + '">' + (x.role === "counselor" ? "رابط الموجه" : "رابط الرصد") + '</button><button class="btn sm" type="button" data-msg="' + x.id + '">رسالة</button>' : "") + "</div></li>";
       }).join("") + "</ul>" : '<div class="empty"><p>لا توجد بيانات.</p></div>');
     $("#sf-add").onclick = function () { editStaff(null); };
     $$("[data-ed]").forEach(function (b) { b.onclick = function () { editStaff(A.byId[b.dataset.ed]); }; });
@@ -1830,7 +1832,8 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var cfg = A.S.settings, base = SL.base(cfg.publicBase);
     if (!cfg.relayUrl || !base) { A.toast("أكمل إعداد الروابط أولاً", "err"); return A.go("settings?tab=links"); }
     if (!x.key) { x.key = SL.newKey(); await A.save(x); }
-    var want = String(x.classes || "").split(/[،,;]+/).map(function (c) { return A.norm(c).replace(/\s*\/\s*/g, "/"); }).filter(Boolean);
+    var isC = x.role === "counselor";
+    var want = isC ? [] : String(x.classes || "").split(/[،,;]+/).map(function (c) { return A.norm(c).replace(/\s*\/\s*/g, "/"); }).filter(Boolean);
     var cls = {}, cst = {};
     A.S.students.forEach(function (s) {
       if (x.school && s.school !== x.school) return;
@@ -1841,12 +1844,12 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     Object.keys(cls).forEach(function (k) { cls[k].sort(function (a, b) { return a.localeCompare(b, "ar"); }); });
     var stages = {}; A.S.settings.schools.forEach(function (z) { if (!x.school || z.id === x.school) stages[R.stageOf(z.stage)] = 1; });
     var payload = { v: 1, kind: "teacher", tid: x.id, name: x.name, subject: x.subject || "", school: x.school ? A.school(x.school).name : A.S.settings.schools.map(function (z) { return z.name; }).join(" و"),
-      stage: Object.keys(stages).length === 1 ? Object.keys(stages)[0] : "ms", box: cfg.box, relay: cfg.relayUrl, k: x.key, wa: SL.normPhone(cfg.schoolWa), cls: cls, cst: cst };
+      stage: Object.keys(stages).length === 1 ? Object.keys(stages)[0] : "ms", box: cfg.box, relay: cfg.relayUrl, k: x.key, wa: SL.normPhone(cfg.schoolWa), cls: cls, cst: cst, role: isC ? "counselor" : "teacher" };
     if (x.lk) SL.short.del(cfg.relayUrl, x.lk);
     var lk = await SL.makeLink(base, "teacher.html", cfg.relayUrl, payload), link = lk.url;
     x.lk = lk.code; await A.save(x);
-    SL.openWa(x.phone, A.fill(cfg.tpl.teacherLink, { "المعلم": x.name, "الرابط": link, "المدرسة": payload.school }));
-    A.log("إرسال رابط الرصد للمعلم " + x.name);
+    SL.openWa(x.phone, A.fill(isC ? cfg.tpl.counselorLink : cfg.tpl.teacherLink, { "المعلم": x.name, "الرابط": link, "المدرسة": payload.school }));
+    A.log("إرسال رابط الرصد " + (isC ? "للموجه الطلابي " : "للمعلم ") + x.name);
   };
 
   /* ————— الاستيراد من Excel ————— */
@@ -1995,7 +1998,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         '<p class="mut">رمز صندوق هذا الجهاز: <code dir="ltr">' + e(cfg.box) + "</code></p>" +
         '<div class="actions wrap"><button class="btn pri" id="ln-save" type="button">حفظ</button><button class="btn" id="ln-test" type="button">اختبار الاتصال</button></div><p id="ln-msg"></p></section>';
     } else if (tab === "msgs") {
-      var names = { sign: "رابط التوقيع لولي الأمر", notify: "إشعار عام لولي الأمر", absence: "إشعار غياب", teacherLink: "رابط الرصد للمعلم", teacherDone: "إبلاغ المعلم بالاعتماد", referral: "إحالة للموجه الطلابي" };
+      var names = { sign: "رابط التوقيع لولي الأمر", notify: "إشعار عام لولي الأمر", absence: "إشعار غياب", teacherLink: "رابط الرصد للمعلم", counselorLink: "رابط الرصد للموجه الطلابي", teacherDone: "إبلاغ المعلم بالاعتماد", referral: "إحالة للموجه الطلابي" };
       html += '<section class="card"><p class="mut">المتغيرات: {الطالب} {الصف} {المدرسة} {النموذج} {الرابط} {المدة} {المعلم} {المشكلة} {الإجراء} {الموجه} {النوع} {العدد}. لا تُذكر تفاصيل المخالفة في رسائل ولي الأمر حفاظاً على السرية.</p>' +
         Object.keys(names).map(function (k) { return "<label>" + names[k] + '<textarea data-tpl="' + k + '" rows="5">' + e(cfg.tpl[k]) + "</textarea></label>"; }).join("") +
         '<div class="actions"><button class="btn pri" id="tp-save" type="button">حفظ</button><button class="btn" id="tp-reset" type="button">استعادة الافتراضي</button></div></section>';
@@ -2474,9 +2477,10 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       var art = R.articleById(o.art); if (!art || !art.items[o.item]) return false;
       var stu = A.S.students.find(function (s) { return A.classKey(s) === o.cls && A.norm(s.name) === A.norm(o.name) && (!t.school || s.school === t.school); });
       var inc = { id: "I" + key, t: "inc", stu: stu ? stu.id : "", stuName: o.name, cls: o.cls, art: art.id, item: o.item, itemText: art.items[o.item], degree: art.degree,
-        date: o.date || new Date().toISOString(), period: o.period || "", place: o.place || "", desc: o.desc || "", by: t.id, byName: t.name, status: "reported", done: {}, createdAt: Date.now(), src: "teacher" };
-      await A.save(inc); A.log("بلاغ من المعلم " + t.name + " عن " + o.name, inc.id);
-      A.toast("بلاغ جديد من " + t.name + ": " + o.name);
+        date: o.date || new Date().toISOString(), period: o.period || "", place: o.place || "", desc: o.desc || "", by: t.id, byName: t.name, status: "reported", done: {}, createdAt: Date.now(), src: t.role === "counselor" ? "counselor" : "teacher" };
+      var who = t.role === "counselor" ? "الموجه الطلابي " : "المعلم ";
+      await A.save(inc); A.log("بلاغ من " + who + t.name + " عن " + o.name, inc.id);
+      A.toast("بلاغ جديد من " + who + t.name + ": " + o.name);
       return true;
     }
     var g = A.byId[key];
