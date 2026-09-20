@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c2233">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>لوحة المزوّد — سَمْت</title>
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="base.css">
+<style>
+body { background: #f4f1ea; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 18px 16px 60px; }
+.hd { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 20px; color: #fff; margin-bottom: 18px;
+  background: radial-gradient(600px 240px at 100% 0%, rgba(201,162,76,.3), transparent 60%), linear-gradient(135deg, #0a1a27, #0c2233 45%, #0f3b45); box-shadow: var(--sh-2); }
+.hd .lg { width: 52px; height: 52px; border-radius: 15px; background: linear-gradient(145deg, #12384a, #0d6b61); box-shadow: inset 0 0 0 2px var(--gold); display: grid; place-items: center; flex: none; }
+.hd b { font-size: 1.25rem; display: block; } .hd small { color: rgba(255,255,255,.72); font-size: .82rem; }
+.hd .sp { margin-inline-start: auto; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.hd .btn { background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.25); color: #fff; min-height: 40px; }
+.hd .btn:hover { background: rgba(255,255,255,.18); }
+.kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+@media (max-width: 820px) { .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.kpi { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 14px 16px; box-shadow: var(--sh); }
+.kpi b { display: block; font-size: 1.8rem; color: var(--navy); line-height: 1.15; }
+.kpi span { font-size: .82rem; color: var(--mut); }
+.kpi.warn b { color: var(--warn); } .kpi.red b { color: var(--red); } .kpi.ok b { color: var(--ok); }
+.bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.bar input[type=search] { flex: 1 1 260px; }
+.seg { display: flex; padding: 4px; border-radius: 12px; gap: 2px; background: #fff; border: 1px solid var(--line); }
+.seg button { border: 0; background: none; padding: 7px 14px; border-radius: 9px; font-size: .86rem; cursor: pointer; color: var(--mut); font-weight: 600; }
+.seg button.on { background: var(--navy); color: #fff; }
+table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--line); border-radius: 18px; overflow: hidden; box-shadow: var(--sh); }
+th, td { padding: 12px 14px; text-align: right; border-bottom: 1px solid var(--line-2); font-size: .9rem; white-space: nowrap; }
+th { background: var(--navy); color: #fff; font-weight: 600; cursor: pointer; user-select: none; }
+th span { opacity: .6; font-size: .75rem; }
+tbody tr:hover { background: var(--bg-2); }
+tr.det td { background: var(--bg-2); white-space: normal; }
+.sch { font-weight: 700; color: var(--navy); }
+.dev { font-family: ui-monospace, Menlo, Consolas, monospace; direction: ltr; display: inline-block; }
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: .2em .7em; border-radius: 999px; font-size: .76rem; font-weight: 700; }
+.p-ok { background: var(--ok-soft); color: var(--ok); } .p-soon { background: var(--warn-soft); color: var(--warn); }
+.p-trial { background: var(--gold-soft); color: var(--gold-2); } .p-end { background: var(--red-soft); color: var(--red); }
+.p-idle { background: var(--line-2); color: var(--mut); }
+.mini { font-size: .78rem; color: var(--mut); }
+.logins { display: flex; flex-direction: column; gap: 4px; font-size: .84rem; }
+.logins li { list-style: none; }
+.tools { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.login-card { max-width: 440px; margin: 60px auto; background: #fff; border: 1px solid var(--line); border-top: 4px solid var(--gold); border-radius: 22px; padding: 26px; box-shadow: var(--sh-2); }
+.login-card h1 { font-size: 1.4rem; }
+.hide { display: none !important; }
+.foot { text-align: center; color: var(--mut); font-size: .8rem; margin-top: 22px; }
+@media (max-width: 720px) { th:nth-child(n+5), td:nth-child(n+5) { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<section id="gate" class="login-card">
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px"><span class="lock-logo" style="width:54px;height:54px;border-radius:16px;margin:0"></span><div><h1 style="margin:0">لوحة المزوّد</h1><small class="mut">سَمْت — متابعة المدارس والاشتراكات</small></div></div>
+  <p class="note">هذه الصفحة خاصة بك. تُقرأ البيانات من قاعدة بيانات المشروع بحسابك فقط.</p>
+  <label>البريد<input id="em" type="email" autocomplete="username" dir="ltr"></label>
+  <label>كلمة المرور<input id="pw" type="password" autocomplete="current-password"></label>
+  <details class="sub" id="keybox"><summary>إعداد المفتاح (مرة واحدة)</summary>
+    <label>Web API Key من إعدادات مشروع Firebase<input id="ak" dir="ltr" placeholder="AIza…"></label>
+  </details>
+  <button class="btn pri" id="go" type="button" style="width:100%">دخول</button>
+  <p id="msg" class="lock-msg err"></p>
+</section>
+
+<main id="app" class="hide">
+  <header class="hd">
+    <span class="lg"></span>
+    <div><b>لوحة المزوّد</b><small id="sub">سَمْت — المدارس المسجّلة والاشتراكات</small></div>
+    <div class="sp">
+      <span class="mini" id="upd" style="color:rgba(255,255,255,.7)"></span>
+      <button class="btn sm" id="rf" type="button">تحديث</button>
+      <button class="btn sm" id="csv" type="button">تصدير CSV</button>
+      <button class="btn sm" id="out" type="button">خروج</button>
+    </div>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="bar">
+    <input id="q" type="search" placeholder="بحث باسم المدرسة أو رقم الجهاز أو الإدارة…">
+    <div class="seg" id="seg">
+      <button data-f="all" class="on" type="button">الكل</button>
+      <button data-f="ok" type="button">فعّال</button>
+      <button data-f="soon" type="button">ينتهي قريباً</button>
+      <button data-f="trial" type="button">تجريبي</button>
+      <button data-f="end" type="button">منتهٍ</button>
+      <button data-f="idle" type="button">غير نشط</button>
+    </div>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr>
+        <th data-s="school">المدرسة <span>⇅</span></th>
+        <th data-s="dev">رقم الجهاز <span>⇅</span></th>
+        <th data-s="end">الاشتراك <span>⇅</span></th>
+        <th data-s="last">آخر دخول <span>⇅</span></th>
+        <th data-s="stu">الطلاب <span>⇅</span></th>
+        <th data-s="inc">المخالفات <span>⇅</span></th>
+        <th data-s="sig">روابط التوقيع <span>⇅</span></th>
+        <th data-s="ver">الإصدار <span>⇅</span></th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <p class="foot">تُرسل الأجهزة هذه البيانات عند كل تشغيل. لا تحتوي على أي بيانات طلاب أو أولياء أمور.</p>
+</main>
+
+</div>
+<script src="shared.js"></script>
+<script>
+(function () {
+  "use strict";
+  var SL = window.SL, e = SL.esc, $ = function (s) { return document.querySelector(s); };
+  var DB = SL.DEFAULT_RELAY, KEY = "", ROWS = [], sortBy = "end", sortDir = 1, filter = "all", timer = null;
+  try { KEY = localStorage.getItem("samt_admin_key") || ""; } catch (err) {}
+  document.querySelectorAll(".lg, .lock-logo").forEach(function (el) { el.innerHTML = SL.LOGO; });
+  if (KEY) $("#ak").value = KEY; else $("#keybox").open = true;
+
+  /* ————— الدخول ————— */
+  async function signIn(email, pass) {
+    var r = await fetch("https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" + encodeURIComponent(KEY),
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email, password: pass, returnSecureToken: true }) });
+    var j = await r.json();
+    if (!r.ok) throw new Error((j.error && j.error.message) || "تعذّر الدخول");
+    return j;
+  }
+  async function refresh(rt) {
+    var r = await fetch("https://securetoken.googleapis.com/v1/token?key=" + encodeURIComponent(KEY),
+      { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: "grant_type=refresh_token&refresh_token=" + encodeURIComponent(rt) });
+    var j = await r.json(); if (!r.ok) throw new Error("انتهت الجلسة");
+    return { idToken: j.id_token, refreshToken: j.refresh_token };
+  }
+  function save(t) { try { localStorage.setItem("samt_admin_rt", t.refreshToken); } catch (err) {} window.__tok = t.idToken; }
+
+  $("#go").onclick = async function () {
+    var m = $("#msg"); m.textContent = ""; KEY = $("#ak").value.trim() || KEY;
+    if (!KEY) { m.textContent = "أدخل Web API Key من إعدادات مشروع Firebase."; $("#keybox").open = true; return; }
+    try { localStorage.setItem("samt_admin_key", KEY); } catch (err) {}
+    this.disabled = true; this.textContent = "جارٍ الدخول…";
+    try { var t = await signIn($("#em").value.trim(), $("#pw").value); save(t); $("#pw").value = ""; start(); }
+    catch (err) { m.textContent = /INVALID|EMAIL|PASSWORD/.test(err.message) ? "البريد أو كلمة المرور غير صحيحة." : err.message; }
+    this.disabled = false; this.textContent = "دخول";
+  };
+  $("#em").onkeydown = $("#pw").onkeydown = function (ev) { if (ev.key === "Enter") $("#go").click(); };
+  $("#out").onclick = function () { try { localStorage.removeItem("samt_admin_rt"); } catch (err) {} location.reload(); };
+
+  (async function auto() {
+    var rt = null; try { rt = localStorage.getItem("samt_admin_rt"); } catch (err) {}
+    if (!rt || !KEY) return;
+    try { save(await refresh(rt)); start(); } catch (err) {}
+  })();
+
+  /* ————— البيانات ————— */
+  function start() { $("#gate").classList.add("hide"); $("#app").classList.remove("hide"); load(); if (timer) clearInterval(timer); timer = setInterval(load, 120000); }
+  async function load() {
+    try {
+      var r = await fetch(DB + "/reg.json?auth=" + encodeURIComponent(window.__tok), { cache: "no-store" });
+      if (r.status === 401) { var rt = localStorage.getItem("samt_admin_rt"); save(await refresh(rt)); return load(); }
+      var box = (await r.json()) || {};
+      ROWS = Object.keys(box).map(function (k) {
+        var o = {}; try { o = typeof box[k] === "string" ? JSON.parse(box[k]) : box[k] || {}; } catch (err) {}
+        var logins = o.logins || [], last = logins[logins.length - 1] || o.at || 0;
+        var endT = o.end ? new Date(o.end + "T23:59:59").getTime() : 0;
+        var days = o.trial ? Math.ceil((o.hours || 0) / 24) : endT ? Math.ceil((endT - Date.now()) / 864e5) : 0;
+        return { dev: o.dev || k, school: o.school || "—", region: o.region || "", admin: o.admin || "", ver: o.ver || "—",
+          trial: !!o.trial, end: o.end || "", endT: endT, days: days, last: last, logins: logins, first: o.first || 0,
+          stu: (o.n || {}).stu || 0, inc: (o.n || {}).inc || 0, sig: (o.n || {}).sig || 0, stf: (o.n || {}).stf || 0, mer: (o.n || {}).mer || 0, ua: o.ua || "" };
+      });
+      $("#upd").textContent = "آخر تحديث " + SL.time(Date.now());
+      draw();
+    } catch (err) { $("#upd").textContent = "تعذّر التحديث"; }
+  }
+  function state(r) {
+    var idle = Date.now() - r.last > 14 * 864e5;
+    if (r.trial) return r.days > 0 ? "trial" : "end";
+    if (!r.endT || r.endT < Date.now()) return "end";
+    if (r.days <= 14) return "soon";
+    return idle ? "idle" : "ok";
+  }
+  var LBL = { ok: ["فعّال", "p-ok"], soon: ["ينتهي بعد " , "p-soon"], trial: ["تجريبي", "p-trial"], end: ["منتهٍ", "p-end"], idle: ["فعّال — غير نشط", "p-idle"] };
+  function ago(t) {
+    if (!t) return "—";
+    var m = Math.floor((Date.now() - t) / 6e4);
+    if (m < 60) return "قبل " + m + " دقيقة";
+    var h = Math.floor(m / 60); if (h < 24) return "قبل " + h + " ساعة";
+    var d = Math.floor(h / 24); return d === 1 ? "أمس" : "قبل " + d + " يوماً";
+  }
+  function draw() {
+    var q = ($("#q").value || "").trim().toLowerCase();
+    var list = ROWS.filter(function (r) {
+      if (filter !== "all" && state(r) !== filter) return false;
+      if (!q) return true;
+      return (r.school + " " + r.dev + " " + r.region + " " + r.admin).toLowerCase().indexOf(q) >= 0;
+    }).sort(function (a, b) {
+      var k = sortBy, x = k === "end" ? (a.endT || (a.trial ? Date.now() + a.days * 864e5 : 0)) : a[k], y = k === "end" ? (b.endT || (b.trial ? Date.now() + b.days * 864e5 : 0)) : b[k];
+      if (typeof x === "string") return sortDir * String(x).localeCompare(String(y), "ar");
+      return sortDir * ((x || 0) - (y || 0));
+    });
+    var n = ROWS.length, ok = ROWS.filter(function (r) { return state(r) === "ok"; }).length;
+    var soon = ROWS.filter(function (r) { return state(r) === "soon"; }).length, tri = ROWS.filter(function (r) { return state(r) === "trial"; }).length;
+    var end = ROWS.filter(function (r) { return state(r) === "end"; }).length, idle = ROWS.filter(function (r) { return state(r) === "idle"; }).length;
+    var stu = ROWS.reduce(function (s, r) { return s + r.stu; }, 0), inc = ROWS.reduce(function (s, r) { return s + r.inc; }, 0);
+    $("#kpis").innerHTML =
+      kpi(n, "جهاز مسجّل", "") + kpi(ok + soon + idle, "اشتراك فعّال", "ok") + kpi(soon, "ينتهي خلال 14 يوماً", "warn") +
+      kpi(tri, "قيد التجربة", "") + kpi(end, "منتهٍ", "red") + kpi(idle, "لم يدخل منذ أسبوعين", "") +
+      kpi(stu.toLocaleString("ar-SA"), "طالب في كل المدارس", "") + kpi(inc.toLocaleString("ar-SA"), "مخالفة مسجّلة", "");
+    $("#rows").innerHTML = list.length ? list.map(function (r, i) {
+      var st = state(r), lb = LBL[st], txt = st === "soon" ? "ينتهي بعد " + r.days + " يوماً" : st === "trial" ? "تجريبي — " + r.days + " يوم" : lb[0];
+      return '<tr data-i="' + i + '" class="row"><td><span class="sch">' + e(r.school) + "</span>" + (r.region ? '<div class="mini">' + e(r.region) + "</div>" : "") + "</td>" +
+        '<td><span class="dev">' + e(r.dev) + "</span></td>" +
+        '<td><span class="pill ' + lb[1] + '">' + e(txt) + "</span>" + (r.end ? '<div class="mini">حتى ' + e(r.end) + "</div>" : "") + "</td>" +
+        "<td>" + e(ago(r.last)) + '<div class="mini">' + e(r.last ? SL.hijri(r.last) + " " + SL.time(r.last) : "") + "</div></td>" +
+        "<td>" + r.stu + "</td><td>" + r.inc + "</td><td>" + r.sig + "</td><td>" + e(r.ver) + "</td></tr>" +
+        '<tr class="det hide" data-d="' + i + '"><td colspan="8">' +
+          '<div style="display:flex;gap:26px;flex-wrap:wrap">' +
+          '<div><b>آخر ' + (r.logins.length || 0) + ' مرات دخول</b><ul class="logins">' + (r.logins.slice().reverse().map(function (t) { return "<li>" + e(SL.hijri(t)) + " — " + e(SL.greg(t)) + " " + e(SL.time(t)) + "</li>"; }).join("") || "<li>—</li>") + "</ul></div>" +
+          "<div><b>أرقام</b><ul class=\"logins\"><li>الطلاب: " + r.stu + "</li><li>المنسوبون: " + r.stf + "</li><li>المخالفات: " + r.inc + "</li><li>السلوك المتميز: " + r.mer + "</li><li>روابط التوقيع: " + r.sig + "</li></ul></div>" +
+          '<div><b>معلومات</b><ul class="logins"><li>أول تشغيل: ' + e(r.first ? SL.hijri(r.first) : "—") + "</li><li>إدارة التعليم: " + e(r.admin || "—") + "</li><li>الجهاز: " + e(r.ua || "—") + "</li></ul></div>" +
+          '</div><div class="tools"><button class="btn sm" data-copy="' + e(r.dev) + '" type="button">نسخ رقم الجهاز</button>' +
+          '<button class="btn sm" data-wa="' + e(r.dev) + '" type="button">رسالة تجديد جاهزة</button></div>' +
+        "</td></tr>";
+    }).join("") : '<tr><td colspan="8"><div class="empty"><p>لا توجد أجهزة مطابقة.</p></div></td></tr>';
+    document.querySelectorAll(".row").forEach(function (tr) {
+      tr.onclick = function () { var d = document.querySelector('[data-d="' + tr.dataset.i + '"]'); if (d) d.classList.toggle("hide"); };
+    });
+    document.querySelectorAll("[data-copy]").forEach(function (b) { b.onclick = function (ev) { ev.stopPropagation(); navigator.clipboard.writeText(b.dataset.copy); b.textContent = "تم النسخ"; }; });
+    document.querySelectorAll("[data-wa]").forEach(function (b) {
+      b.onclick = function (ev) {
+        ev.stopPropagation();
+        var t = "السلام عليكم، بخصوص اشتراك منصة «سَمْت».\nرقم الجهاز: " + b.dataset.wa + "\nيسعدنا تجديد الاشتراك عبر متجر تقناس: www.TiqNas.com";
+        navigator.clipboard.writeText(t); b.textContent = "نُسخت الرسالة";
+      };
+    });
+    function kpi(v, l, c) { return '<div class="kpi ' + c + '"><b>' + v + "</b><span>" + l + "</span></div>"; }
+  }
+  $("#q").oninput = draw;
+  document.querySelectorAll("#seg button").forEach(function (b) {
+    b.onclick = function () { document.querySelectorAll("#seg button").forEach(function (x) { x.classList.toggle("on", x === b); }); filter = b.dataset.f; draw(); };
+  });
+  document.querySelectorAll("th[data-s]").forEach(function (th) {
+    th.onclick = function () { if (sortBy === th.dataset.s) sortDir = -sortDir; else { sortBy = th.dataset.s; sortDir = 1; } draw(); };
+  });
+  $("#rf").onclick = load;
+  $("#csv").onclick = function () {
+    var head = ["المدرسة", "رقم الجهاز", "الحالة", "نهاية الاشتراك", "آخر دخول", "الطلاب", "المنسوبون", "المخالفات", "روابط التوقيع", "الإصدار", "إدارة التعليم"];
+    var lines = [head.join(",")].concat(ROWS.map(function (r) {
+      return [r.school, r.dev, LBL[state(r)][0], r.end, r.last ? new Date(r.last).toISOString().slice(0, 16).replace("T", " ") : "", r.stu, r.stf, r.inc, r.sig, r.ver, r.admin]
+        .map(function (x) { return '"' + String(x == null ? "" : x).replace(/"/g, '""') + '"'; }).join(",");
+    }));
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" }));
+    a.download = "samt-schools-" + new Date().toISOString().slice(0, 10) + ".csv"; a.click();
+  };
+})();
+</script>
+</body>
+</html>

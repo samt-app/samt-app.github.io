@@ -10,6 +10,12 @@
           ".read": "$box === 'L' && $tok.length >= 20"
         }
       }
+    },
+    "reg": {
+      ".read": false,
+      "$dev": {
+        ".write": "newData.isString() && newData.val().length < 5000 || !newData.exists()"
+      }
     }
   }
 }

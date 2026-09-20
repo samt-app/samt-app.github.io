@@ -1887,6 +1887,82 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     }
     return 0;
   }
+  /* ————— ملف نور: «البيانات الخاصة بالإرشاد الطلابي» (ملف لكل مدرسة/مرحلة) ————— */
+  var NOOR_GRADE = { "01": "الأول الابتدائي", "02": "الثاني الابتدائي", "03": "الثالث الابتدائي", "04": "الرابع الابتدائي", "05": "الخامس الابتدائي", "06": "السادس الابتدائي",
+    "07": "الأول المتوسط", "08": "الثاني المتوسط", "09": "الثالث المتوسط", "10": "الأول الثانوي", "11": "الثاني الثانوي", "12": "الثالث الثانوي" };
+  var NOOR_STAGE = { "1": "ابتدائي", "2": "متوسط", "3": "ثانوي" };
+  function noorGrade(code) {
+    var c = String(code == null ? "" : code).replace(/[٠-٩]/g, function (d) { return "٠١٢٣٤٥٦٧٨٩".indexOf(d); }).replace(/\D/g, "");
+    if (!c) return "";
+    if (c.length < 4) c = ("0000" + c).slice(-4);
+    return NOOR_GRADE[c.slice(0, 2)] || "";
+  }
+  /* يقرأ تقرير نور «بيانات معلمي المدرسة» ويعيد ورقة منسوبين، أو null */
+  function noorStaff(wb) {
+    for (var i = 0; i < wb.SheetNames.length; i++) {
+      var rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[i]], { header: 1, raw: false, defval: "" });
+      var hi = rows.findIndex(function (r) { var t = A.norm(r.join(" ")); return /الاسم/.test(t) && /رقم الهويه/.test(t); });
+      if (hi < 0) continue;
+      var head = (rows[hi] || []).map(function (h) { return A.norm(h); });
+      function col(re) { for (var k = 0; k < head.length; k++) if (re.test(head[k])) return k; return -1; }
+      var cN = col(/^الاسم$/), cId = col(/رقم الهويه/), cM = col(/^الجوال$/), cP1 = col(/^هاتف 1$/), cMail = col(/بريد الالكتروني/);
+      if (cN < 0 || cId < 0) continue;
+      /* اسم المدرسة والإدارة من ترويسة التقرير */
+      var school = "", admin = "";
+      rows.slice(0, hi).forEach(function (r) {
+        r.forEach(function (c) {
+          var t = String(c || "").replace(/\s+/g, " ").trim(); if (!t) return;
+          if (/^الإدارة العامة للتعليم/.test(t)) admin = t;
+          else if (/(ابتدائي|متوسط|ثانوي|مدرس|مجمع|ثانوية|روضة)/.test(t) && !/وزارة|المملكة|بيانات معلمي/.test(t) && t.length < 60) school = school || t;
+        });
+      });
+      var out = [];
+      rows.slice(hi + 1).forEach(function (r) {
+        var name = String(r[cN] == null ? "" : r[cN]).replace(/\s+/g, " ").trim();
+        if (!name || name.length < 4 || /^الاسم/.test(A.norm(name))) return;
+        var ph = SL.normPhone(r[cM]) || SL.normPhone(cP1 >= 0 ? r[cP1] : "");
+        out.push([name, String(r[cId] == null ? "" : r[cId]).trim(), SL.validPhone(ph) ? ph : "", school, "", "", cMail >= 0 ? String(r[cMail] || "").trim() : ""]);
+      });
+      if (!out.length) continue;
+      return { name: "نور — بيانات معلمي المدرسة", noorStaff: { school: school, admin: admin, n: out.length },
+        headers: ["الاسم", "السجل المدني", "الجوال", "المدرسة", "الوظيفة", "الفصول", "البريد الإلكتروني"], rows: out,
+        type: "stf", map: { name: 0, sid: 1, phone: 2, school: 3, role: 4, classes: 5, subject: -1 } };
+    }
+    return null;
+  }
+  /* يقرأ ورقتي نور (School Info + Student Info Table) ويعيد ورقة جاهزة بأعمدة التطبيق، أو null */
+  function noorSheet(wb) {
+    var info = null, tbl = null;
+    wb.SheetNames.forEach(function (n) {
+      var rows = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: false, defval: "" });
+      var flat = rows.slice(0, 8).map(function (r) { return A.norm(r.join(" ")); }).join(" | ");
+      if (!info && /اسم المدرسه|school info/i.test(flat)) info = rows;
+      if (!tbl && /رقم الطالب/.test(flat) && /رقم الصف/.test(flat)) tbl = rows;
+    });
+    if (!tbl) return null;
+    var school = "", stage = "";
+    (info || []).forEach(function (r) {
+      var k = A.norm(r.join(" "));
+      var val = r.filter(function (c) { return String(c).trim(); }).pop();
+      if (/اسم المدرسه/.test(k)) school = String(val || "").trim();
+      else if (/مرحله المدرسه/.test(k)) stage = NOOR_STAGE[String(val || "").trim().replace(/\.0$/, "")] || "";
+    });
+    var hi = tbl.findIndex(function (r) { return /رقم الطالب/.test(A.norm(r.join(" "))); });
+    var head = (tbl[hi] || []).map(function (h) { return A.norm(h); });
+    function col(re) { for (var i = 0; i < head.length; i++) if (re.test(head[i])) return i; return -1; }
+    var cN = col(/^اسم الطالب/), cId = col(/^رقم الطالب/), cG = col(/^رقم الصف/), cC = col(/^الفصل/), cP = col(/^الجوال/);
+    if (cN < 0 || cG < 0) return null;
+    var rows = [];
+    tbl.slice(hi + 1).forEach(function (r) {
+      var name = String(r[cN] == null ? "" : r[cN]).trim(); if (!name) return;
+      rows.push([name, String(r[cId] == null ? "" : r[cId]).trim(), noorGrade(r[cG]), String(r[cC] == null ? "" : r[cC]).trim(), SL.normPhone(r[cP]), school, stage]);
+    });
+    if (!rows.length) return null;
+    return { name: "نور — الإرشاد الطلابي", noor: { school: school, stage: stage },
+      headers: ["اسم الطالب", "السجل المدني", "الصف", "الفصل", "جوال ولي الأمر", "المدرسة", "المرحلة"], rows: rows,
+      type: "stu", map: { name: 0, sid: 1, grade: 2, section: 3, parentPhone: 4, school: 5, stage: 6, parentName: -1, parentPhone2: -1 } };
+  }
+
   V["import"] = function () {
     setTitle("الاستيراد من Excel");
     main().innerHTML = '<section class="card"><p>ارفع ملف Excel يحتوي ورقة للطلاب وورقة للمعلمين والإدارة (أو ملفاً لكل منهما). يتعرف النظام على الأعمدة تلقائياً ويمكنك تعديلها قبل الحفظ. يُحدَّث الطالب الموجود عند تطابق السجل المدني.</p>' +
@@ -1896,6 +1972,8 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       $("#im-out").innerHTML = '<p class="mut">جارٍ القراءة…</p>';
       try { await A.loadScript("xlsx.full.min.js"); } catch (err) { $("#im-out").innerHTML = '<p class="alert err">تعذّر تحميل قارئ Excel.</p>'; return; }
       var wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
+      var nr = null; try { nr = noorSheet(wb) || noorStaff(wb); } catch (err) {}
+      if (nr) { drawSheets([nr]); return; }
       var sheets = wb.SheetNames.map(function (n) {
         var rows = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: false, defval: "" });
         var hi = findHeaderRow(rows), headers = (rows[hi] || []).map(function (h) { return String(h).trim(); });
@@ -1908,7 +1986,10 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   function drawSheets(sheets) {
     var schools = A.S.settings.schools;
     var html = sheets.map(function (s, si) {
-      return '<section class="card imp" data-si="' + si + '"><h3>الورقة: ' + e(s.name) + ' <small class="mut">(' + s.rows.length + " صف)</small></h3>" +
+      return '<section class="card imp" data-si="' + si + '">' + (s.noorStaff ? '<div class="alert ok">تم التعرف على ملف <b>نور — بيانات معلمي المدرسة</b>: ' +
+        (s.noorStaff.school ? "مدرسة <b>" + e(s.noorStaff.school) + "</b> · " : "") + "<b>" + s.noorStaff.n + '</b> منسوباً. التقرير لا يتضمن الوظيفة ولا الفصول، فبعد الحفظ حدّد <b>المدير والوكيل والموجّه</b> وفصول كل معلم من صفحة «المعلمون والإدارة».</div>' : "") + (s.noor ? '<div class="alert ok">تم التعرف على ملف <b>نور — البيانات الخاصة بالإرشاد الطلابي</b>: ' +
+        (s.noor.school ? "مدرسة <b>" + e(s.noor.school) + "</b>" : "") + (s.noor.stage ? " · المرحلة <b>" + e(s.noor.stage) + "</b>" : "") + " · <b>" + s.rows.length + "</b> طالباً. تُضاف المدرسة تلقائياً إن لم تكن موجودة، وتُحدَّد مرحلة الطلاب من الملف. ارفع ملف كل مدرسة/مرحلة على حدة.</div>" : "") +
+        '<h3>الورقة: ' + e(s.name) + ' <small class="mut">(' + s.rows.length + " صف)</small></h3>" +
         '<label>نوع البيانات<select class="im-type"><option value="">تجاهل</option><option value="stu"' + (s.type === "stu" ? " selected" : "") + '>الطلاب</option><option value="stf"' + (s.type === "stf" ? " selected" : "") + ">المعلمون والإدارة</option></select></label>" +
         '<div class="im-map"></div>' +
         (schools.length ? '<label>المدرسة الافتراضية (عند غياب عمود المدرسة)<select class="im-sc">' + schools.map(function (z) { return '<option value="' + e(z.id) + '">' + e(z.name) + "</option>"; }).join("") + "</select></label>" : '<p class="alert warn sm">لم تُضف مدرسة في الإعدادات — ستُنشأ تلقائياً من عمود المدرسة أو باسم «مدرستي».</p>') +
@@ -1938,13 +2019,14 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     });
     $("#im-go").onclick = async function () {
       var S = A.S, schools = S.settings.schools, nS = 0, uS = 0, nT = 0, uT = 0, bad = 0, recs = [];
-      function schoolId(name, def) {
+      function schoolId(name, def, stage) {
         name = String(name || "").trim();
         if (!name) return def || (schools[0] && schools[0].id) || ensureSchool("مدرستي");
         var z = schools.find(function (x) { return A.norm(x.name) === A.norm(name); });
-        return z ? z.id : ensureSchool(name);
+        if (z) { if (stage && !z.stage) z.stage = stage; return z.id; }
+        return ensureSchool(name, stage);
       }
-      function ensureSchool(name) { var z = { id: "C" + SL.rid(6), name: name, stage: /ابتدائ/.test(name) ? "ابتدائي" : /ثانو/.test(name) ? "ثانوي" : "متوسط", region: "", admin: "" }; schools.push(z); return z.id; }
+      function ensureSchool(name, stage) { var z = { id: "C" + SL.rid(6), name: name, stage: stage || (/ابتدائ/.test(name) ? "ابتدائي" : /ثانو/.test(name) ? "ثانوي" : "متوسط"), region: "", admin: "" }; schools.push(z); return z.id; }
       var bySid = {}, byKey = {};
       S.students.forEach(function (x) { if (x.sid) bySid[x.sid] = x; byKey[A.norm(x.name) + "|" + A.norm(x.grade) + "|" + A.norm(x.section)] = x; });
       var stfBy = {}; S.staff.forEach(function (x) { stfBy[x.sid || A.norm(x.name)] = x; });
@@ -1956,14 +2038,19 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
           var name = g(r, "name"); if (!name || name.length < 3) { bad++; return; }
           var sid = g(r, "sid").replace(/[٠-٩]/g, function (d) { return "٠١٢٣٤٥٦٧٨٩".indexOf(d); }).replace(/\D/g, "");
           if (s.type === "stu") {
-            var stg = g(r, "stage"), rec = { t: "stu", name: name, sid: sid, school: schoolId(g(r, "school"), def), grade: g(r, "grade"), stageHint: /ابتدائ/.test(stg) ? "ابتدائي" : /متوسط/.test(stg) ? "متوسط" : /ثانو/.test(stg) ? "ثانوي" : (/ابتدائ|متوسط|ثانو/.test(g(r, "grade")) ? "" : defStg), section: g(r, "section"), parentName: g(r, "parentName"), parentPhone: SL.normPhone(g(r, "parentPhone")), parentPhone2: SL.normPhone(g(r, "parentPhone2")) };
+            var stg = g(r, "stage"), rec = { t: "stu", name: name, sid: sid, school: schoolId(g(r, "school"), def, /ابتدائ|متوسط|ثانو/.test(g(r, "stage")) ? g(r, "stage") : ""), grade: g(r, "grade"), stageHint: /ابتدائ/.test(stg) ? "ابتدائي" : /متوسط/.test(stg) ? "متوسط" : /ثانو/.test(stg) ? "ثانوي" : (/ابتدائ|متوسط|ثانو/.test(g(r, "grade")) ? "" : defStg), section: g(r, "section"), parentName: g(r, "parentName"), parentPhone: SL.normPhone(g(r, "parentPhone")), parentPhone2: SL.normPhone(g(r, "parentPhone2")) };
             var old = (sid && bySid[sid]) || byKey[A.norm(name) + "|" + A.norm(rec.grade) + "|" + A.norm(rec.section)];
             if (old) { Object.keys(rec).forEach(function (k) { if (rec[k]) old[k] = rec[k]; }); recs.push(old); uS++; }
             else { rec.id = "S" + SL.rid(10); recs.push(rec); if (sid) bySid[sid] = rec; nS++; }
           } else {
             var t = { t: "stf", name: name, sid: sid, role: guessRole(g(r, "role")), roleText: g(r, "role"), phone: SL.normPhone(g(r, "phone")), subject: g(r, "subject"), classes: g(r, "classes"), school: g(r, "school") ? schoolId(g(r, "school"), def) : "" };
             var o2 = stfBy[sid || A.norm(name)];
-            if (o2) { Object.keys(t).forEach(function (k) { if (t[k]) o2[k] = t[k]; }); recs.push(o2); uT++; }
+            if (o2) {
+              var both = o2.school && t.school && o2.school !== t.school; /* منسوب يعمل في مدرستين: يُتاح للجميع */
+              Object.keys(t).forEach(function (k) { if (t[k]) o2[k] = t[k]; });
+              if (both) o2.school = "";
+              recs.push(o2); uT++;
+            }
             else { t.id = "T" + SL.rid(10); recs.push(t); stfBy[sid || A.norm(name)] = t; nT++; }
           }
         });
@@ -2018,7 +2105,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     } else if (tab === "lic") {
       var L = C.lic || {};
       html += '<section class="card"><h3>الاشتراك</h3><p>الحالة: <b>' + e(C.licLabel(L)) + '</b></p><div class="lock-dev"><span>رقم الجهاز</span><b dir="ltr">' + e(L.dev || "") + '</b><button class="btn sm" type="button" id="lc-copy">نسخ</button></div>' +
-        '<label>كود الاشتراك<textarea id="lc-code" rows="3" dir="ltr" placeholder="SL1.…"></textarea></label><div class="actions"><button class="btn pri" id="lc-act" type="button">تفعيل / تجديد</button></div><p id="lc-msg"></p></section>' +
+        '<label>كود الاشتراك<textarea id="lc-code" rows="3" dir="ltr" placeholder="SL1.…"></textarea></label><p class="note">يُرسل للمزوّد عند كل تشغيل: رقم الجهاز، واسم المدرسة، وتاريخ انتهاء الاشتراك، وآخر خمس مرات دخول، وأعداد مجمّعة (الطلاب والمخالفات). لا تُرسل بيانات الطلاب ولا أولياء الأمور.</p><div class="actions"><button class="btn pri" id="lc-act" type="button">تفعيل / تجديد</button></div><p id="lc-msg"></p></section>' +
         '<section class="card"><h3>التحديث</h3><p>الإصدار الحالي: <b>' + e(C.version || C.BUILTIN) + '</b></p><p class="mut">عند وصول ملف تحديث (.slu) اختره هنا؛ يتحقق التطبيق من توقيعه ثم يثبته ويعيد التشغيل. بياناتك لا تتأثر.</p>' +
         '<div class="actions wrap"><label class="btn pri">اختيار ملف التحديث<input id="up-f" type="file" accept=".slu,application/json" hidden></label><button class="btn" id="up-rb" type="button">الرجوع للإصدار المدمج</button></div><p id="up-msg"></p></section>';
     } else if (tab === "sec") {
@@ -2453,6 +2540,27 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     });
   }
 
+  /* ————— نبضة التسجيل للمزوّد (رقم الجهاز واسم المدرسة والاشتراك وآخر الدخول) —————
+     لا تُرسل أي بيانات طلاب أو أولياء أمور — أرقام مجمّعة فقط. */
+  A.ping = async function () {
+    var cfg = A.S.settings, base = cfg.relayUrl || A.RELAY;
+    if (!base || cfg.noPing) return;
+    try {
+      var L = C.lic || {}, now = Date.now();
+      var logins = (await C.DB.get("logins")) || [];
+      if (!logins.length || now - logins[logins.length - 1] > 6e5) { logins.push(now); logins = logins.slice(-5); await C.DB.set("logins", logins); }
+      var first = (await C.DB.get("firstSeen")) || now; if (!(await C.DB.get("firstSeen"))) await C.DB.set("firstSeen", first);
+      var pend = A.S.sigs.filter(function (g) { return g.via === "link"; }).length;
+      var rec = { v: 1, dev: L.dev || "", school: A.S.settings.schools.map(function (z) { return z.name; }).filter(Boolean).join(" · "),
+        region: (A.S.settings.schools[0] || {}).region || "", admin: (A.S.settings.schools[0] || {}).admin || "",
+        ver: C.version || C.BUILTIN, trial: !!L.trial, end: L.end ? new Date(L.end).toISOString().slice(0, 10) : "", days: L.days || 0, hours: L.hours || 0,
+        logins: logins, first: first, at: now, n: { stu: A.S.students.length, stf: A.S.staff.length, inc: A.S.incidents.length, sig: pend, mer: A.S.merits.length },
+        wa: !!cfg.relayUrl, ua: (navigator.platform || "") + " · " + (navigator.language || "") };
+      await fetch(String(base).replace(/\/+$/, "") + "/reg/" + encodeURIComponent(L.dev || "unknown") + ".json",
+        { method: "PUT", body: JSON.stringify(JSON.stringify(rec)) });
+    } catch (err) {}
+  };
+
   /* ————— الاستلام التلقائي من صندوق البريد ————— */
   var busy = false, timer = null;
   A.poll = async function (manual) {
@@ -2515,5 +2623,6 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") A.poll(); });
     A.route();
     A.startPolling();
+    A.ping();
   })();
 })();
