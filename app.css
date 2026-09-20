@@ -388,3 +388,12 @@ details.sub summary { cursor: pointer; font-weight: 600; color: var(--navy); }
 .stat b { display: block; font-size: 1.6rem; color: var(--navy); }
 .stat span { font-size: .82rem; color: var(--mut); }
 .score { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; height: 28px; border-radius: 9px; font-weight: 700; font-size: .85rem; padding: 0 7px; }
+
+/* ————— إطارات القوالب المحتوية على بيانات بلون خلفية القائمة الجانبية ————— */
+.card, .kpi, .tile, .stat, .menu, .tabs, .tbl-wrap, .lvlbox, .items, .school, details.sub, .q-res, .search,
+main > .list, main > #st-list > .list, main > #inc-list > .list, .list.panel { border-color: var(--frame); }
+/* قوائم مؤطَّرة داخل حاوية (شاشة المعلمين) */
+.list.panel { background: #fff; border: 1px solid var(--frame); border-radius: var(--r); padding: 8px; box-shadow: var(--sh); margin: 0 0 18px; }
+.list.panel > li { border-bottom: 1px solid var(--frame); }
+.list.panel > li:last-child { border-bottom: 0; }
+.sec-h { border-bottom-color: var(--frame); }

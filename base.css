@@ -14,6 +14,7 @@
   --wa: #1f9d55; --red: #c53030; --red-soft: #fdecec; --warn: #b26a00; --warn-soft: #fff4e0; --ok: #1e7b45; --ok-soft: #e6f5ec; --info: #1a56b0; --info-soft: #e8f0fe;
   --d1: #2f855a; --d2: #b7862f; --d3: #dd6b20; --d4: #c53030; --d5: #6b46c1;
   --r: 20px; --r-sm: 12px;
+  --frame: #0c2233; /* إطار القوالب — بلون خلفية القائمة الجانبية */
   --sh: 0 1px 2px rgba(12,34,51,.04), 0 8px 24px rgba(12,34,51,.05); --sh-2: 0 16px 40px rgba(12,34,51,.13);
   --font: "Plex", "IBM Plex Sans Arabic", -apple-system, "SF Arabic", "Segoe UI", Tahoma, sans-serif;
 }

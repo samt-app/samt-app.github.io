@@ -1903,7 +1903,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       $("#sf-n").innerHTML = l.length + " منسوباً" + (n ? " · <b>" + n + "</b> محدَّد لإرسال رابط الرصد" : "") + ".";
       $("#sf-send").disabled = !n;
       $("#sf-send").innerHTML = SLI("whatsapp") + " إرسال روابط الرصد" + (n ? " (" + n + ")" : "");
-      $("#sf-l").innerHTML = l.length ? '<ul class="list">' + l.map(function (x) {
+      function row(x) {
         var ok = can(x);
         return '<li class="frow selrow' + (ok && sel[x.id] ? " on" : "") + '"><label class="sel"><input type="checkbox" data-pick="' + e(x.id) + '"' + (ok && sel[x.id] ? " checked" : "") + (ok ? "" : " disabled") + ">" +
           '<span class="row1"><b>' + e(x.name) + '</b> <span class="chip">' + e(ROLE[x.role] || x.role) + "</span>" +
@@ -1912,7 +1912,13 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
           (SL.validPhone(x.phone) ? ' <small class="mut" dir="ltr">' + e(SL.showPhone(x.phone)) + "</small>" : ' <span class="chip warnc">بلا جوال</span>') + "</span></label>" +
           '<div class="row3"><button class="btn sm" type="button" data-ed="' + x.id + '">تعديل</button>' +
           (SL.validPhone(x.phone) ? '<button class="btn sm" type="button" data-msg="' + x.id + '">رسالة</button>' : "") + "</div></li>";
-      }).join("") + "</ul>" : '<div class="empty"><p>لا توجد بيانات.</p></div>';
+      }
+      function group(title, arr) {
+        return arr.length ? '<h3 class="sec-h">' + title + ' <span class="chip">' + arr.length + "</span></h3>" +
+          '<ul class="list panel">' + arr.map(row).join("") + "</ul>" : "";
+      }
+      var adm = l.filter(function (x) { return x.role !== "teacher"; }), tch = l.filter(function (x) { return x.role === "teacher"; });
+      $("#sf-l").innerHTML = l.length ? group("الإدارة", adm) + group("المعلمون", tch) : '<div class="empty"><p>لا توجد بيانات.</p></div>';
       $$("[data-ed]").forEach(function (b) { b.onclick = function () { editStaff(A.byId[b.dataset.ed]); }; });
       $$("[data-msg]").forEach(function (b) { b.onclick = function () { var x = A.byId[b.dataset.msg]; SL.openWa(x.phone, "الأستاذ " + x.name + "\n"); }; });
       $$("[data-pick]").forEach(function (b) { b.onchange = function () { if (b.checked) sel[b.dataset.pick] = 1; else delete sel[b.dataset.pick]; keep(); draw(); }; });
