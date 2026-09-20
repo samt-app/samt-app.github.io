@@ -61,7 +61,7 @@ tr.det td { background: var(--bg-2); white-space: normal; }
   <p class="note">هذه الصفحة خاصة بك. تُقرأ البيانات من قاعدة بيانات المشروع بحسابك فقط.</p>
   <label>البريد<input id="em" type="email" autocomplete="username" dir="ltr"></label>
   <label>كلمة المرور<input id="pw" type="password" autocomplete="current-password"></label>
-  <details class="sub" id="keybox"><summary>إعداد المفتاح (مرة واحدة)</summary>
+  <details class="sub" id="keybox" hidden><summary>إعداد المفتاح (عند الحاجة)</summary>
     <label>Web API Key من إعدادات مشروع Firebase<input id="ak" dir="ltr" placeholder="AIza…"></label>
   </details>
   <button class="btn pri" id="go" type="button" style="width:100%">دخول</button>
@@ -118,10 +118,10 @@ tr.det td { background: var(--bg-2); white-space: normal; }
 (function () {
   "use strict";
   var SL = window.SL, e = SL.esc, $ = function (s) { return document.querySelector(s); };
-  var DB = SL.DEFAULT_RELAY, KEY = "", ROWS = [], sortBy = "end", sortDir = 1, filter = "all", timer = null;
-  try { KEY = localStorage.getItem("samt_admin_key") || ""; } catch (err) {}
+  var DB = SL.DEFAULT_RELAY, KEY = "AIzaSyAUfytIrA1q-RRqwGqKiJvyhuGyn_4IdvI", ROWS = [], sortBy = "end", sortDir = 1, filter = "all", timer = null;
+  try { KEY = localStorage.getItem("samt_admin_key") || KEY; } catch (err) {}
   document.querySelectorAll(".lg, .lock-logo").forEach(function (el) { el.innerHTML = SL.LOGO; });
-  if (KEY) $("#ak").value = KEY; else $("#keybox").open = true;
+  $("#ak").value = KEY; $("#keybox").hidden = false;
 
   /* ————— الدخول ————— */
   async function signIn(email, pass) {

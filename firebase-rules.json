@@ -12,7 +12,7 @@
       }
     },
     "reg": {
-      ".read": false,
+      ".read": "auth != null && auth.uid === 's0Ckx7lIpiXuEcnMJF1IJeuzsbp2'",
       "$dev": {
         ".write": "newData.isString() && newData.val().length < 5000 || !newData.exists()"
       }
