@@ -198,6 +198,7 @@
   /* ————— الروابط القصيرة —————
      يُرفع النموذج مشفراً إلى /relay/L/<بصمة الرمز>، والرابط يحمل الرمز فقط (11 حرفاً).
      مفتاح فك التشفير مشتق من الرمز، فلا يستطيع الوسيط قراءة المحتوى. */
+  SL.LOGO = '<svg class="mark" viewBox="64 64 384 384" aria-hidden="true"><polygon points="256,78 302,145 382,130 367,210 434,256 367,302 382,382 302,367 256,434 210,367 130,382 145,302 78,256 145,210 130,130 210,145" fill="none" stroke="#d6b465" stroke-width="18" stroke-linejoin="round"/><circle cx="256" cy="256" r="92" fill="none" stroke="#d6b465" stroke-width="9" opacity=".5"/><path d="M256 112 290 256 256 400 222 256Z" fill="#d6b465"/><path d="M256 112 290 256H256Z" fill="#fff" opacity=".45"/><circle cx="256" cy="256" r="17" fill="#0c2233" stroke="#d6b465" stroke-width="8"/></svg>';
   SL.DEFAULT_RELAY = "https://samt-app-4132d-default-rtdb.europe-west1.firebasedatabase.app";
   var B56 = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
   function code(n) { var s = ""; while (s.length < n) { var a = new Uint8Array(n * 2); crypto.getRandomValues(a); for (var i = 0; i < a.length && s.length < n; i++) if (a[i] < 224) s += B56[a[i] % 56]; } return s; }
@@ -2379,11 +2380,11 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var items = [["home", "home", "الرئيسية"], ["students", "users", "الطلاب"], ["incidents", "alert", "المخالفات", "nav-badge"], ["merit", "star", "السلوك المتميز"], ["absence", "calendar", "الغياب"],
       ["sigs", "pen", "التوقيعات عن بُعد", "sig-badge"], ["staff", "teacher", "المعلمون والإدارة"], ["commit", "doc", "الالتزام المدرسي"], ["import", "upload", "الاستيراد"], ["settings", "gear", "الإعدادات"]];
     document.getElementById("boot").innerHTML =
-      '<aside class="side"><a class="logo" href="#home"><span class="lg">س</span><span class="logo-t"><b>سَمْت</b><small>ضبط السلوك والمواظبة</small></span></a>' +
+      '<aside class="side"><a class="logo" href="#home"><span class="lg">' + SL.LOGO + '</span><span class="logo-t"><b>سَمْت</b><small>ضبط السلوك والمواظبة</small></span></a>' +
       '<a class="new" href="#new">' + SLI("plus") + '<span>رصد مخالفة</span><kbd>N</kbd></a><nav class="snav">' +
       items.map(function (x) { return '<a href="#' + x[0] + '">' + SLI(x[1]) + "<span>" + x[2] + "</span>" + (x[3] ? '<em id="' + x[3] + '" hidden></em>' : "") + "</a>"; }).join("") +
       '</nav><a class="subc" href="#settings?tab=lic" id="side-plan"></a><div class="side-foot">وفق قواعد السلوك والمواظبة — الإصدار الخامس 1447هـ</div></aside>' +
-      '<div class="shell"><header class="top"><a class="m-logo" href="#home">س</a><div class="crumb"><small id="top-school"></small><h1 id="top-title"></h1></div>' +
+      '<div class="shell"><header class="top"><a class="m-logo" href="#home">' + SL.LOGO + '</a><div class="crumb"><small id="top-school"></small><h1 id="top-title"></h1></div>' +
       '<div class="search" id="q-box">' + SLI("search") + '<input id="q-all" type="search" autocomplete="off" placeholder="ابحث عن طالب بالاسم أو السجل المدني…"><kbd>/</kbd><div class="q-res" id="q-res" hidden></div></div>' +
       '<a id="top-lic" class="lic" href="#settings?tab=lic"></a><span id="top-sync" class="sync" title="الاستلام التلقائي"><i></i><b></b></span>' +
       '<img class="moe" src="moe-logo.png" alt="وزارة التعليم" onerror="this.remove()"></header><main id="main"></main></div>' +
@@ -2444,7 +2445,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     return new Promise(function (res) {
       if (!A.S.settings.pin) return res();
       var w = document.createElement("div"); w.className = "lock";
-      w.innerHTML = '<div class="lock-card"><div class="lock-logo">س</div><h1>سَمْت</h1><label class="lock-l">الرمز<input id="pg" type="password" inputmode="numeric" autocomplete="off"></label><button class="btn pri" id="pg-ok" type="button">دخول</button><p id="pg-m" class="lock-msg err"></p></div>';
+      w.innerHTML = '<div class="lock-card"><div class="lock-logo">' + SL.LOGO + '</div><h1>سَمْت</h1><label class="lock-l">الرمز<input id="pg" type="password" inputmode="numeric" autocomplete="off"></label><button class="btn pri" id="pg-ok" type="button">دخول</button><p id="pg-m" class="lock-msg err"></p></div>';
       document.body.appendChild(w);
       var inp = w.querySelector("#pg"); setTimeout(function () { inp.focus(); }, 50);
       async function go() { if ((await SL.sha256("samt|" + inp.value)) === A.S.settings.pin) { w.remove(); res(); } else { w.querySelector("#pg-m").textContent = "الرمز غير صحيح"; inp.value = ""; } }

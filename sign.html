@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0e6e6a">
+<meta name="theme-color" content="#0c2233">
 <meta name="color-scheme" content="light">
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
@@ -19,7 +19,7 @@
 (function () {
   "use strict";
   var SL = window.SL, e = SL.esc, app = document.getElementById("app"), P = null;
-  function head() { return '<div class="pub-h"><div class="logo">س</div><div><b>' + e(P.school || "") + '</b><small>توقيع إلكتروني لنموذج من المدرسة</small></div></div>'; }
+  function head() { return '<div class="pub-h"><div class="logo">' + SL.LOGO + '</div><div><b>' + e(P.school || "") + '</b><small>توقيع إلكتروني لنموذج من المدرسة</small></div></div>'; }
   function fail(msg) { app.innerHTML = '<div class="card done"><div class="ic" style="color:#c62828">!</div><h2>' + e(msg) + "</h2><p class=\"mut\">تواصل مع المدرسة إن احتجت رابطاً جديداً.</p></div>"; }
   function doneKey() { return "samt_signed_" + P.tok; }
 

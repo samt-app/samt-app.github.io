@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0e6e6a">
+<meta name="theme-color" content="#0c2233">
 <meta name="color-scheme" content="light">
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
@@ -38,7 +38,7 @@
     var now = new Date(), local = new Date(now.getTime() - now.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
     var sent = sentList();
     var isC = P.role === "counselor", to = isC ? "إدارة المدرسة للاعتماد" : "وكيل شؤون الطلبة";
-    app.innerHTML = '<div class="pub-h"><div class="logo">س</div><div><b>' + (isC ? "رصد الموجه الطلابي" : "رصد مشكلة سلوكية") + "</b><small>" + e(P.name) + " — " + e(P.school) + "</small></div></div>" +
+    app.innerHTML = '<div class="pub-h"><div class="logo">' + SL.LOGO + '</div><div><b>' + (isC ? "رصد الموجه الطلابي" : "رصد مشكلة سلوكية") + "</b><small>" + e(P.name) + " — " + e(P.school) + "</small></div></div>" +
       '<div class="card">' + (isC ? '<label>ابحث عن الطالب بالاسم<input id="sq" type="search" autocomplete="off" placeholder="اكتب جزءاً من اسم الطالب…"></label><div id="sr" class="sres" hidden></div>' : "") + '<div class="grid2"><label>الفصل<select id="cl"><option value="">اختر</option>' + classes.map(function (c) { return "<option>" + e(c) + "</option>"; }).join("") + '</select></label>' +
       '<label>الطالب<select id="st" disabled><option value="">—</option></select></label></div>' +
       '<label>ابحث عن المشكلة<input id="q" type="search" placeholder="مثال: التأخر، الجوال، الهروب…"></label><div class="degtabs" id="dg"></div><div class="items" id="its"></div>' +

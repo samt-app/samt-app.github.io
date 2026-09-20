@@ -5,6 +5,7 @@
   "use strict";
   var BUILTIN = "1.0.0";
   var TRIAL_HOURS = 48;
+  var MARK = '<svg class="mark" viewBox="64 64 384 384" aria-hidden="true"><polygon points="256,78 302,145 382,130 367,210 434,256 367,302 382,382 302,367 256,434 210,367 130,382 145,302 78,256 145,210 130,130 210,145" fill="none" stroke="#d6b465" stroke-width="18" stroke-linejoin="round"/><circle cx="256" cy="256" r="92" fill="none" stroke="#d6b465" stroke-width="9" opacity=".5"/><path d="M256 112 290 256 256 400 222 256Z" fill="#d6b465"/><path d="M256 112 290 256H256Z" fill="#fff" opacity=".45"/><circle cx="256" cy="256" r="17" fill="#0c2233" stroke="#d6b465" stroke-width="8"/></svg>';
   var VENDOR = { name: "تقناس", wa: "" };
   /* المفتاح العام للتحقق من أكواد الاشتراك وملفات التحديث (المفتاح الخاص لدى المطوّر فقط) */
   var PUB = { kty: "EC", crv: "P-256", x: "xX3tdXeSIU2uPnqVD4pfGLnHzjJ-L8kMuBqNuOvtSyY", y: "_Muab14jpoehdsDYXZv-gp1TjGOoMkdYN_FcN4h2JT0", ext: true, key_ops: ["verify"] };
@@ -171,7 +172,7 @@
     var wa = VENDOR.wa ? "https://wa.me/" + VENDOR.wa + "?text=" + encodeURIComponent("السلام عليكم، أرغب بالاشتراك في تطبيق «سَمْت».\nرقم الجهاز: " + L.dev) : "";
     root.innerHTML =
       '<div class="lock"><div class="lock-card">' +
-      '<div class="lock-logo">س</div><h1>سَمْت</h1>' +
+      '<div class="lock-logo">' + MARK + '</div><h1>سَمْت</h1>' +
       '<p class="lock-why">' + esc(L.why || "") + "</p>" +
       '<div class="lock-dev"><span>رقم الجهاز</span><b id="lk-dev">' + esc(L.dev) + '</b><button id="lk-copy" type="button">نسخ</button></div>' +
       '<p class="lock-hint">أرسل رقم الجهاز إلى ' + esc(VENDOR.name) + " للحصول على كود الاشتراك.</p>" +
@@ -273,7 +274,7 @@
     return new Promise(function (res) {
       var el = document.getElementById("boot");
       var first = mode === "first";
-      el.innerHTML = '<div class="lock"><div class="lock-card"><div class="lock-logo">س</div><h1>سَمْت</h1>' +
+      el.innerHTML = '<div class="lock"><div class="lock-card"><div class="lock-logo">' + MARK + '</div><h1>سَمْت</h1>' +
         (first ? "<p><b>مجلد البيانات على جهازك</b></p><p class=\"mut\">ستظهر نافذة اختيار مجلد. اختر مجلد <b>المستندات (Documents)</b> ثم اضغط «تحديد» أو «فتح»، فيُنشأ داخله مجلد <b>sammt</b> تلقائياً وتُحفظ فيه كل البيانات، فلا يؤثر مسح المتصفح أو حذفه عليها.</p><p class=\"mut\" style=\"font-size:.85rem\">لا يُسمح باختيار القرص الرئيسي نفسه (C: أو Macintosh HD) لأن المتصفح يحميه. إن كان لديك مجلد sammt سابق فاختره مباشرة لاستعادة بياناتك واشتراكك.</p>" +
           '<button class="btn pri" id="fg-pick" type="button">اختيار مكان مجلد sammt</button><button class="btn" id="fg-skip" type="button">لاحقاً</button>'
         : '<p>اسمح لسَمْت بالوصول إلى مجلد البيانات <b>sammt</b> للمتابعة.</p><button class="btn pri" id="fg-ok" type="button">السماح والمتابعة</button><button class="btn" id="fg-new" type="button">اختيار مجلد آخر</button><button class="btn" id="fg-skip" type="button">المتابعة بدون المجلد</button>') +

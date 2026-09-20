@@ -100,3 +100,5 @@ code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .85em; 
 .lock-msg.ok { color: var(--ok); } .lock-msg.err { color: var(--red); }
 .lock details { margin-top: 12px; text-align: right; }
 .lock summary { cursor: pointer; color: var(--mut); }
+svg.mark { display: block; width: 74%; height: 74%; }
+.lock-logo svg.mark { width: 72%; height: 72%; }
