@@ -1269,12 +1269,28 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     setTitle("الطلاب");
     var S = A.S;
     var schools = S.settings.schools;
-    var grades = {}; S.students.forEach(function (s) { grades[A.classKey(s)] = 1; });
     main().innerHTML = '<div class="toolbar"><input id="st-q" type="search" placeholder="بحث بالاسم أو السجل المدني أو الجوال" value="' + e(q.q || "") + '">' +
       (schools.length > 1 ? '<select id="st-sc"><option value="">كل المدارس</option>' + schools.map(function (s) { return '<option value="' + e(s.id) + '">' + e(s.name) + "</option>"; }).join("") + "</select>" : "") +
-      '<select id="st-stg"><option value="">كل المراحل</option><option>ابتدائي</option><option>متوسط</option><option>ثانوي</option></select>' +
-      '<select id="st-cl"><option value="">كل الفصول</option>' + Object.keys(grades).sort().map(function (g) { return "<option>" + e(g) + "</option>"; }).join("") + '</select></div><div id="st-list"></div>' +
+      '<select id="st-stg"></select><select id="st-cl"></select></div><div id="st-list"></div>' +
       '<div class="toolbar end"><button class="btn pri" id="st-stages" type="button">تحديد مراحل الطلاب</button><a class="btn" href="#import">استيراد من Excel</a><button class="btn" id="st-add" type="button">إضافة طالب</button></div>';
+    /* المرشحات مرتبطة: المرحلة تتبع المدرسة، والفصل يتبع المدرسة والمرحلة */
+    function fill(el, all, opts, keep) {
+      var v = opts.indexOf(keep) >= 0 ? keep : "";
+      el.innerHTML = '<option value="">' + all + "</option>" + opts.map(function (o) { return '<option' + (o === v ? " selected" : "") + ">" + e(o) + "</option>"; }).join("");
+      el.value = v; el.disabled = !opts.length;
+      return v;
+    }
+    function sync() {
+      var sc = $("#st-sc") ? $("#st-sc").value : "";
+      var inSc = S.students.filter(function (s) { return !sc || s.school === sc; });
+      var st = {}; inSc.forEach(function (s) { st[A.stageText(s)] = 1; });
+      var sg = fill($("#st-stg"), "كل المراحل", ["ابتدائي", "متوسط", "ثانوي"].filter(function (x) { return st[x]; }), $("#st-stg").value);
+      var cls = {}, ord = { "ابتدائي": 1, "متوسط": 2, "ثانوي": 3 };
+      inSc.forEach(function (s) { if (!sg || A.stageText(s) === sg) cls[A.classKey(s)] = (ord[A.stageText(s)] || 9) * 100 + A.gradeNum(String(A.classKey(s)).split(" / ")[0]); });
+      fill($("#st-cl"), "كل الفصول", Object.keys(cls).sort(function (a, b) {
+        return (cls[a] - cls[b]) || a.localeCompare(b, "ar");
+      }), $("#st-cl").value);
+    }
     function draw() {
       var qq = A.norm($("#st-q").value), sc = $("#st-sc") ? $("#st-sc").value : "", cl = $("#st-cl").value, sg = $("#st-stg").value;
       var list = S.students.filter(function (s) {
@@ -1285,10 +1301,11 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         return '<li><a href="#student/' + s.id + '">' + A.scoreChip(s) + " " + stuLine(s) + (SL.validPhone(s.parentPhone) ? "" : ' <span class="chip warnc">بلا جوال</span>') + "</a></li>";
       }).join("") + "</ul>" : empty(S.students.length ? "لا نتائج." : "لا يوجد طلاب بعد.", '<a class="btn pri" href="#import">استيراد من Excel</a>');
     }
-    ["#st-q", "#st-sc", "#st-cl", "#st-stg"].forEach(function (s) { var el = $(s); if (el) el.addEventListener("input", draw); });
+    ["#st-q", "#st-cl"].forEach(function (s) { var el = $(s); if (el) el.addEventListener("input", draw); });
+    ["#st-sc", "#st-stg"].forEach(function (s) { var el = $(s); if (el) el.addEventListener("input", function () { sync(); draw(); }); });
     $("#st-stages").onclick = stagesTool;
     $("#st-add").onclick = function () { editStudent(null); };
-    draw();
+    sync(); draw();
   };
 
   /* تحديد مرحلة الطلاب حسب الفصل — تختلف المواد والإجراءات بين الابتدائي (6–9) والمتوسط/الثانوي (10–14) */
