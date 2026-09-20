@@ -1116,7 +1116,8 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   A.route = function () {
     var h = decodeURIComponent(location.hash.replace(/^#/, "")) || "home", p = h.split("/"), q = {};
     if (p[p.length - 1].indexOf("?") >= 0) { var sp = p[p.length - 1].split("?"); p[p.length - 1] = sp[0]; sp[1].split("&").forEach(function (kv) { var z = kv.split("="); q[z[0]] = z[1]; }); }
-    $$(".nav a").forEach(function (a) { a.classList.toggle("on", a.getAttribute("href") === "#" + p[0] || (p[0] === "student" && a.getAttribute("href") === "#students") || (p[0] === "inc" && a.getAttribute("href") === "#incidents")); });
+    $$(".nav a, .snav a").forEach(function (a) { a.classList.toggle("on", a.getAttribute("href") === "#" + p[0] || (p[0] === "student" && a.getAttribute("href") === "#students") || (p[0] === "inc" && a.getAttribute("href") === "#incidents") || (p[0] === "doc" && a.getAttribute("href") === "#incidents")); });
+    var mn = main(); mn.classList.remove("enter"); void mn.offsetWidth; mn.classList.add("enter");
     window.scrollTo(0, 0);
     var fn = V[p[0]] || V.home;
     try { fn(p.slice(1), q); } catch (err) { console.error(err); main().innerHTML = empty("حدث خطأ في عرض الصفحة: " + err.message); }
@@ -1132,32 +1133,126 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         '<a class="btn pri" href="#settings">البدء بالإعدادات</a> <a class="btn" href="template.xlsx" download>تنزيل قالب Excel</a></section>';
       return;
     }
+    var DAY = 864e5, t0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    var live = S.incidents.filter(function (x) { return x.status !== "void" && x.status !== "reported"; });
     var reported = S.incidents.filter(function (x) { return x.status === "reported"; });
-    var monthInc = S.incidents.filter(function (x) { var d = new Date(x.date); return x.status !== "void" && x.status !== "reported" && d.getMonth() === month && d.getFullYear() === year; });
-    var pend = S.sigs.filter(function (g) { return g.status === "pending" && g.exp > Date.now(); });
-    var signedToday = S.sigs.filter(function (g) { return g.status === "signed" && g.via === "link" && SL.isoDay(g.at) === SL.isoDay(); });
+    var monthInc = live.filter(function (x) { var d = new Date(x.date); return d.getMonth() === month && d.getFullYear() === year; });
+    var prevM = new Date(year, month - 1, 1), prevInc = live.filter(function (x) { var d = new Date(x.date); return d.getMonth() === prevM.getMonth() && d.getFullYear() === prevM.getFullYear(); });
+    var todayInc = live.filter(function (x) { return new Date(x.date).getTime() >= t0; });
+    var linkSigs = S.sigs.filter(function (g) { return g.via === "link" && g.status !== "replaced"; });
+    var pend = linkSigs.filter(function (g) { return g.status === "pending" && g.exp > Date.now(); });
+    var signedToday = linkSigs.filter(function (g) { return g.status === "signed" && (g.recvAt || g.at) >= t0; });
     var low = S.students.filter(function (s) { return !A.qualitative(s) && A.score(s).total < 80; }).sort(function (a, b) { return A.score(a).total - A.score(b).total; }).slice(0, 8);
-    var recent = S.incidents.filter(function (x) { return x.status !== "void"; }).sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); }).slice(0, 6);
-    var bak = S.settings.lastBackup ? Math.floor((Date.now() - S.settings.lastBackup) / 864e5) : null;
-    var html = "";
-    var FS = C.FS || {};
-    if (FS.supported && !FS.ok) html += '<div class="alert warn">مجلد البيانات <b>sammt</b> غير مربوط — مسح المتصفح قد يُفقد البيانات. <a href="#settings?tab=backup">ربط المجلد الآن</a></div>';
-    else if (!FS.supported && (bak === null || bak >= 7)) html += '<div class="alert warn">البيانات محفوظة في هذا المتصفح فقط. ' + (bak === null ? "لم تُنشأ نسخة احتياطية بعد." : "آخر نسخة احتياطية قبل " + bak + " يوماً.") + ' <a href="#settings?tab=backup">إنشاء نسخة الآن</a></div>';
-    if (!S.settings.relayUrl) html += '<div class="alert">لتفعيل التوقيع عن بُعد ووصول بلاغات المعلمين تلقائياً أكمل <a href="#settings?tab=links">إعداد الروابط</a>.</div>';
+    var recent = S.incidents.filter(function (x) { return x.status !== "void"; }).sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); }).slice(0, 7);
+    var withInc = {}; monthInc.forEach(function (x) { if (x.stu) withInc[x.stu] = 1; });
+    var discipline = S.students.length ? Math.round((1 - Object.keys(withInc).length / S.students.length) * 100) : 100;
+    var classes = {}; S.students.forEach(function (st) { classes[A.classKey(st)] = 1; });
+    function daily(arr, key, days) { var out = []; for (var i = days - 1; i >= 0; i--) { var a0 = t0 - i * DAY, a1 = a0 + DAY; out.push(arr.filter(function (x) { var t = new Date(key(x)).getTime(); return t >= a0 && t < a1; }).length); } return out; }
+    function weekly(arr, key, weeks) { var out = []; for (var i = weeks - 1; i >= 0; i--) { var a1 = t0 + DAY - i * 7 * DAY, a0 = a1 - 7 * DAY; out.push(arr.filter(function (x) { var t = new Date(key(x)).getTime(); return t >= a0 && t < a1; }).length); } return out; }
+    var bak = S.settings.lastBackup ? Math.floor((Date.now() - S.settings.lastBackup) / DAY) : null;
+    var FS = C.FS || {}, alerts = "";
+    if (FS.supported && !FS.ok) alerts += '<a class="alert warn" href="#settings?tab=backup">' + SLI("folder") + ' مجلد البيانات <b>sammt</b> غير مربوط — مسح المتصفح قد يُفقد البيانات. <u>ربط المجلد الآن</u></a>';
+    else if (!FS.supported && (bak === null || bak >= 7)) alerts += '<a class="alert warn" href="#settings?tab=backup">البيانات محفوظة في هذا المتصفح فقط. ' + (bak === null ? "لم تُنشأ نسخة احتياطية بعد." : "آخر نسخة احتياطية قبل " + bak + " يوماً.") + " <u>إنشاء نسخة الآن</u></a>";
+    if (!S.settings.relayUrl) alerts += '<a class="alert" href="#settings?tab=links">لتفعيل التوقيع عن بُعد ووصول بلاغات المعلمين تلقائياً أكمل <u>إعداد الروابط</u>.</a>';
     var hr = now.getHours(), greet = hr < 12 ? "صباح الخير" : "مساء الخير";
-    html = '<section class="hero"><div class="hero-t"><small>' + e(SL.dayName(now)) + " " + e(SL.hijri(now)) + " — " + e(SL.greg(now)) + "</small><h2>" + greet + '</h2><p>' + e(S.settings.schools.map(function (z) { return z.name; }).filter(Boolean).join(" · ") || "سَمْت — ضبط السلوك والمواظبة") + "</p></div>" +
-      '<div class="hero-a"><a class="btn gold big" href="#new">' + SLI("plus") + ' رصد مخالفة</a><a class="btn ghost big" href="#merit">' + SLI("star") + ' سلوك متميز</a><a class="btn ghost big" href="#absence">' + SLI("calendar") + ' الغياب</a><button class="btn ghost big inst-btn" type="button" id="hm-inst">' + SLI("download") + " تثبيت التطبيق</button></div></section>" + html;
-    html += '<div class="stats">' +
-      stat(S.students.length, "طالب", "#students", "", "users") + stat(monthInc.length, "مخالفة هذا الشهر", "#incidents", "", "alert") +
-      stat(reported.length, "بلاغات معلمين جديدة", "#incidents?f=reported", reported.length ? "hot" : "", "inbox") +
-      stat(pend.length, "توقيعات بانتظار الرد", "#sigs", "", "clock") + stat(signedToday.length, "وُقّع اليوم عن بُعد", "#sigs", "", "check") + "</div>";
-    if (reported.length) html += '<section class="card"><h3 class="sec-h">' + SLI("inbox") + ' بلاغات المعلمين بانتظار الاعتماد</h3>' + incList(reported) + "</section>";
-    html += '<section class="card"><h3 class="sec-h">' + SLI("list") + ' آخر المخالفات</h3>' + (recent.length ? incList(recent) : '<p class="mut">لا توجد مخالفات مسجلة.</p>') + "</section>";
-    if (low.length) html += '<section class="card"><h3 class="sec-h">' + SLI("shield") + ' طلاب درجة سلوكهم أقل من 80</h3><ul class="list">' + low.map(function (s) { return '<li><a href="#student/' + s.id + '">' + A.scoreChip(s) + " " + stuLine(s) + "</a></li>"; }).join("") + "</ul></section>";
+    var schoolNames = S.settings.schools.map(function (z) { return z.name; }).filter(Boolean).join(" · ") || "سَمْت — ضبط السلوك والمواظبة";
+
+    var html = '<section class="hero">' + PATTERN + '<div class="hero-t"><span class="date">' + SLI("calendar") + " " + e(SL.dayName(now)) + " " + e(SL.hijri(now)) + " — " + e(SL.greg(now)) + "</span>" +
+      "<h2>" + greet + '</h2><p class="hero-s">' + e(schoolNames) + "</p>" +
+      '<div class="today"><div><b data-n="' + todayInc.length + '">0</b><span>مخالفات اليوم</span></div><div><b data-n="' + signedToday.length + '">0</b><span>توقيعات وصلت اليوم</span></div><div><b data-n="' + discipline + '" data-s="%">0</b><span>نسبة الانضباط هذا الشهر</span></div></div></div>' +
+      '<div class="hero-a"><a class="b1" href="#new">' + SLI("plus") + '<span><b>رصد مخالفة</b><small>تسجيل مع إجراءات تلقائية</small></span></a><a href="#merit">' + SLI("star") + '<span><b>سلوك متميز</b><small>تعويض درجات السلوك</small></span></a>' +
+      '<a href="#absence">' + SLI("calendar") + '<span><b>الغياب</b><small>مستويات 3 / 5 / 10 أيام</small></span></a><a href="#import">' + SLI("upload") + '<span><b>استيراد Excel</b><small>الطلاب والمنسوبون</small></span></a>' +
+      '<button type="button" class="inst-btn" id="hm-inst">' + SLI("download") + "<span><b>تثبيت التطبيق</b><small>على هذا الجهاز</small></span></button></div></section>" + alerts;
+
+    var dm = prevInc.length ? Math.round((monthInc.length - prevInc.length) / prevInc.length * 100) : null;
+    html += '<section class="kpis">' +
+      kpi("users", "الطلاب", S.students.length, "#students", "c1", Object.keys(classes).length + " فصل", null) +
+      kpi("alert", "مخالفات هذا الشهر", monthInc.length, "#incidents", "c2", dm == null ? "" : (dm > 0 ? "▲ " : dm < 0 ? "▼ " : "") + Math.abs(dm) + "%", weekly(live, function (x) { return x.date; }, 8), dm != null && dm <= 0 ? "good" : dm > 0 ? "bad" : "") +
+      kpi("inbox", "بلاغات معلمين جديدة", reported.length, "#incidents?f=reported", reported.length ? "c3 hot" : "c3", reported.length ? "بانتظار اعتمادك" : "لا جديد", daily(reported, function (x) { return x.createdAt || x.date; }, 7)) +
+      kpi("clock", "توقيعات بانتظار الرد", pend.length, "#sigs", "c4", "روابط سارية", daily(linkSigs, function (x) { return x.createdAt; }, 7)) +
+      kpi("check", "وُقّع عن بُعد اليوم", signedToday.length, "#sigs", "c5", "يصل تلقائياً", daily(linkSigs.filter(function (g) { return g.status === "signed"; }), function (x) { return x.recvAt || x.at; }, 7)) + "</section>";
+
+    /* المخالفات حسب الشهر الهجري */
+    var hm = hijriMonths(12);
+    html += '<div class="dash"><section class="card span2"><div class="c-h"><div><h3>المخالفات حسب الشهر</h3><small>بالتقويم الهجري</small></div><div class="seg" id="ch-seg"><button type="button" data-m="4">4 أشهر</button><button type="button" data-m="6" class="on">6 أشهر</button><button type="button" data-m="12">12 شهراً</button></div></div><div id="ch-box"></div></section>';
+
+    var degs = [1, 2, 3, 4, 5].map(function (d) { return monthInc.filter(function (x) { return +x.degree === d; }).length; }), tot = degs.reduce(function (a, b) { return a + b; }, 0);
+    var off = 0, C_ = 263.9, segs = tot ? degs.map(function (v, i) { if (!v) return ""; var L = v / tot * C_, g = Math.min(2, L / 3); var c = '<circle class="dn d' + (i + 1) + '" cx="50" cy="50" r="42" stroke-dasharray="' + (L - g).toFixed(1) + " " + (C_ - L + g).toFixed(1) + '" stroke-dashoffset="' + (-off).toFixed(1) + '"/>'; off += L; return c; }).join("") : "";
+    html += '<section class="card"><div class="c-h"><div><h3>توزيع الدرجات</h3><small>مخالفات هذا الشهر</small></div></div><div class="donut"><svg viewBox="0 0 100 100"><circle class="dn-bg" cx="50" cy="50" r="42"/>' + segs + '</svg><div class="dn-c"><b data-n="' + tot + '">0</b><small>مخالفة</small></div></div>' +
+      '<ul class="legend">' + degs.map(function (v, i) { return '<li><i class="d' + (i + 1) + '"></i>' + e(R.DEGREE_NAME[i + 1]) + "<b>" + v + "</b></li>"; }).join("") + "</ul></section>";
+
+    html += '<section class="card span2"><div class="c-h"><div><h3>آخر المخالفات</h3><small>تُحدَّث تلقائياً</small></div><a class="more" href="#incidents">عرض الكل ' + SLI("chevron") + "</a></div>" + (recent.length ? rowList(recent) : '<div class="empty-s">' + SLI("check") + "<p>لا توجد مخالفات مسجلة.</p></div>") + "</section>";
+
+    html += '<section class="card"><div class="c-h"><div><h3>بلاغات المعلمين</h3><small>' + (reported.length ? reported.length + " بانتظار الاعتماد" : "لا بلاغات جديدة") + "</small></div></div>" + (reported.length ? '<ul class="reps">' + reported.slice(0, 5).map(function (x) {
+      var st = A.byId[x.stu] || { name: x.stuName || "؟" };
+      return '<li><a href="#inc/' + x.id + '"><span class="av sm">' + e((x.byName || "م").trim().charAt(0)) + "</span><span><b>" + e(x.byName || "معلم") + " ← " + e(st.name) + "</b><small>" + e(x.itemText) + '</small></span><span class="go">' + SLI("chevron") + "</span></a></li>";
+    }).join("") + "</ul>" : '<div class="empty-s">' + SLI("inbox") + "<p>تصل بلاغات المعلمين هنا تلقائياً عبر روابطهم.</p></div>") + "</section>";
+
+    var wk = linkSigs.filter(function (g) { return (g.createdAt || 0) >= t0 - 6 * DAY; }), wS = wk.filter(function (g) { return g.status === "signed"; }).length, wR = wk.filter(function (g) { return g.status === "refused"; }).length, wP = wk.length - wS - wR;
+    var rate = wk.length ? Math.round(wS / wk.length * 100) : 0;
+    html += '<section class="card"><div class="c-h"><div><h3>التوقيعات عن بُعد</h3><small>آخر 7 أيام</small></div><a class="more" href="#sigs">التفاصيل ' + SLI("chevron") + '</a></div><div class="ringw"><svg viewBox="0 0 120 120" class="ring"><circle cx="60" cy="60" r="50" class="rg-bg"/><circle cx="60" cy="60" r="50" class="rg" stroke-dasharray="' + (314 * rate / 100).toFixed(0) + ' 314"/></svg><div class="rg-c"><b data-n="' + rate + '" data-s="%">0</b><small>نسبة التوقيع</small></div></div>' +
+      '<div class="minis"><div><b>' + wS + "</b><small>وقّع</small></div><div><b>" + wP + "</b><small>بانتظار</small></div><div><b>" + wR + "</b><small>رفض</small></div></div></section>";
+
+    html += '<section class="card span2"><div class="c-h"><div><h3>طلاب يحتاجون متابعة</h3><small>درجة السلوك أقل من 80</small></div><a class="more" href="#students">كل الطلاب ' + SLI("chevron") + "</a></div>" + (low.length ? '<ul class="lows">' + low.map(function (st) {
+      var v = A.score(st).total, c = v < 65 ? "r" : v < 75 ? "o" : "y";
+      return '<li><a href="#student/' + st.id + '"><span class="av sm ' + c + '">' + e(st.name.trim().charAt(0)) + "</span><span><b>" + e(st.name) + "</b><small>" + e(A.classKey(st)) + '</small></span><span class="sc"><span class="sc-b"><i class="' + c + '" style="width:' + v + '%"></i></span><b>' + v + "</b></span></a></li>";
+    }).join("") + "</ul>" : '<div class="empty-s">' + SLI("shield") + "<p>جميع الطلاب درجاتهم 80 فأكثر — ممتاز.</p></div>") + "</section></div>";
+
     main().innerHTML = html;
     var hb = $("#hm-inst"); if (hb) hb.onclick = A.install;
-    function stat(n, l, href, c, ic) { return '<a class="stat ' + (c || "") + '" href="' + href + '"><span class="stat-i">' + SLI(ic) + "</span><b>" + n + "</b><span>" + e(l) + "</span></a>"; }
+    function chart(n) {
+      var ms = hm.slice(-n), vals = ms.map(function (m) { return live.filter(function (x) { return hkey(new Date(x.date)) === m.k; }).length; });
+      var mx = Math.max.apply(null, vals.concat([4])), W = 400, bw = Math.min(40, (W - 30) / n * .55), step = (W - 30) / n;
+      $("#ch-box").innerHTML = '<svg class="chart" viewBox="0 0 400 200">' + [0.25, 0.5, 0.75, 1].map(function (f) { return '<line class="gl" x1="10" x2="390" y1="' + (160 - 140 * f) + '" y2="' + (160 - 140 * f) + '"/>'; }).join("") + ms.map(function (m, i) {
+        var h = Math.max(vals[i] ? 6 : 2, vals[i] / mx * 140), x = 20 + i * step + (step - bw) / 2, last = i === n - 1;
+        return '<g class="bar-g"><rect class="bar-f' + (last ? " hi" : "") + '" x="' + x.toFixed(1) + '" y="' + (160 - h).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="' + Math.min(10, bw / 3).toFixed(1) + '" style="animation-delay:' + i * 50 + 'ms"/>' +
+          '<text class="bar-v" x="' + (x + bw / 2).toFixed(1) + '" y="' + (152 - h).toFixed(1) + '">' + vals[i] + '</text><text class="bar-x" x="' + (x + bw / 2).toFixed(1) + '" y="182">' + e(m.l) + "</text></g>";
+      }).join("") + "</svg>";
+    }
+    chart(6);
+    $$("#ch-seg button").forEach(function (b) { b.onclick = function () { $$("#ch-seg button").forEach(function (x) { x.classList.toggle("on", x === b); }); chart(+b.dataset.m); }; });
+    countUp(main());
+    function kpi(ic, l, n, href, c, sub, sp, tone) {
+      return '<a class="kpi ' + c + '" href="' + href + '"><span class="k-top"><span class="k-i">' + SLI(ic) + "</span>" + (sub ? '<span class="k-sub ' + (tone || "") + '">' + e(sub) + "</span>" : "") + '</span><b data-n="' + n + '">0</b><span class="k-l">' + e(l) + "</span>" + (sp ? spark(sp) : '<span class="spark-e"></span>') + "</a>";
+    }
   };
+  var PATTERN = '<svg class="pat" aria-hidden="true"><defs><pattern id="hp" width="56" height="56" patternUnits="userSpaceOnUse"><path d="M28 3 35 21 53 28 35 35 28 53 21 35 3 28 21 21Z" fill="none" stroke="currentColor" stroke-width=".9"/><circle cx="28" cy="28" r="6.5" fill="none" stroke="currentColor" stroke-width=".9"/></pattern></defs><rect width="100%" height="100%" fill="url(#hp)"/></svg>';
+  function spark(p) {
+    var mx = Math.max.apply(null, p), mn = Math.min.apply(null, p), n = p.length;
+    var pts = p.map(function (v, i) { return (i * 100 / (n - 1)).toFixed(1) + "," + (28 - (mx === mn ? 10 : (v - mn) / (mx - mn) * 22)).toFixed(1); });
+    return '<svg class="spark" viewBox="0 0 100 30" preserveAspectRatio="none"><path class="sp-a" d="M' + pts.join(" L") + ' L100,30 L0,30Z"/><path class="sp-l" d="M' + pts.join(" L") + '"/></svg>';
+  }
+  var fHM = null; try { fHM = new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura-nu-latn", { month: "long", year: "numeric" }); } catch (err) {}
+  function hkey(d) { return fHM ? fHM.format(d) : d.getFullYear() + "-" + d.getMonth(); }
+  function hijriMonths(n) {
+    var out = [], seen = {}, d = new Date();
+    for (var i = 0; out.length < n && i < 400; i++) {
+      var dd = new Date(d.getTime() - i * 864e5), k = hkey(dd);
+      if (!seen[k]) { seen[k] = 1; var l = fHM ? new Intl.DateTimeFormat("ar-SA-u-ca-islamic-umalqura-nu-latn", { month: "long" }).format(dd) : String(dd.getMonth() + 1); out.unshift({ k: k, l: l.replace("الأول", "١").replace("الآخر", "٢").replace("الثاني", "٢").replace("الأولى", "١").replace("الآخرة", "٢") }); }
+    }
+    return out;
+  }
+  function countUp(root) {
+    $$("[data-n]", root).forEach(function (el) {
+      var to = +el.dataset.n, suf = el.dataset.s || "", t0 = null;
+      if (!to || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { el.textContent = to + suf; return; }
+      function step(ts) { if (!t0) t0 = ts; var k = Math.min(1, (ts - t0) / 700); el.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))) + suf; if (k < 1) requestAnimationFrame(step); }
+      requestAnimationFrame(step);
+    });
+  }
+  A.countUp = countUp;
+  function ago(t) {
+    var m = Math.floor((Date.now() - t) / 6e4);
+    if (m < 1) return "الآن"; if (m < 60) return "قبل " + m + " دقيقة"; var h = Math.floor(m / 60); if (h < 24) return "قبل " + h + " ساعة";
+    var d = Math.floor(h / 24); return d === 1 ? "أمس" : d < 7 ? "قبل " + d + " أيام" : SL.hijri(t);
+  }
+  A.ago = ago;
+  function rowList(arr) {
+    return '<ul class="rows">' + arr.map(function (x) {
+      var st = A.byId[x.stu] || { name: x.stuName || "؟" };
+      return '<li><a href="#inc/' + x.id + '"><span class="av d' + x.degree + '">' + e((st.name || "؟").trim().charAt(0)) + '</span><span class="r-m"><b>' + e(st.name) + "</b><small>" + e(st.grade ? A.classKey(st) : x.cls || "") + '</small></span><span class="r-t">' + e(x.itemText) + "</span>" + A.degChip(x.degree) + statusChip(x) + "<time>" + e(ago(x.createdAt || new Date(x.date).getTime())) + "</time></a></li>";
+    }).join("") + "</ul>";
+  }
   function incList(arr) {
     return '<ul class="list">' + arr.map(function (x) {
       var s = A.byId[x.stu] || { name: x.stuName || "؟" };
@@ -2278,20 +2373,67 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   var R = window.RULES, SL = window.SL, C = window.SLCore, A = window.APP, e = SL.esc, $ = A.$;
 
   function shell() {
+    var items = [["home", "home", "الرئيسية"], ["students", "users", "الطلاب"], ["incidents", "alert", "المخالفات", "nav-badge"], ["merit", "star", "السلوك المتميز"], ["absence", "calendar", "الغياب"],
+      ["sigs", "pen", "التوقيعات عن بُعد", "sig-badge"], ["staff", "teacher", "المعلمون والإدارة"], ["commit", "doc", "الالتزام المدرسي"], ["import", "upload", "الاستيراد"], ["settings", "gear", "الإعدادات"]];
     document.getElementById("boot").innerHTML =
-      '<header class="top"><a class="brand" href="#home"><span class="logo">س</span><span class="brand-t"><b>سَمْت</b><small id="top-school"></small></span></a><h1 id="top-title"></h1><a id="top-lic" class="lic" href="#settings?tab=lic"></a><span id="top-sync" class="sync" title="الاستلام التلقائي"></span></header>' +
-      '<main id="main"></main>' +
-      '<nav class="nav"><a href="#home">' + SLI("home") + '<span>الرئيسية</span></a><a href="#students">' + SLI("users") + '<span>الطلاب</span></a><a href="#new" class="plus"><i>' + SLI("plus") + '</i><span>رصد</span></a><a href="#incidents">' + SLI("alert") + '<span>المخالفات</span><b id="nav-badge" hidden></b></a><a href="#more">' + SLI("more") + '<span>المزيد</span></a>' +
-      '<div class="nav-foot">وفق قواعد السلوك والمواظبة<br>الإصدار الخامس 1447هـ</div></nav>';
+      '<aside class="side"><a class="logo" href="#home"><span class="lg">س</span><span class="logo-t"><b>سَمْت</b><small>ضبط السلوك والمواظبة</small></span></a>' +
+      '<a class="new" href="#new">' + SLI("plus") + '<span>رصد مخالفة</span><kbd>N</kbd></a><nav class="snav">' +
+      items.map(function (x) { return '<a href="#' + x[0] + '">' + SLI(x[1]) + "<span>" + x[2] + "</span>" + (x[3] ? '<em id="' + x[3] + '" hidden></em>' : "") + "</a>"; }).join("") +
+      '</nav><a class="subc" href="#settings?tab=lic" id="side-plan"></a><div class="side-foot">وفق قواعد السلوك والمواظبة — الإصدار الخامس 1447هـ</div></aside>' +
+      '<div class="shell"><header class="top"><a class="m-logo" href="#home">س</a><div class="crumb"><small id="top-school"></small><h1 id="top-title"></h1></div>' +
+      '<div class="search" id="q-box">' + SLI("search") + '<input id="q-all" type="search" autocomplete="off" placeholder="ابحث عن طالب بالاسم أو السجل المدني…"><kbd>/</kbd><div class="q-res" id="q-res" hidden></div></div>' +
+      '<a id="top-lic" class="lic" href="#settings?tab=lic"></a><span id="top-sync" class="sync" title="الاستلام التلقائي"><i></i><b></b></span>' +
+      '<img class="moe" src="moe-logo.png" alt="وزارة التعليم" onerror="this.remove()"></header><main id="main"></main></div>' +
+      '<nav class="nav"><a href="#home">' + SLI("home") + '<span>الرئيسية</span></a><a href="#students">' + SLI("users") + '<span>الطلاب</span></a><a href="#new" class="plus"><i>' + SLI("plus") + '</i><span>رصد</span></a><a href="#incidents">' + SLI("alert") + '<span>المخالفات</span><b id="nav-badge-m" hidden></b></a><a href="#more">' + SLI("more") + "<span>المزيد</span></a></nav>";
+    bindSearch();
+    document.addEventListener("keydown", function (ev) {
+      var t = ev.target, typing = /INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable;
+      if (typing || ev.metaKey || ev.ctrlKey || ev.altKey || document.querySelector(".sheet-wrap")) return;
+      if (ev.key === "/") { ev.preventDefault(); $("#q-all").focus(); }
+      else if (ev.key === "n" || ev.key === "N" || ev.key === "ى") { ev.preventDefault(); A.go("new"); }
+    });
     A.drawTop();
+  }
+  /* بحث فوري عن الطالب من الشريط العلوي */
+  function bindSearch() {
+    var inp = $("#q-all"), box = $("#q-res"), sel = 0, list = [];
+    function draw() {
+      var q = A.norm(inp.value);
+      if (!q) { box.hidden = true; return; }
+      list = A.S.students.filter(function (s) { return A.norm(s.name).indexOf(q) >= 0 || String(s.sid || "").indexOf(q) >= 0; }).slice(0, 7);
+      sel = Math.min(sel, Math.max(0, list.length - 1));
+      box.innerHTML = list.length ? list.map(function (s, i) {
+        return '<a href="#student/' + s.id + '" class="' + (i === sel ? "on" : "") + '"><span class="av">' + e((s.name || "؟").trim().charAt(0)) + "</span><span><b>" + e(s.name) + "</b><small>" + e(A.classKey(s)) + "</small></span>" + A.scoreChip(s) + "</a>";
+      }).join("") + '<a class="all" href="#students?q=' + encodeURIComponent(inp.value) + '">عرض كل النتائج في صفحة الطلاب</a>' : '<p class="q-none">لا يوجد طالب بهذا الاسم أو السجل.</p>';
+      box.hidden = false;
+    }
+    inp.addEventListener("input", function () { sel = 0; draw(); });
+    inp.addEventListener("focus", draw);
+    inp.addEventListener("keydown", function (ev) {
+      if (ev.key === "ArrowDown") { sel = Math.min(sel + 1, list.length - 1); draw(); ev.preventDefault(); }
+      else if (ev.key === "ArrowUp") { sel = Math.max(sel - 1, 0); draw(); ev.preventDefault(); }
+      else if (ev.key === "Enter") { var s = list[sel]; if (s) A.go("student/" + s.id); else A.go("students?q=" + encodeURIComponent(inp.value)); close(); }
+      else if (ev.key === "Escape") { close(); inp.blur(); }
+    });
+    function close() { box.hidden = true; inp.value = ""; }
+    document.addEventListener("click", function (ev) { if (!$("#q-box").contains(ev.target)) box.hidden = true; else if (ev.target.closest && ev.target.closest(".q-res a")) close(); });
   }
   A.drawTop = function () {
     var L = C.lic || {}, el = $("#top-lic"); if (!el) return;
     var sn = $("#top-school"); if (sn) sn.textContent = A.S.settings.schools.map(function (z) { return z.name; }).filter(Boolean).join(" · ") || "ضبط السلوك والمواظبة";
     el.textContent = L.trial ? "تجريبي: " + L.hours + " ساعة" : L.ok && L.days <= 14 ? "ينتهي بعد " + L.days + " يوماً" : "";
     el.hidden = !el.textContent;
-    var n = A.S.incidents.filter(function (x) { return x.status === "reported"; }).length, b = $("#nav-badge");
-    if (b) { b.hidden = !n; b.textContent = n; }
+    var n = A.S.incidents.filter(function (x) { return x.status === "reported"; }).length;
+    [$("#nav-badge"), $("#nav-badge-m")].forEach(function (b) { if (b) { b.hidden = !n; b.textContent = n; } });
+    var pn = A.S.sigs.filter(function (g) { return g.status === "pending" && g.exp > Date.now(); }).length, sb = $("#sig-badge");
+    if (sb) { sb.hidden = !pn; sb.textContent = pn; }
+    var pl = $("#side-plan");
+    if (pl) {
+      var pct = L.trial ? Math.max(4, Math.min(100, (L.hours || 0) / 48 * 100)) : L.ok ? Math.max(4, Math.min(100, (L.days || 0) / 365 * 100)) : 0;
+      pl.className = "subc" + (L.trial ? " trial" : L.ok && L.days > 14 ? "" : " warn");
+      pl.innerHTML = '<span class="subc-t"><b>الاشتراك</b><span>' + (L.trial ? "تجريبي" : L.ok ? "فعّال" : "منتهٍ") + '</span></span><span class="subc-bar"><i style="width:' + pct + '%"></i></span><small>' +
+        e(L.trial ? "متبقٍ " + L.hours + " ساعة من التجربة" : L.ok ? "متبقٍ " + L.days + " يوماً" : C.licLabel(L)) + "</small>";
+    }
   };
 
   /* ————— قفل بالرمز ————— */
