@@ -4,7 +4,7 @@
 (function () {
   "use strict";
   var BUILTIN = "1.0.0";
-  var TRIAL_HOURS = 48;
+  var TRIAL_HOURS = 72;
   var MARK = '<svg class="mark" viewBox="64 64 384 384" aria-hidden="true"><polygon points="256,78 302,145 382,130 367,210 434,256 367,302 382,382 302,367 256,434 210,367 130,382 145,302 78,256 145,210 130,130 210,145" fill="none" stroke="#d6b465" stroke-width="18" stroke-linejoin="round"/><circle cx="256" cy="256" r="92" fill="none" stroke="#d6b465" stroke-width="9" opacity=".5"/><path d="M256 112 290 256 256 400 222 256Z" fill="#d6b465"/><path d="M256 112 290 256H256Z" fill="#fff" opacity=".45"/><circle cx="256" cy="256" r="17" fill="#0c2233" stroke="#d6b465" stroke-width="8"/></svg>';
   var VENDOR = { name: "تقناس", wa: "" };
   /* المفتاح العام للتحقق من أكواد الاشتراك وملفات التحديث (المفتاح الخاص لدى المطوّر فقط) */
@@ -108,7 +108,7 @@
     if (!start) { start = now; await DB.set("trialStart", start); }
     var end = new Date(start + TRIAL_HOURS * 3600e3), left = end - now;
     if (left > 0) return { ok: true, trial: true, dev: dev, end: end, hours: Math.ceil(left / 3600e3) };
-    return { ok: false, trial: true, dev: dev, end: end, why: "انتهت الفترة التجريبية (يومان). أدخل كود الاشتراك للمتابعة." };
+    return { ok: false, trial: true, dev: dev, end: end, why: "انتهت الفترة التجريبية (ثلاثة أيام). أدخل كود الاشتراك للمتابعة." };
   }
   async function activate(code) {
     var dev = await deviceId(), r = await verifyCode(code, dev);

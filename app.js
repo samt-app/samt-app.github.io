@@ -2433,7 +2433,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     if (sb) { sb.hidden = !pn; sb.textContent = pn; }
     var pl = $("#side-plan");
     if (pl) {
-      var pct = L.trial ? Math.max(4, Math.min(100, (L.hours || 0) / 48 * 100)) : L.ok ? Math.max(4, Math.min(100, (L.days || 0) / 365 * 100)) : 0;
+      var pct = L.trial ? Math.max(4, Math.min(100, (L.hours || 0) / 72 * 100)) : L.ok ? Math.max(4, Math.min(100, (L.days || 0) / 365 * 100)) : 0;
       pl.className = "subc" + (L.trial ? " trial" : L.ok && L.days > 14 ? "" : " warn");
       pl.innerHTML = '<span class="subc-t"><b>الاشتراك</b><span>' + (L.trial ? "تجريبي" : L.ok ? "فعّال" : "منتهٍ") + '</span></span><span class="subc-bar"><i style="width:' + pct + '%"></i></span><small>' +
         e(L.trial ? "متبقٍ " + L.hours + " ساعة من التجربة" : L.ok ? "متبقٍ " + L.days + " يوماً" : C.licLabel(L)) + "</small>";
