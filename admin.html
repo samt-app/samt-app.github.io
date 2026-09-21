@@ -441,6 +441,7 @@ details.sub { border: 1px solid var(--line); border-radius: 14px; padding: 10px 
         (x.cmd.stop ? '<button class="btn sm" type="button" data-srun="' + e(x.moe) + '">إلغاء الإيقاف</button>' : '<button class="btn sm danger" type="button" data-sstop="' + e(x.moe) + '">إيقاف الاشتراك</button>') +
         (x.unlock ? '<button class="btn sm" type="button" data-lock="' + e(x.moe) + '">إلغاء السماح بالتعديل</button>' : '<button class="btn sm" type="button" data-unl="' + e(x.moe) + '">السماح بتعديل البيانات…</button>') +
         '<button class="btn sm" type="button" data-swa="' + e(x.moe) + '">رسالة تجديد</button>' +
+        '<button class="btn sm danger" type="button" data-sdel="' + e(x.moe) + '">حذف الترخيص</button>' +
         (x.cmd.end ? '<span class="pill p-ok">تمديد من اللوحة حتى ' + e(x.cmd.end) + "</span>" : "") + "</div>" +
         '<div class="unl hide" id="unl-' + e(x.moe) + '"><b>اختر ما يُسمح للمدرسة بتعديله:</b><div class="checks-inline">' +
           FIELDS.map(function (f) { return '<label><input type="checkbox" value="' + f[0] + '"> ' + f[1] + "</label>"; }).join("") + "</div>" +
@@ -487,6 +488,11 @@ details.sub { border: 1px solid var(--line); border-radius: 14px; padding: 10px 
       act(b, function () { return put("/lic/" + moe + "/unlock", { fields: f.join(","), until: until, at: Date.now(), by: "admin" }); }, "تم السماح");
     });
     each("[data-lock]", function (b) { act(b, function () { return put("/lic/" + b.dataset.lock + "/unlock", null); }, "أُلغي السماح"); });
+    each("[data-sdel]", function (b) {
+      if (!confirm("حذف ترخيص الرقم الوزاري " + b.dataset.sdel + " نهائياً؟ تُفصل أجهزته الثلاثة ويُحذف اعتماد بياناته، ويلزم تفعيل الكود واعتماد البيانات من جديد.")) return;
+      if (prompt("للتأكيد اكتب الرقم الوزاري:") !== b.dataset.sdel) return;
+      act(b, function () { return put("/lic/" + b.dataset.sdel, null); }, "حُذف");
+    });
     each("[data-swa]", function (b) {
       var x = sx(b.dataset.swa);
       var t = "السلام عليكم، بخصوص اشتراك منصة «سَمْت» لـ" + (x.info.name || "المدرسة") + " (الرقم الوزاري " + x.moe + ")" + (x.endT ? "، ينتهي بتاريخ " + isoDay(x.endT) : "") + ".\nيسعدنا تجديد الاشتراك عبر متجر تقناس: www.TiqNas.com";
