@@ -1859,7 +1859,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   /* ————— رصد مخالفة ————— */
   /* تبويب المخالفات بقسمين: السجل + الرصد */
   function incTabs(on) {
-    return '<div class="tabs"><a href="#incidents" class="' + (on === "list" ? "on" : "") + '">' + SLI("alert") + ' سجل المخالفات</a><a href="#new" class="rec' + (on === "new" ? " on" : "") + '">' + SLI("plus") + " رصد المخالفات</a></div>";
+    return '<div class="tabs"><a href="#new" class="rec' + (on === "new" ? " on" : "") + '">' + SLI("plus") + ' رصد المخالفات</a><a href="#incidents" class="' + (on === "list" ? "on" : "") + '">' + SLI("alert") + " سجل المخالفات</a></div>";
   }
   V["new"] = function (p, q) {
     setTitle("المخالفات — رصد");

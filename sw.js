@@ -1,5 +1,5 @@
 /* سَمْت — عامل الخدمة: يحفظ ملفات النواة ليعمل التطبيق دون إنترنت. البيانات لا تمر من هنا. */
-var CACHE = "samt-shell-1.0.0-r25";
+var CACHE = "samt-shell-1.0.0-r26";
 var FILES = ["./", "index.html", "loader.js", "base.css", "doc.css", "pub.css", "app.css", "app.js", "template.xlsx",
   "shared.js", "rules.js", "sign.html", "teacher.html", "s.html", "xlsx.full.min.js", "moe-logo.png", "icon-192.png", "icon-512.png", "manifest.webmanifest",
   "plex-arabic-400.woff2", "plex-arabic-500.woff2", "plex-arabic-600.woff2", "plex-arabic-700.woff2", "plex-latin-400.woff2", "plex-latin-600.woff2", "plex-latin-700.woff2"];
