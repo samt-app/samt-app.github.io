@@ -1522,7 +1522,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   A.route = function () {
     var h = decodeURIComponent(location.hash.replace(/^#/, "")) || "home", p = h.split("/"), q = {};
     if (p[p.length - 1].indexOf("?") >= 0) { var sp = p[p.length - 1].split("?"); p[p.length - 1] = sp[0]; sp[1].split("&").forEach(function (kv) { var z = kv.split("="); q[z[0]] = z[1]; }); }
-    $$(".nav a, .snav a").forEach(function (a) { a.classList.toggle("on", a.getAttribute("href") === "#" + p[0] || (p[0] === "student" && a.getAttribute("href") === "#students") || (p[0] === "inc" && a.getAttribute("href") === "#incidents") || (p[0] === "doc" && a.getAttribute("href") === "#incidents")); });
+    $$(".nav a, .snav a").forEach(function (a) { a.classList.toggle("on", a.getAttribute("href") === "#" + p[0] || (p[0] === "student" && a.getAttribute("href") === "#students") || ((p[0] === "inc" || p[0] === "new") && a.getAttribute("href") === "#incidents") || (p[0] === "doc" && a.getAttribute("href") === "#incidents")); });
     var mn = main(); mn.classList.remove("enter"); void mn.offsetWidth; mn.classList.add("enter");
     window.scrollTo(0, 0);
     /* مدرسة مرخّصة لم تُعتمد بياناتها بعد: تُستكمل البيانات وتُعتمد أولاً */
@@ -1857,15 +1857,19 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   A.pickStudent = pickStudent;
 
   /* ————— رصد مخالفة ————— */
+  /* تبويب المخالفات بقسمين: السجل + الرصد */
+  function incTabs(on) {
+    return '<div class="tabs"><a href="#incidents" class="' + (on === "list" ? "on" : "") + '">' + SLI("alert") + ' سجل المخالفات</a><a href="#new" class="' + (on === "new" ? "on" : "") + '">' + SLI("plus") + " رصد المخالفات</a></div>";
+  }
   V["new"] = function (p, q) {
-    setTitle("رصد مخالفة");
-    if (!A.S.students.length) { main().innerHTML = empty("استورد الطلاب أولاً.", '<a class="btn pri" href="#import">استيراد</a>'); return; }
+    setTitle("المخالفات — رصد");
+    if (!A.S.students.length) { main().innerHTML = incTabs("new") + empty("استورد الطلاب أولاً.", '<a class="btn pri" href="#import">استيراد</a>'); return; }
     var sel = {}, shown = [], one = q.s ? A.byId[q.s] : null;
     if (one) sel[one.id] = 1;
     var st = { art: null, item: null };
     var now = new Date(), local = new Date(now.getTime() - now.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
     var staffOpts = A.S.staff.slice().sort(function (a, b) { return a.name.localeCompare(b.name, "ar"); }).map(function (x) { return '<option value="' + e(x.id) + '">' + e(x.name) + " — " + e(ROLE[x.role] || "") + "</option>"; }).join("");
-    main().innerHTML = '<section class="card" id="fn-pick"><div class="toolbar"><input id="fn-s" type="search" placeholder="ابحث عن طالب بالاسم أو السجل المدني">' + scopeHTML("fn") + "</div>" +
+    main().innerHTML = incTabs("new") + '<section class="card" id="fn-pick"><div class="toolbar"><input id="fn-s" type="search" placeholder="ابحث عن طالب بالاسم أو السجل المدني">' + scopeHTML("fn") + "</div>" +
       '<div class="actions"><button class="btn" id="fn-all" type="button">تحديد المعروض</button><button class="btn" id="fn-none" type="button">إلغاء التحديد</button></div>' +
       '<p id="fn-n" class="mut"></p><ul class="list" id="fn-l"></ul></section>' +
       '<form class="form card" id="fn">' +
@@ -1970,7 +1974,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   V.incidents = function (p, q) {
     setTitle("المخالفات");
     var f = q.f || "";
-    main().innerHTML = '<div class="toolbar"><input id="il-q" type="search" placeholder="بحث باسم الطالب أو المخالفة"><select id="il-f"><option value="">الكل</option><option value="reported">بلاغات المعلمين</option><option value="open">قيد المتابعة</option><option value="closed">مغلقة</option><option value="void">ملغاة</option></select>' +
+    main().innerHTML = incTabs("list") + '<div class="toolbar"><input id="il-q" type="search" placeholder="بحث باسم الطالب أو المخالفة"><select id="il-f"><option value="">الكل</option><option value="reported">بلاغات المعلمين</option><option value="open">قيد المتابعة</option><option value="closed">مغلقة</option><option value="void">ملغاة</option></select>' +
       '<select id="il-d"><option value="">كل الدرجات</option>' + [1, 2, 3, 4, 5].map(function (d) { return '<option value="' + d + '">' + R.DEGREE_NAME[d] + "</option>"; }).join("") + '</select></div><div id="il"></div>';
     $("#il-f").value = f;
     function draw() {
@@ -3098,14 +3102,14 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       ["sigs", "pen", "التوقيعات عن بُعد", "sig-badge"], ["staff", "teacher", "المعلمون والإدارة"], ["commit", "doc", "الالتزام المدرسي"], ["import", "upload", "الاستيراد"], ["settings", "gear", "الإعدادات"]];
     document.getElementById("boot").innerHTML =
       '<aside class="side"><a class="logo" href="#home"><span class="lg">' + SL.LOGO + '</span><span class="logo-t"><b>سَمْت</b><small>ضبط السلوك والمواظبة</small></span></a>' +
-      '<a class="new" href="#new">' + SLI("plus") + '<span>رصد مخالفة</span><kbd>N</kbd></a><nav class="snav">' +
+      '<nav class="snav">' +
       items.map(function (x) { return '<a href="#' + x[0] + '">' + SLI(x[1]) + "<span>" + x[2] + "</span>" + (x[3] ? '<em id="' + x[3] + '" hidden></em>' : "") + "</a>"; }).join("") +
       '</nav><a class="subc" href="#settings?tab=lic" id="side-plan"></a><div class="side-foot">وفق قواعد السلوك والمواظبة — الإصدار الخامس 1447هـ</div></aside>' +
       '<div class="shell"><header class="top"><a class="m-logo" href="#home">' + SL.LOGO + '</a><div class="crumb"><small id="top-school"></small><h1 id="top-title"></h1></div>' +
       '<div class="search" id="q-box">' + SLI("search") + '<input id="q-all" type="search" autocomplete="off" placeholder="ابحث عن طالب بالاسم أو السجل المدني…"><kbd>/</kbd><div class="q-res" id="q-res" hidden></div></div>' +
       '<a id="top-lic" class="lic" href="#settings?tab=lic"></a><span id="top-sync" class="sync" title="الاستلام التلقائي"><i></i><b></b></span>' +
       '<img class="moe" src="moe-logo.png" alt="وزارة التعليم" onerror="this.remove()"></header><main id="main"></main></div>' +
-      '<nav class="nav"><a href="#home">' + SLI("home") + '<span>الرئيسية</span></a><a href="#students">' + SLI("users") + '<span>الطلاب</span></a><a href="#new" class="plus"><i>' + SLI("plus") + '</i><span>رصد</span></a><a href="#incidents">' + SLI("alert") + '<span>المخالفات</span><b id="nav-badge-m" hidden></b></a><a href="#more">' + SLI("more") + "<span>المزيد</span></a></nav>";
+      '<nav class="nav"><a href="#home">' + SLI("home") + '<span>الرئيسية</span></a><a href="#students">' + SLI("users") + '<span>الطلاب</span></a><a href="#incidents">' + SLI("alert") + '<span>المخالفات</span><b id="nav-badge-m" hidden></b></a><a href="#more">' + SLI("more") + "<span>المزيد</span></a></nav>";
     bindSearch();
     document.addEventListener("keydown", function (ev) {
       var t = ev.target, typing = /INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable;

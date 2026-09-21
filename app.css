@@ -441,3 +441,4 @@ input[readonly] { cursor: not-allowed; }
 .alert.info { background: var(--info-soft); border-color: #c8d9f5; color: #123e7a; }
 .alert.pdfc { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .alert.pdfc > span { flex: 1; min-width: 200px; }
+.tabs a svg.ic { width: 17px; height: 17px; vertical-align: -3px; margin-inline-end: 2px; }
