@@ -1258,6 +1258,246 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   };
 })();
 
+/* سَمْت — تحويل تقارير PDF (مثل تقارير نور) إلى جدول ثم استيرادها كملف Excel
+   يعمل على الجهاز بالكامل (pdf.js مضمّن)، ولا يُرسل الملف لأي خادم.
+   1) الجداول ذات الحدود (تقارير نور): تُقرأ خطوط الحدود من الملف فتُعرف الأعمدة والصفوف بدقة.
+   2) بلا حدود: تُستنتج الأعمدة من ترويسة الجدول والصفوف من عمود المرجع (رقم الهوية غالباً).
+   النص العربي قد يُخزَّن حرفاً حرفاً: يُجمع إلى كلمات ثم سطور ثم خلايا مع مراعاة اتجاه الأرقام. */
+(function () {
+  "use strict";
+  var A = window.APP;
+  var HEAD = /^(الاسم|اسم الطالب|اسم المعلم|اسم الموظف|رقم الهويه|السجل المدني|رقم السجل|الهويه|الجوال|رقم الجوال|الصف|الفصل|الشعبه|المرحله|العنوان|البريد الالكتروني|م)$/;
+  var AR = /[؀-ۿ]/;
+  function norm(s) { return String(s || "").normalize("NFKC").replace(/[‎‏‪-‮⁦-⁩]/g, "").replace(/\s+/g, " ").trim(); }
+  function key(s) { return A.norm(norm(s)); }
+  function med(a) { var b = a.slice().sort(function (p, q) { return p - q; }); return b.length ? b[Math.floor(b.length / 2)] : 0; }
+  var loading = null;
+  function lib() {
+    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    if (!loading) loading = A.loadScript("pdf.min.js").then(function () { window.pdfjsLib.GlobalWorkerOptions.workerSrc = "pdf.worker.min.js"; return window.pdfjsLib; });
+    return loading;
+  }
+
+  /* ————— قراءة الصفحة: النصوص بمواضعها + خطوط الحدود ————— */
+  async function pageData(L, page) {
+    var vp = page.getViewport({ scale: 1 }), U = L.Util, tc = await page.getTextContent(), items = [];
+    tc.items.forEach(function (it) {
+      var s = norm(it.str); if (!s) return;
+      var t = it.transform, p = U.applyTransform([t[4], t[5]], vp.transform), h = Math.hypot(t[2], t[3]) || Math.abs(t[0]) || 8;
+      var w = it.width || s.length * h * 0.5;
+      items.push({ s: s, x0: p[0], x1: p[0] + w, xc: p[0] + w / 2, y: p[1], yc: p[1] - 0.3 * h, h: h });
+    });
+    var V = [], H = [], OPS = L.OPS, ctm = [1, 0, 0, 1, 0, 0], stack = [];
+    try {
+      var ol = await page.getOperatorList();
+      for (var i = 0; i < ol.fnArray.length; i++) {
+        var fn = ol.fnArray[i], a = ol.argsArray[i];
+        if (fn === OPS.save) stack.push(ctm.slice());
+        else if (fn === OPS.restore) ctm = stack.pop() || ctm;
+        else if (fn === OPS.transform) ctm = U.transform(ctm, a);
+        else if (fn === OPS.constructPath) {
+          var m = U.transform(vp.transform, ctm), ops = a[0], args = a[1], k = 0, cx = 0, cy = 0;
+          for (var j = 0; j < ops.length; j++) {
+            var op = ops[j];
+            if (op === OPS.rectangle) { rect(m, args[k], args[k + 1], args[k + 2], args[k + 3]); k += 4; }
+            else if (op === OPS.moveTo) { cx = args[k]; cy = args[k + 1]; k += 2; }
+            else if (op === OPS.lineTo) { seg(m, cx, cy, args[k], args[k + 1]); cx = args[k]; cy = args[k + 1]; k += 2; }
+            else if (op === OPS.curveTo) k += 6; else if (op === OPS.curveTo2 || op === OPS.curveTo3) k += 4;
+          }
+        }
+      }
+    } catch (e) {}
+    function seg(m, x0, y0, x1, y1) {
+      var p = U.applyTransform([x0, y0], m), q = U.applyTransform([x1, y1], m);
+      if (Math.abs(p[0] - q[0]) < 1) V.push({ x: (p[0] + q[0]) / 2, a: Math.min(p[1], q[1]), b: Math.max(p[1], q[1]) });
+      else if (Math.abs(p[1] - q[1]) < 1) H.push({ y: (p[1] + q[1]) / 2, a: Math.min(p[0], q[0]), b: Math.max(p[0], q[0]) });
+    }
+    function rect(m, x, y, w, h) {
+      var p = U.applyTransform([x, y], m), q = U.applyTransform([x + w, y + h], m);
+      var X0 = Math.min(p[0], q[0]), X1 = Math.max(p[0], q[0]), Y0 = Math.min(p[1], q[1]), Y1 = Math.max(p[1], q[1]);
+      if (X1 - X0 > 0.8 * vp.width && Y1 - Y0 > 0.5 * vp.height) return; /* خلفية الصفحة ليست حدود جدول */
+      if (X1 - X0 <= 2.5) V.push({ x: (X0 + X1) / 2, a: Y0, b: Y1 });
+      else if (Y1 - Y0 <= 2.5) H.push({ y: (Y0 + Y1) / 2, a: X0, b: X1 });
+      else { V.push({ x: X0, a: Y0, b: Y1 }, { x: X1, a: Y0, b: Y1 }); H.push({ y: Y0, a: X0, b: X1 }, { y: Y1, a: X0, b: X1 }); }
+    }
+    return { items: items, V: V, H: H, w: vp.width };
+  }
+
+  /* ————— تجميع الحروف إلى كلمات وسطور ونص خلية ————— */
+  function lines(items) {
+    var out = [];
+    items.slice().sort(function (a, b) { return a.y - b.y; }).forEach(function (it) {
+      var L = out[out.length - 1];
+      if (L && Math.abs(it.y - L.y) <= Math.max(1.2, 0.35 * Math.min(it.h, L.h))) { L.items.push(it); L.h = Math.max(L.h, it.h); }
+      else out.push({ y: it.y, h: it.h, items: [it] });
+    });
+    return out;
+  }
+  function words(its) { /* حروف متلاصقة → كلمة؛ العربية تُقرأ من اليمين، والأرقام واللاتيني من اليسار */
+    var s = its.slice().sort(function (a, b) { return a.x0 - b.x0; }), out = [];
+    s.forEach(function (it) {
+      var w = out[out.length - 1];
+      if (w && it.x0 - w.x1 < 0.16 * it.h) { w.parts.push(it); w.x1 = Math.max(w.x1, it.x1); }
+      else out.push({ x0: it.x0, x1: it.x1, h: it.h, y: it.y, parts: [it] });
+    });
+    out.forEach(function (w) {
+      var ar = w.parts.some(function (p) { return AR.test(p.s); });
+      w.s = (ar ? w.parts.slice().reverse() : w.parts).map(function (p) { return p.s; }).join("");
+      w.ar = ar; w.xc = (w.x0 + w.x1) / 2;
+    });
+    return out;
+  }
+  function lineText(its) {
+    var ws = words(its), ar = ws.some(function (w) { return w.ar; });
+    return ws.sort(function (a, b) { return ar ? b.x0 - a.x0 : a.x0 - b.x0; }).map(function (w) { return w.s; }).join(" ");
+  }
+  function cellText(its) {
+    if (!its.length) return "";
+    return lines(its).map(function (L) { return lineText(L.items); }).reduce(function (acc, t) {
+      return !acc ? t : /^[\d.+-]+$/.test(acc) && /^[\d.]+$/.test(t) ? acc + t : acc + " " + t;
+    }, "").replace(/\s+/g, " ").trim();
+  }
+  function phrases(L, gap) { /* كلمات السطر → عبارات يفصلها فراغ واسع (خلايا أو أعمدة مختلفة) */
+    var ws = words(L.items).sort(function (a, b) { return a.x0 - b.x0; }), out = [];
+    ws.forEach(function (w) {
+      var ph = out[out.length - 1];
+      if (ph && w.x0 - ph.x1 < gap * w.h) { ph.parts = ph.parts.concat(w.parts); ph.x1 = Math.max(ph.x1, w.x1); }
+      else out.push({ x0: w.x0, x1: w.x1, h: w.h, y: L.y, parts: w.parts.slice() });
+    });
+    out.forEach(function (p) { p.s = lineText(p.parts); p.xc = (p.x0 + p.x1) / 2; p.yc = p.y - 0.3 * p.h; });
+    return out;
+  }
+  function isData(s) { return /\d{6,}/.test(String(s).replace(/\s/g, "")) || /@/.test(s); }
+  function headerY(ls) {
+    for (var i = 0; i < ls.length; i++) {
+      var ph = phrases(ls[i], 0.9);
+      if (ph.length >= 3 && ph.some(function (p) { return HEAD.test(key(p.s)); })) return ls[i].y;
+    }
+    return null;
+  }
+  function preText(ls, yMax) {
+    return ls.filter(function (L) { return L.y < yMax; }).map(function (L) { return phrases(L, 1.6).map(function (p) { return p.s; }); }).filter(function (r) { return r.length; });
+  }
+
+  /* ————— 1) جدول بحدود ————— */
+  function clusterLines(list, pos, tol) {
+    var s = list.slice().sort(function (a, b) { return a[pos] - b[pos]; }), out = [];
+    s.forEach(function (l) {
+      var c = out[out.length - 1];
+      if (c && l[pos] - c.v <= tol) { c.segs.push(l); c.v = (c.v * (c.segs.length - 1) + l[pos]) / c.segs.length; }
+      else out.push({ v: l[pos], segs: [l] });
+    });
+    out.forEach(function (c) { /* الطول المغطّى فعلاً */
+      var iv = c.segs.map(function (g) { return [g.a, g.b]; }).sort(function (p, q) { return p[0] - q[0]; }), len = 0, cur = null;
+      iv.forEach(function (x) { if (!cur || x[0] > cur[1]) { if (cur) len += cur[1] - cur[0]; cur = x.slice(); } else cur[1] = Math.max(cur[1], x[1]); });
+      if (cur) len += cur[1] - cur[0]; c.len = len;
+      c.a = Math.min.apply(null, c.segs.map(function (g) { return g.a; })); c.b = Math.max.apply(null, c.segs.map(function (g) { return g.b; }));
+    });
+    return out;
+  }
+  function gridPage(d) {
+    var ls = lines(d.items), hy = headerY(ls); if (hy == null) return null;
+    var h = med(d.items.map(function (i) { return i.h; })) || 8;
+    var Hc = clusterLines(d.H, "y", 1.2).filter(function (c) { return c.len > 30; });
+    var above = Hc.filter(function (c) { return c.v <= hy - 0.2 * h; }), top = above.length ? above[above.length - 1].v : null;
+    if (top == null) return null;
+    var Vc = clusterLines(d.V.filter(function (v) { return v.b > top + 0.5 * h && v.a < hy + 2 * h; }), "x", 1.2).filter(function (c) { return c.len > 1.5 * h; });
+    var xs = Vc.map(function (c) { return c.v; }), ys = Hc.filter(function (c) { return c.v >= top - 0.5; }).map(function (c) { return c.v; });
+    if (xs.length < 3 || ys.length < 3) return null;
+    var cols = []; for (var i = 0; i + 1 < xs.length; i++) if (xs[i + 1] - xs[i] > 3) cols.push([xs[i], xs[i + 1]]);
+    var rows = []; for (var j = 0; j + 1 < ys.length; j++) if (ys[j + 1] - ys[j] > 0.5 * h) rows.push([ys[j], ys[j + 1]]);
+    if (cols.length < 2 || rows.length < 2) return null;
+    /* صف مفتوح في أسفل الصفحة (يكمل في الصفحة التالية): نص ملاصق لآخر خط في أكثر من عمود */
+    var last = ys[ys.length - 1], x0 = xs[0], x1 = xs[xs.length - 1], below = d.items.filter(function (it) { return it.yc > last && it.xc > x0 && it.xc < x1; }).sort(function (p, q) { return p.yc - q.yc; });
+    if (below.length && below[0].yc - last < 1.6 * h) {
+      var end = below[0].yc, blk = [];
+      below.forEach(function (it) { if (it.yc - end < 1.8 * h) { blk.push(it); end = Math.max(end, it.yc); } });
+      var used = {}; blk.forEach(function (it) { var c = cols.findIndex(function (b) { return it.xc >= b[0] && it.xc < b[1]; }); if (c >= 0) used[c] = 1; });
+      if (Object.keys(used).length >= 2) rows.push([last, end + 0.6 * h]);
+    }
+    var grid = rows.map(function () { return cols.map(function () { return []; }); });
+    d.items.forEach(function (it) {
+      var r = rows.findIndex(function (b) { return it.yc >= b[0] && it.yc < b[1]; }); if (r < 0) return;
+      var c = cols.findIndex(function (b) { return it.xc >= b[0] && it.xc < b[1]; }); if (c < 0) return;
+      grid[r][c].push(it);
+    });
+    var text = grid.map(function (r) { return r.map(cellText); });
+    cols.reverse(); text = text.map(function (r) { return r.reverse(); }); /* من اليمين لليسار */
+    var hr = text.findIndex(function (r) { return r.some(function (c) { return HEAD.test(key(c)); }); });
+    if (hr < 0) return null;
+    return { head: text[hr], rows: text.slice(hr + 1), pre: preText(ls, top) };
+  }
+
+  /* ————— 2) بلا حدود: أعمدة من الترويسة، وصف لكل قيمة في عمود المرجع ————— */
+  function loosePage(d, colsIn) {
+    var ls = lines(d.items), hy = headerY(ls), cols = colsIn, pre = [], body = [];
+    var ph = []; ls.forEach(function (L) { ph = ph.concat(phrases(L, 0.6)); });
+    if (hy != null) {
+      var h = med(d.items.map(function (i) { return i.h; })) || 8;
+      var hp = ph.filter(function (p) { return Math.abs(p.y - hy) < 2.6 * h && !isData(p.s); });
+      var cl = [];
+      hp.sort(function (p, q) { return p.x0 - q.x0; }).forEach(function (p) {
+        var c = cl.find(function (k) { return p.x0 < k.x1 - 0.5 && p.x1 > k.x0 + 0.5; });
+        if (c) { c.x0 = Math.min(c.x0, p.x0); c.x1 = Math.max(c.x1, p.x1); c.parts = c.parts.concat(p.parts); } else cl.push({ x0: p.x0, x1: p.x1, parts: p.parts.slice() });
+      });
+      cl.sort(function (p, q) { return q.x0 - p.x0; });
+      cl.forEach(function (c, i) { c.name = cellText(c.parts); var r = cl[i - 1], l = cl[i + 1]; c.hi = r ? (c.x1 + r.x0) / 2 : Infinity; c.lo = l ? (l.x1 + c.x0) / 2 : -Infinity; });
+      if (!cols || cl.length >= cols.length - 1) cols = cl;
+      var hTop = Math.min.apply(null, hp.map(function (p) { return p.y - p.h; })), hBot = Math.max.apply(null, hp.map(function (p) { return p.y; }));
+      pre = preText(ls, hTop);
+      body = ph.filter(function (p) { return p.y > hBot + 0.3 * h; });
+    } else body = ph;
+    if (!cols) return null;
+    var items = [];
+    body.forEach(function (p) { var c = cols.findIndex(function (k) { return p.xc <= k.hi && p.xc > k.lo; }); if (c >= 0) items.push({ p: p, c: c }); });
+    if (!items.length) return { cols: cols, head: cols.map(function (c) { return c.name; }), rows: [], pre: pre };
+    var sc = cols.map(function (c, i) {
+      var v = items.filter(function (b) { return b.c === i; });
+      return { i: i, ids: v.filter(function (b) { return /^\d{8,11}$/.test(b.p.s.replace(/\s/g, "")); }).length + (/الهويه|السجل/.test(key(c.name)) ? 0.5 : 0), n: v.length };
+    }).sort(function (p, q) { return q.ids - p.ids || q.n - p.n; });
+    var kc = sc[0].i, anchors = items.filter(function (b) { return b.c === kc; }).map(function (b) { return b.p.yc; }).sort(function (p, q) { return p - q; });
+    var grid = anchors.map(function () { return cols.map(function () { return []; }); }), hm = med(items.map(function (b) { return b.p.h; })) || 8;
+    items.forEach(function (b) {
+      var best = -1, dd = Infinity;
+      anchors.forEach(function (y, r) { var x = Math.abs(b.p.yc - y); if (x < dd - 0.01) { dd = x; best = r; } });
+      if (best >= 0 && dd <= 4 * hm) grid[best][b.c] = grid[best][b.c].concat(b.p.parts);
+    });
+    return { cols: cols, head: cols.map(function (c) { return c.name; }), rows: grid.map(function (r) { return r.map(cellText); }), pre: pre };
+  }
+
+  /* ————— ملف PDF → جدول (مصفوفة صفوف) + مصنّف Excel ————— */
+  A.pdfToSheet = async function (file) {
+    var L = await lib(), pdf = await L.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isEvalSupported: false }).promise;
+    var head = null, rows = [], pre = [], cols = null, keyCol = -1, mode = "";
+    for (var p = 1; p <= pdf.numPages; p++) {
+      var d = await pageData(L, await pdf.getPage(p)), r = gridPage(d);
+      if (r) mode = mode || "grid"; else { r = loosePage(d, cols); if (r) { cols = r.cols; mode = mode || "loose"; } }
+      if (!r) continue;
+      if (!head) { head = r.head; pre = r.pre; keyCol = keyIndex(head, r.rows); }
+      r.rows.forEach(function (row, i) {
+        if (!row.some(Boolean) || row.join("|") === head.join("|")) return;
+        /* صف انقسم بين صفحتين: أول صف في الصفحة بلا قيمة مرجعية يُضم للسابق */
+        if (i === 0 && rows.length && keyCol >= 0 && !row[keyCol]) { var prev = rows[rows.length - 1]; row.forEach(function (c, k) { if (c) prev[k] = (prev[k] ? prev[k] + " " : "") + c; }); return; }
+        rows.push(row);
+      });
+    }
+    if (!head || !rows.length) throw new Error("لم يُعثر على جدول في ملف PDF. تأكد أنه تقرير نصي (غير ممسوح ضوئياً).");
+    var aoa = pre.concat([[]], [head], rows);
+    await A.loadScript("xlsx.full.min.js");
+    var wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), "من PDF");
+    wb.Workbook = { Views: [{ RTL: true }] };
+    return { aoa: aoa, wb: wb, pages: pdf.numPages, rows: rows.length, head: head, mode: mode };
+  };
+  function keyIndex(head, rows) {
+    var best = -1, n = 0;
+    head.forEach(function (h, i) {
+      var c = rows.filter(function (r) { return /^\d{8,11}$/.test(String(r[i] || "").replace(/\s/g, "")); }).length + (/الهويه|السجل/.test(key(h)) ? 0.5 : 0);
+      if (c > n) { n = c; best = i; }
+    });
+    return best;
+  }
+})();
+
 /* سَمْت — الشاشات */
 (function () {
   "use strict";
@@ -2262,16 +2502,16 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       return '<div class="nsrc" data-drop><div class="nsrc-h"><span class="nsrc-ic">' + SLI(ic) + "</span><div><b>" + title + "</b><small>" + sub + "</small></div></div>" +
         '<p class="nsrc-l">مكان التقرير في نظام نور:</p><ol class="npath">' + path.map(function (x, i) { return "<li>" + (i === path.length - 1 ? SLI("download") + " " : "") + x + "</li>"; }).join("") + "</ol>" +
         '<p class="mut sm">' + note + "</p>" +
-        '<label class="btn pri">' + SLI("upload") + " " + btn + '<input class="im-any" type="file" accept=".xlsx,.xls,.csv" hidden></label><span class="nsrc-drop">أو اسحب الملف وأفلته هنا</span></div>';
+        '<label class="btn pri">' + SLI("upload") + " " + btn + '<input class="im-any" type="file" accept=".xlsx,.xls,.csv,.pdf,application/pdf" hidden></label><span class="nsrc-drop">أو اسحب الملف وأفلته هنا — يُقبل Excel أو PDF (يُحوَّل تلقائياً)</span></div>';
     }
     main().innerHTML = '<div class="noor-src">' +
-      src("users", "الطلاب وأولياء الأمور", "تقرير «البيانات الخاصة بالإرشاد الطلابي»", ["التقارير", "التقارير الإحصائية", "البيانات الخاصة بالإرشاد الطلابي", "تصدير Excel"],
+      src("users", "الطلاب وأولياء الأمور", "تقرير «البيانات الخاصة بالإرشاد الطلابي»", ["التقارير", "التقارير الإحصائية", "البيانات الخاصة بالإرشاد الطلابي", "تصدير Excel أو PDF"],
         "يشمل الصف والفصل وجوال ولي الأمر. في المدرسة المدمجة ينتج ملف لكل مرحلة — ارفع كل ملف على حدة. قد يختلف موضع التقرير قليلاً بحسب المرحلة.", "رفع تقرير الطلاب") +
-      src("teacher", "المعلمون والإداريون", "تقرير «بيانات معلمي المدرسة»", ["التقارير", "تقارير المعلمين", "بيانات معلمي المدرسة", "كل المعلمين ← عرض", "تصدير Excel"],
+      src("teacher", "المعلمون والإداريون", "تقرير «بيانات معلمي المدرسة»", ["التقارير", "تقارير المعلمين", "بيانات معلمي المدرسة", "كل المعلمين ← عرض", "تصدير Excel أو PDF"],
         "يشمل الاسم والسجل المدني والجوال. لا يتضمن الوظيفة: بعد الحفظ حدّد المدير والوكيل والموجه من صفحة «المعلمون والإدارة».", "رفع تقرير المعلمين") +
       "</div>" +
-      '<section class="card"><p>ملف Excel آخر؟ ارفعه بورقة للطلاب وورقة للمعلمين والإدارة (أو ملفاً لكل منهما). يتعرف النظام على الأعمدة تلقائياً ويمكنك تعديلها قبل الحفظ. يُحدَّث الطالب الموجود عند تطابق السجل المدني.</p>' +
-      '<div class="actions wrap"><label class="btn">اختيار ملف<input id="im-f" type="file" accept=".xlsx,.xls,.csv" hidden></label><a class="btn" href="template.xlsx" download>تنزيل القالب</a></div></section><div id="im-out"></div>';
+      '<section class="card"><p>ملف Excel أو PDF آخر؟ ارفعه بورقة للطلاب وورقة للمعلمين والإدارة (أو ملفاً لكل منهما). يتعرف النظام على الأعمدة تلقائياً ويمكنك تعديلها قبل الحفظ. يُحدَّث الطالب الموجود عند تطابق السجل المدني.</p>' +
+      '<div class="actions wrap"><label class="btn">اختيار ملف<input id="im-f" type="file" accept=".xlsx,.xls,.csv,.pdf,application/pdf" hidden></label><a class="btn" href="template.xlsx" download>تنزيل القالب</a></div></section><div id="im-out"></div>';
     $$(".im-any").forEach(function (inp) { inp.onchange = function () { if (this.files[0]) handle(this.files[0]); }; });
     $$("[data-drop]").forEach(function (box) {
       box.addEventListener("dragover", function (ev) { ev.preventDefault(); box.classList.add("over"); });
@@ -2283,16 +2523,27 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       $("#im-out").scrollIntoView({ behavior: "smooth", block: "start" });
       $("#im-out").innerHTML = '<p class="mut">جارٍ القراءة…</p>';
       try { await A.loadScript("xlsx.full.min.js"); } catch (err) { $("#im-out").innerHTML = '<p class="alert err">تعذّر تحميل قارئ Excel.</p>'; return; }
-      var wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
+      var wb, conv = null;
+      if (/\.pdf$/i.test(f.name) || f.type === "application/pdf") {
+        $("#im-out").innerHTML = '<p class="mut">جارٍ تحويل ملف PDF إلى جدول…</p>';
+        try { conv = await A.pdfToSheet(f); wb = conv.wb; }
+        catch (err) { $("#im-out").innerHTML = '<p class="alert err">تعذّر تحويل ملف PDF: ' + e(err.message) + "</p>"; return; }
+      } else wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
+      function convNote() {
+        if (!conv) return;
+        var base = String(f.name).replace(/\.pdf$/i, "");
+        $("#im-out").insertAdjacentHTML("afterbegin", '<div class="alert info pdfc">' + SLI("doc") + " <span>حُوِّل ملف PDF (" + conv.pages + " صفحة) إلى جدول من <b>" + conv.rows + "</b> صفاً و" + conv.head.length + ' عموداً — راجع البيانات أدناه قبل الحفظ.</span> <button class="btn sm" type="button" id="im-xl">' + SLI("download") + " تنزيل Excel</button></div>");
+        $("#im-xl").onclick = function () { XLSX.writeFile(conv.wb, base + ".xlsx"); };
+      }
       var nr = null; try { nr = noorSheet(wb) || noorStaff(wb); } catch (err) {}
-      if (nr) { drawSheets([nr]); return; }
+      if (nr) { drawSheets([nr]); convNote(); return; }
       var sheets = wb.SheetNames.map(function (n) {
         var rows = XLSX.utils.sheet_to_json(wb.Sheets[n], { header: 1, raw: false, defval: "" });
         var hi = findHeaderRow(rows), headers = (rows[hi] || []).map(function (h) { return String(h).trim(); });
         var d = detect(headers);
         return { name: n, headers: headers, rows: rows.slice(hi + 1).filter(function (r) { return r.some(function (c) { return String(c).trim(); }); }), type: d.type, map: d.map };
       }).filter(function (s) { return s.headers.length; });
-      drawSheets(sheets);
+      drawSheets(sheets); convNote();
     };
   };
   function drawSheets(sheets) {

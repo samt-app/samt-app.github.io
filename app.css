@@ -436,3 +436,7 @@ input[readonly] { cursor: not-allowed; }
 .nsrc .mut.sm { font-size: .82rem; margin: 0; }
 .nsrc > .btn { align-self: flex-start; margin-top: auto; }
 .nsrc-drop { font-size: .78rem; color: var(--mut); }
+/* إشعار تحويل PDF */
+.alert.info { background: var(--info-soft); border-color: #c8d9f5; color: #123e7a; }
+.alert.pdfc { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.alert.pdfc > span { flex: 1; min-width: 200px; }

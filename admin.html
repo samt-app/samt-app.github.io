@@ -80,6 +80,17 @@ tr.det td { background: var(--bg-2); white-space: normal; }
 .empty { text-align: center; padding: 30px; color: var(--mut); background: #fff; border: 1px dashed var(--frame); border-radius: 18px; }
 details.sub { border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; margin: 12px 0; background: var(--bg-2); }
 .p-lock { background: var(--navy); color: #f3e6c4; } .p-wait { background: var(--warn-soft); color: var(--warn); } .p-open { background: var(--gold-soft); color: #7a5a17; }
+.scard .top .del { margin-inline-start: 8px; width: 38px; height: 38px; border-radius: 11px; border: 1px solid #f2c3c3; background: var(--red-soft); color: var(--red); display: grid; place-items: center; cursor: pointer; flex: none; }
+.scard .top .del:hover { background: var(--red); color: #fff; }
+.scard .top .del svg { width: 19px; height: 19px; }
+.modal-w { position: fixed; inset: 0; z-index: 50; background: rgba(10,20,30,.55); display: grid; place-items: center; padding: 16px; }
+.modal { width: 100%; max-width: 520px; background: #fff; border-radius: 22px; border-top: 5px solid var(--red); box-shadow: var(--sh-2); padding: 22px; }
+.modal h3 { display: flex; align-items: center; gap: 10px; color: var(--red); margin: 0 0 10px; font-size: 1.2rem; }
+.modal h3 svg { width: 26px; height: 26px; }
+.modal ul { margin: 8px 0 12px; padding-inline-start: 20px; line-height: 1.9; }
+.modal .who2 { background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin: 8px 0; }
+.modal .actions { display: flex; gap: 8px; justify-content: flex-start; margin-top: 12px; }
+.modal .btn.danger[disabled] { opacity: .45; cursor: not-allowed; }
 .mnt { background: #fff; border: 1px solid var(--frame); border-radius: 20px; padding: 20px; box-shadow: var(--sh); max-width: 760px; }
 .mnt .state { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-weight: 700; }
 .mnt .state i { width: 12px; height: 12px; border-radius: 50%; background: #22c55e; }
@@ -427,7 +438,8 @@ details.sub { border: 1px solid var(--line); border-radius: 14px; padding: 10px 
         '<span class="pill ' + st[1] + '">' + e(st[0]) + "</span>" + (x.endT ? '<span class="mini">حتى ' + e(isoDay(x.endT)) + "</span>" : "") +
         (x.approved ? '<span class="pill p-lock">🔒 معتمدة</span>' : '<span class="pill p-wait">بانتظار الاعتماد</span>') +
         (x.unlock ? (x.unlock.used ? '<span class="pill p-ok">✓ عدّلت المدرسة وأعادت الاعتماد</span>' : '<span class="pill p-open">🔓 مسموح بتعديل: ' + e(fl) + " حتى " + e(isoDay(+x.unlock.until)) + "</span>") : "") +
-        '<span class="mini" style="margin-inline-start:auto">آخر نشاط: ' + e(ago(x.last)) + "</span></div>" +
+        '<span class="mini" style="margin-inline-start:auto">آخر نشاط: ' + e(ago(x.last)) + "</span>" +
+        '<button class="del" type="button" data-sdel="' + e(x.moe) + '" title="حذف المدرسة نهائياً" aria-label="حذف المدرسة نهائياً">' + TRASH + "</button></div>" +
         '<div class="who"><span><b>المدير:</b> ' + e(i.principal || "—") + "</span><span><b>الوكيل:</b> " + e(i.deputy || "—") + "</span><span><b>الموجه الطلابي:</b> " + e(i.counselor || "—") + "</span></div>" +
         '<div class="slots">' + x.devs.map(function (d) {
           if (!d.dev) return '<div class="slot empty s' + d.n + '"><span class="no">' + d.n + "</span><b>جهاز " + d.n + "</b><span class=\"mini\">خانة فارغة — تُشغل عند تفعيل الكود في جهاز جديد</span></div>";
@@ -441,7 +453,6 @@ details.sub { border: 1px solid var(--line); border-radius: 14px; padding: 10px 
         (x.cmd.stop ? '<button class="btn sm" type="button" data-srun="' + e(x.moe) + '">إلغاء الإيقاف</button>' : '<button class="btn sm danger" type="button" data-sstop="' + e(x.moe) + '">إيقاف الاشتراك</button>') +
         (x.unlock ? '<button class="btn sm" type="button" data-lock="' + e(x.moe) + '">إلغاء السماح بالتعديل</button>' : '<button class="btn sm" type="button" data-unl="' + e(x.moe) + '">السماح بتعديل البيانات…</button>') +
         '<button class="btn sm" type="button" data-swa="' + e(x.moe) + '">رسالة تجديد</button>' +
-        '<button class="btn sm danger" type="button" data-sdel="' + e(x.moe) + '">حذف الترخيص</button>' +
         (x.cmd.end ? '<span class="pill p-ok">تمديد من اللوحة حتى ' + e(x.cmd.end) + "</span>" : "") + "</div>" +
         '<div class="unl hide" id="unl-' + e(x.moe) + '"><b>اختر ما يُسمح للمدرسة بتعديله:</b><div class="checks-inline">' +
           FIELDS.map(function (f) { return '<label><input type="checkbox" value="' + f[0] + '"> ' + f[1] + "</label>"; }).join("") + "</div>" +
@@ -453,6 +464,39 @@ details.sub { border: 1px solid var(--line); border-radius: 14px; padding: 10px 
     bindSchools();
   }
   function k(v, l, c) { return '<div class="kpi ' + c + '"><b>' + v + "</b><span>" + l + "</span></div>"; }
+  var TRASH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M5.5 7l1 12.5A1.5 1.5 0 0 0 8 21h8a1.5 1.5 0 0 0 1.5-1.5L18.5 7M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7"/></svg>';
+  var WARN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 2.5 20h19L12 3z"/><path d="M12 10v4.5M12 17.5v.01"/></svg>';
+  /* حذف مدرسة نهائياً: تحذير واضح + كتابة الرقم الوزاري للتأكيد */
+  function delSchool(x) {
+    var i = x.info || {}, devs = x.devs.filter(function (d) { return d.dev; });
+    var w = document.createElement("div"); w.className = "modal-w";
+    w.innerHTML = '<div class="modal" role="dialog" aria-modal="true"><h3>' + WARN + " حذف المدرسة نهائياً</h3>" +
+      '<div class="who2"><b>' + e(i.name || "مدرسة لم تُعتمد بياناتها") + '</b><div class="mini">الرقم الوزاري: <span class="dev">' + e(x.moe) + "</span> · الأجهزة المسجّلة: " + devs.length + " من 3</div></div>" +
+      "<p><b>سيُحذف من الخادم نهائياً ولا يمكن التراجع:</b></p><ul>" +
+      "<li>ترخيص المدرسة وخانات أجهزتها الثلاثة</li><li>بيانات الاعتماد (الاسم، المدير، الوكيل، الموجه)</li><li>أوامر التمديد والإيقاف والسماح بالتعديل</li><li>سجلات أجهزتها في هذه اللوحة</li></ul>" +
+      '<p class="mini">بيانات الطلاب والمخالفات محفوظة على أجهزة المدرسة نفسها ولا تُحذف، لكن المنصة تُقفل عندهم عند أول تشغيل متصل، ويلزم تفعيل الكود واعتماد البيانات من جديد لإعادتها.</p>' +
+      '<label>للتأكيد اكتب الرقم الوزاري <b class="dev">' + e(x.moe) + '</b><input id="dl-in" dir="ltr" inputmode="numeric" autocomplete="off"></label>' +
+      '<div class="actions"><button class="btn danger" id="dl-go" type="button" disabled>' + TRASH.replace("<svg", '<svg style="width:18px;height:18px;vertical-align:-3px"') + ' حذف نهائي</button><button class="btn" id="dl-no" type="button">إلغاء</button></div><p id="dl-msg" class="mini"></p></div>';
+    document.body.appendChild(w);
+    var inp = w.querySelector("#dl-in"), go = w.querySelector("#dl-go");
+    function close() { w.remove(); document.removeEventListener("keydown", esc); }
+    function esc(ev) { if (ev.key === "Escape") close(); }
+    document.addEventListener("keydown", esc);
+    w.addEventListener("click", function (ev) { if (ev.target === w) close(); });
+    w.querySelector("#dl-no").onclick = close;
+    inp.oninput = function () { go.disabled = inp.value.replace(/\D/g, "") !== x.moe; };
+    setTimeout(function () { inp.focus(); }, 50);
+    go.onclick = async function () {
+      go.disabled = true; go.textContent = "جارٍ الحذف…";
+      try {
+        var ids = {}; devs.forEach(function (d) { ids[d.dev] = 1; });
+        Object.keys(RAW).forEach(function (d) { if ((RAW[d].lics || []).some(function (l) { return l.moe === x.moe; })) ids[d] = 1; });
+        await put("/lic/" + x.moe, null);
+        for (var d in ids) { await put("/reg/" + encodeURIComponent(d), null); await put("/cmd/" + encodeURIComponent(d), null); }
+        close(); await load();
+      } catch (err) { w.querySelector("#dl-msg").textContent = "تعذّر الحذف — أعد المحاولة (" + err.message + ")"; go.disabled = false; go.textContent = "حذف نهائي"; }
+    };
+  }
   function bindSchools() {
     function each(sel, fn) { document.querySelectorAll(sel).forEach(function (b) { b.onclick = function (ev) { ev.stopPropagation(); fn(b); }; }); }
     function sx(moe) { return SCH.find(function (x) { return x.moe === moe; }) || { cmd: {} }; }
@@ -488,11 +532,7 @@ details.sub { border: 1px solid var(--line); border-radius: 14px; padding: 10px 
       act(b, function () { return put("/lic/" + moe + "/unlock", { fields: f.join(","), until: until, at: Date.now(), by: "admin" }); }, "تم السماح");
     });
     each("[data-lock]", function (b) { act(b, function () { return put("/lic/" + b.dataset.lock + "/unlock", null); }, "أُلغي السماح"); });
-    each("[data-sdel]", function (b) {
-      if (!confirm("حذف ترخيص الرقم الوزاري " + b.dataset.sdel + " نهائياً؟ تُفصل أجهزته الثلاثة ويُحذف اعتماد بياناته، ويلزم تفعيل الكود واعتماد البيانات من جديد.")) return;
-      if (prompt("للتأكيد اكتب الرقم الوزاري:") !== b.dataset.sdel) return;
-      act(b, function () { return put("/lic/" + b.dataset.sdel, null); }, "حُذف");
-    });
+    each("[data-sdel]", function (b) { delSchool(sx(b.dataset.sdel)); });
     each("[data-swa]", function (b) {
       var x = sx(b.dataset.swa);
       var t = "السلام عليكم، بخصوص اشتراك منصة «سَمْت» لـ" + (x.info.name || "المدرسة") + " (الرقم الوزاري " + x.moe + ")" + (x.endT ? "، ينتهي بتاريخ " + isoDay(x.endT) : "") + ".\nيسعدنا تجديد الاشتراك عبر متجر تقناس: www.TiqNas.com";
