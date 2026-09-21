@@ -2258,10 +2258,29 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
 
   V["import"] = function () {
     setTitle("الاستيراد من Excel");
-    main().innerHTML = '<section class="card"><p>ارفع ملف Excel يحتوي ورقة للطلاب وورقة للمعلمين والإدارة (أو ملفاً لكل منهما). يتعرف النظام على الأعمدة تلقائياً ويمكنك تعديلها قبل الحفظ. يُحدَّث الطالب الموجود عند تطابق السجل المدني.</p>' +
-      '<div class="actions wrap"><label class="btn pri">اختيار ملف<input id="im-f" type="file" accept=".xlsx,.xls,.csv" hidden></label><a class="btn" href="template.xlsx" download>تنزيل القالب</a></div></section><div id="im-out"></div>';
-    $("#im-f").onchange = async function () {
-      var f = this.files[0]; if (!f) return;
+    function src(ic, title, sub, path, note, btn) {
+      return '<div class="nsrc" data-drop><div class="nsrc-h"><span class="nsrc-ic">' + SLI(ic) + "</span><div><b>" + title + "</b><small>" + sub + "</small></div></div>" +
+        '<p class="nsrc-l">مكان التقرير في نظام نور:</p><ol class="npath">' + path.map(function (x, i) { return "<li>" + (i === path.length - 1 ? SLI("download") + " " : "") + x + "</li>"; }).join("") + "</ol>" +
+        '<p class="mut sm">' + note + "</p>" +
+        '<label class="btn pri">' + SLI("upload") + " " + btn + '<input class="im-any" type="file" accept=".xlsx,.xls,.csv" hidden></label><span class="nsrc-drop">أو اسحب الملف وأفلته هنا</span></div>';
+    }
+    main().innerHTML = '<div class="noor-src">' +
+      src("users", "الطلاب وأولياء الأمور", "تقرير «البيانات الخاصة بالإرشاد الطلابي»", ["التقارير", "التقارير الإحصائية", "البيانات الخاصة بالإرشاد الطلابي", "تصدير Excel"],
+        "يشمل الصف والفصل وجوال ولي الأمر. في المدرسة المدمجة ينتج ملف لكل مرحلة — ارفع كل ملف على حدة. قد يختلف موضع التقرير قليلاً بحسب المرحلة.", "رفع تقرير الطلاب") +
+      src("teacher", "المعلمون والإداريون", "تقرير «بيانات معلمي المدرسة»", ["التقارير", "تقارير المعلمين", "بيانات معلمي المدرسة", "كل المعلمين ← عرض", "تصدير Excel"],
+        "يشمل الاسم والسجل المدني والجوال. لا يتضمن الوظيفة: بعد الحفظ حدّد المدير والوكيل والموجه من صفحة «المعلمون والإدارة».", "رفع تقرير المعلمين") +
+      "</div>" +
+      '<section class="card"><p>ملف Excel آخر؟ ارفعه بورقة للطلاب وورقة للمعلمين والإدارة (أو ملفاً لكل منهما). يتعرف النظام على الأعمدة تلقائياً ويمكنك تعديلها قبل الحفظ. يُحدَّث الطالب الموجود عند تطابق السجل المدني.</p>' +
+      '<div class="actions wrap"><label class="btn">اختيار ملف<input id="im-f" type="file" accept=".xlsx,.xls,.csv" hidden></label><a class="btn" href="template.xlsx" download>تنزيل القالب</a></div></section><div id="im-out"></div>';
+    $$(".im-any").forEach(function (inp) { inp.onchange = function () { if (this.files[0]) handle(this.files[0]); }; });
+    $$("[data-drop]").forEach(function (box) {
+      box.addEventListener("dragover", function (ev) { ev.preventDefault(); box.classList.add("over"); });
+      box.addEventListener("dragleave", function () { box.classList.remove("over"); });
+      box.addEventListener("drop", function (ev) { ev.preventDefault(); box.classList.remove("over"); var f = ev.dataTransfer.files[0]; if (f) handle(f); });
+    });
+    $("#im-f").onchange = function () { if (this.files[0]) handle(this.files[0]); };
+    async function handle(f) {
+      $("#im-out").scrollIntoView({ behavior: "smooth", block: "start" });
       $("#im-out").innerHTML = '<p class="mut">جارٍ القراءة…</p>';
       try { await A.loadScript("xlsx.full.min.js"); } catch (err) { $("#im-out").innerHTML = '<p class="alert err">تعذّر تحميل قارئ Excel.</p>'; return; }
       var wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
