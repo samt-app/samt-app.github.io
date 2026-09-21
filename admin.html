@@ -90,6 +90,12 @@ details.sub { border: 1px solid var(--line); border-radius: 14px; padding: 10px 
 .modal ul { margin: 8px 0 12px; padding-inline-start: 20px; line-height: 1.9; }
 .modal .who2 { background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin: 8px 0; }
 .modal .actions { display: flex; gap: 8px; justify-content: flex-start; margin-top: 12px; }
+td.dcol, th.dcol { width: 52px; text-align: center; }
+td.dcol .del, .scard .top .del { width: 38px; height: 38px; border-radius: 11px; border: 1px solid #f2c3c3; background: var(--red-soft); color: var(--red); display: inline-grid; place-items: center; cursor: pointer; }
+td.dcol .del:hover { background: var(--red); color: #fff; }
+td.dcol .del svg { width: 19px; height: 19px; }
+.modal .chk { display: flex; gap: 10px; align-items: flex-start; margin: 8px 0; font-weight: 600; color: var(--red); }
+.modal .chk input { width: 18px; height: 18px; min-height: 0; flex: none; margin: 3px 0 0; padding: 0; accent-color: var(--red); }
 .modal .btn.danger[disabled] { opacity: .45; cursor: not-allowed; }
 .mnt { background: #fff; border: 1px solid var(--frame); border-radius: 20px; padding: 20px; box-shadow: var(--sh); max-width: 760px; }
 .mnt .state { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-weight: 700; }
@@ -183,6 +189,7 @@ details.sub { border: 1px solid var(--line); border-radius: 14px; padding: 10px 
         <th data-s="inc">المخالفات <span>⇅</span></th>
         <th data-s="sig">روابط التوقيع <span>⇅</span></th>
         <th data-s="ver">الإصدار <span>⇅</span></th>
+        <th class="dcol" title="حذف نهائي"></th>
       </tr></thead>
       <tbody id="rows"></tbody>
     </table>
@@ -252,7 +259,7 @@ details.sub { border: 1px solid var(--line); border-radius: 14px; padding: 10px 
         }
       } catch (err) {}
       RAW = {};
-      ROWS = Object.keys(box).map(function (k) {
+      ROWS = Object.keys(box).filter(function (k) { var c = cmds[k]; if (!c) { try { var oo = typeof box[k] === "string" ? JSON.parse(box[k]) : box[k]; c = cmds[(oo || {}).dev]; } catch (err) {} } return !(c && c.del); }).map(function (k) {
         var o = {}; try { o = typeof box[k] === "string" ? JSON.parse(box[k]) : box[k] || {}; } catch (err) {}
         RAW[o.dev || k] = o;
         var logins = o.logins || [], last = logins[logins.length - 1] || o.at || 0;
@@ -312,8 +319,9 @@ details.sub { border: 1px solid var(--line); border-radius: 14px; padding: 10px 
         '<td><span class="dev">' + e(r.dev) + "</span></td>" +
         '<td><span class="pill ' + lb[1] + '">' + e(txt) + "</span>" + (r.end ? '<div class="mini">حتى ' + e(r.end) + "</div>" : "") + "</td>" +
         "<td>" + e(ago(r.last)) + '<div class="mini">' + e(r.last ? SL.hijri(r.last) + " " + SL.time(r.last) : "") + "</div></td>" +
-        "<td>" + r.stu + "</td><td>" + r.inc + "</td><td>" + r.sig + "</td><td>" + e(r.ver) + "</td></tr>" +
-        '<tr class="det hide" data-d="' + i + '"><td colspan="8">' +
+        "<td>" + r.stu + "</td><td>" + r.inc + "</td><td>" + r.sig + "</td><td>" + e(r.ver) + "</td>" +
+        '<td class="dcol"><button class="del" type="button" data-ddel="' + e(r.dev) + '" title="حذف الجهاز نهائياً" aria-label="حذف الجهاز نهائياً">' + TRASH + "</button></td></tr>" +
+        '<tr class="det hide" data-d="' + i + '"><td colspan="9">' +
           '<div style="display:flex;gap:26px;flex-wrap:wrap">' +
           '<div><b>آخر ' + (r.logins.length || 0) + ' مرات دخول</b><ul class="logins">' + (r.logins.slice().reverse().map(function (t) { return "<li>" + e(SL.hijri(t)) + " — " + e(SL.greg(t)) + " " + e(SL.time(t)) + "</li>"; }).join("") || "<li>—</li>") + "</ul></div>" +
           "<div><b>أرقام</b><ul class=\"logins\"><li>الطلاب: " + r.stu + "</li><li>المنسوبون: " + r.stf + "</li><li>المخالفات: " + r.inc + "</li><li>السلوك المتميز: " + r.mer + "</li><li>روابط التوقيع: " + r.sig + "</li></ul></div>" +
@@ -327,10 +335,11 @@ details.sub { border: 1px solid var(--line); border-radius: 14px; padding: 10px 
                      : '<button class="btn sm danger" data-stop="' + e(r.dev) + '" type="button">إيقاف الاشتراك</button>') +
           (r.cmdEnd ? '<span class="pill p-ok">أمر ساري: حتى ' + e(r.cmdEnd) + "</span>" : "") + "</div>" +
         "</td></tr>";
-    }).join("") : '<tr><td colspan="8"><div class="empty"><p>لا توجد أجهزة مطابقة.</p></div></td></tr>';
+    }).join("") : '<tr><td colspan="9"><div class="empty"><p>لا توجد أجهزة مطابقة.</p></div></td></tr>';
     document.querySelectorAll(".row").forEach(function (tr) {
       tr.onclick = function () { var d = document.querySelector('[data-d="' + tr.dataset.i + '"]'); if (d) d.classList.toggle("hide"); };
     });
+    document.querySelectorAll("[data-ddel]").forEach(function (b) { b.onclick = function (ev) { ev.stopPropagation(); delDevice(ROWS.find(function (x) { return x.dev === b.dataset.ddel; }) || { dev: b.dataset.ddel }); }; });
     document.querySelectorAll("[data-copy]").forEach(function (b) { b.onclick = function (ev) { ev.stopPropagation(); navigator.clipboard.writeText(b.dataset.copy); b.textContent = "تم النسخ"; }; });
     function iso(d) { return new Date(d).toISOString().slice(0, 10); }
     async function cmd(dev, body, btn, label) {
@@ -493,6 +502,35 @@ details.sub { border: 1px solid var(--line); border-radius: 14px; padding: 10px 
         Object.keys(RAW).forEach(function (d) { if ((RAW[d].lics || []).some(function (l) { return l.moe === x.moe; })) ids[d] = 1; });
         await put("/lic/" + x.moe, null);
         for (var d in ids) { await put("/reg/" + encodeURIComponent(d), null); await put("/cmd/" + encodeURIComponent(d), null); }
+        close(); await load();
+      } catch (err) { w.querySelector("#dl-msg").textContent = "تعذّر الحذف — أعد المحاولة (" + err.message + ")"; go.disabled = false; go.textContent = "حذف نهائي"; }
+    };
+  }
+  /* حذف جهاز نهائياً من لوحة «كل الأجهزة»: تحذير + كتابة «حذف» للتأكيد */
+  function delDevice(r) {
+    var w = document.createElement("div"); w.className = "modal-w";
+    w.innerHTML = '<div class="modal" role="dialog" aria-modal="true"><h3>' + WARN + " حذف الجهاز نهائياً</h3>" +
+      '<div class="who2"><b>' + e(r.school && r.school !== "—" ? r.school : "جهاز بلا اسم مدرسة") + '</b><div class="mini">رقم الجهاز: <span class="dev">' + e(r.dev) + "</span>" + (r.stu ? " · الطلاب: " + r.stu : "") + (r.inc ? " · المخالفات: " + r.inc : "") + "</div></div>" +
+      "<p><b>سيُحذف من الخادم نهائياً ولا يمكن التراجع:</b></p><ul><li>سجل الجهاز في هذه اللوحة (الدخول، الأرقام، الإصدار)</li><li>أوامر التمديد والإيقاف الخاصة به</li></ul>" +
+      '<label class="chk"><input type="checkbox" id="dl-blk" checked> إقفال المنصة على هذا الجهاز أيضاً (لا يعود للظهور ولا يعمل حتى لو شُغّل من جديد)</label>' +
+      '<p class="mini">بيانات الطلاب والمخالفات محفوظة على الجهاز نفسه ولا تُحذف. إن ألغيت الإقفال فسيعود الجهاز للظهور هنا عند أول تشغيل متصل.</p>' +
+      '<label>للتأكيد اكتب كلمة <b>حذف</b><input id="dl-in" autocomplete="off"></label>' +
+      '<div class="actions"><button class="btn danger" id="dl-go" type="button" disabled>' + TRASH.replace("<svg", '<svg style="width:18px;height:18px;vertical-align:-3px"') + ' حذف نهائي</button><button class="btn" id="dl-no" type="button">إلغاء</button></div><p id="dl-msg" class="mini"></p></div>';
+    document.body.appendChild(w);
+    var inp = w.querySelector("#dl-in"), go = w.querySelector("#dl-go");
+    function close() { w.remove(); document.removeEventListener("keydown", esc); }
+    function esc(ev) { if (ev.key === "Escape") close(); }
+    document.addEventListener("keydown", esc);
+    w.addEventListener("click", function (ev) { if (ev.target === w) close(); });
+    w.querySelector("#dl-no").onclick = close;
+    inp.oninput = function () { go.disabled = inp.value.trim() !== "حذف"; };
+    setTimeout(function () { inp.focus(); }, 50);
+    go.onclick = async function () {
+      go.disabled = true; go.textContent = "جارٍ الحذف…";
+      var id = encodeURIComponent(r.dev), blk = w.querySelector("#dl-blk").checked;
+      try {
+        await put("/reg/" + id, null);
+        await put("/cmd/" + id, blk ? JSON.stringify({ stop: true, del: true, why: "أُلغي تسجيل هذا الجهاز من المزوّد. تواصل مع متجر تقناس.", by: "admin", at: Date.now() }) : null);
         close(); await load();
       } catch (err) { w.querySelector("#dl-msg").textContent = "تعذّر الحذف — أعد المحاولة (" + err.message + ")"; go.disabled = false; go.textContent = "حذف نهائي"; }
     };
