@@ -206,6 +206,19 @@
   async function codeKey(c) { var b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("samt-link|" + c)); return b64u(new Uint8Array(b)); }
   async function codeId(c) { return (await SL.sha256("samt-lid|" + c)).slice(0, 24); }
   SL.linkRelay = function (base) { var h = ""; try { h = new URL(base).hostname; } catch (e) {} return /^(localhost|127\.)/.test(h) ? new URL(base).origin : SL.DEFAULT_RELAY; };
+  /* صيانة المنصة: إن أعلنها المزوّد تظهر رسالة الاعتذار بدل الصفحة */
+  SL.maintGate = async function (el) {
+    var base = typeof window.SAMT_REG === "string" ? window.SAMT_REG : SL.DEFAULT_RELAY; if (!base) return false;
+    try {
+      var c = new AbortController(), t = setTimeout(function () { c.abort(); }, 3000);
+      var r = await fetch(base + "/sys/maint.json", { cache: "no-store", signal: c.signal }); clearTimeout(t);
+      var m = r.ok ? await r.json() : null;
+      if (!(m && m.on && (!m.from || Date.now() >= +m.from))) return false;
+      var w = m.until ? new Date(+m.until).toLocaleString("ar-SA-u-nu-latn", { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" }) : "";
+      (el || document.body).innerHTML = '<div class="pub-h"><div class="logo">' + SL.LOGO + '</div><div><b>سَمْت</b><small>منصة ضبط السلوك والمواظبة</small></div></div><div class="card done"><h2>المنصة متوقفة مؤقتاً للصيانة</h2><p style="white-space:pre-line">' + SL.esc(m.msg || "") + "</p>" + (w ? '<p class="mut">العودة المتوقعة: ' + SL.esc(w) + "</p>" : "") + '<p class="mut">الرابط يبقى صالحاً — أعد فتحه بعد انتهاء الصيانة.</p></div>';
+      return true;
+    } catch (e) { return false; }
+  };
   SL.short = {
     put: async function (relay, obj) { var c = code(11); await SL.relay.put(relay, "L", await codeId(c), await SL.seal(await codeKey(c), obj)); return c; },
     get: async function (relay, c) {
@@ -1096,6 +1109,155 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   };
 })();
 
+/* سَمْت — ترخيص المدارس بالرقم الوزاري واعتماد بياناتها
+   • كل رقم وزاري = ترخيص مستقل يعمل على 3 أجهزة.
+   • عند التفعيل تُعتمد: اسم المدرسة، الرقم الوزاري، مدير المدرسة، وكيل شؤون الطلبة، الموجه الطلابي.
+   • بعد الاعتماد لا تُعدَّل إلا بإذن من المزوّد (لوحة التراخيص)، والبيانات المعتمدة على الخادم هي المرجع. */
+(function () {
+  "use strict";
+  var SL = window.SL, C = window.SLCore, A = window.APP;
+  var FIELDS = [["name", "اسم المدرسة"], ["moe", "الرقم الوزاري"], ["principal", "مدير المدرسة"], ["deputy", "وكيل شؤون الطلبة"], ["counselor", "الموجه الطلابي"]];
+  var LOCK_ROLES = ["principal", "deputy", "counselor"];
+  A.ID_FIELDS = FIELDS; A.LOCK_ROLES = LOCK_ROLES;
+
+  /* الأرقام الوزارية للمدرسة: رقم واحد، أو رقمان للمدرسة المدمجة إن اختير ذلك */
+  A.schoolMoes = function (z) {
+    if (!z) return [];
+    var two = A.combinedStages(z) && z.moeMode === "two";
+    return [String(z.moeCode || "").trim(), two ? String(z.moeCode2 || "").trim() : ""].filter(Boolean);
+  };
+  A.licOf = function (moe) { return ((C.lic && C.lic.schools) || []).find(function (x) { return x.moe === moe; }) || null; };
+
+  /* قفل بيانات المدرسة: مقفلة إذا اعتُمد أي رقم من أرقامها؛ الحقل مفتوح فقط بإذن ساري من المزوّد لم يُستهلك بعد */
+  A.lockFor = function (z) {
+    var out = { locked: false, id: null, open: {}, unlock: null, moes: A.schoolMoes(z) };
+    out.moes.forEach(function (m) {
+      var l = A.licOf(m); if (!l || !l.id) return;
+      out.locked = true; out.id = out.id || l.id;
+      var u = l.unlock;
+      if (u && +u.until > Date.now() && !(l.id.at > +u.at)) {
+        out.unlock = u;
+        String(u.fields || "").split(",").forEach(function (f) { if (f) out.open[f.trim()] = true; });
+      }
+    });
+    return out;
+  };
+  A.fieldLocked = function (z, f) { var k = A.lockFor(z); return k.locked && !k.open[f]; };
+
+  /* الاسم المعتمد يُقدَّم في النماذج على أي سجل محلي */
+  var baseStaffName = A.staffName;
+  A.staffName = function (role, school) {
+    if (LOCK_ROLES.indexOf(role) >= 0) {
+      var z = school ? A.S.settings.schools.find(function (s) { return s.id === school; }) : A.S.settings.schools[0];
+      var k = A.lockFor(z);
+      if (k.locked && k.id && k.id[role] && !k.open[role]) return k.id[role];
+    }
+    return baseStaffName(role, school);
+  };
+
+  /* منسوب مقفل: مدير/وكيل/موجه مدرسة معتمدة واسمه هو المعتمد */
+  A.lockedStaff = function (x) {
+    if (!x || LOCK_ROLES.indexOf(x.role) < 0) return null;
+    var hit = null;
+    A.S.settings.schools.forEach(function (z) {
+      if (hit || (x.school && x.school !== z.id)) return;
+      var k = A.lockFor(z);
+      if (k.locked && k.id && !k.open[x.role] && A.norm(k.id[x.role]) === A.norm(x.name)) hit = z;
+    });
+    return hit;
+  };
+  A.roleTaken = function (role, schoolId, exceptId) {
+    if (LOCK_ROLES.indexOf(role) < 0) return false;
+    return A.S.settings.schools.some(function (z) {
+      if (schoolId && z.id !== schoolId) return false;
+      var k = A.lockFor(z); if (!k.locked || k.open[role]) return false;
+      return A.S.staff.some(function (x) { return x.id !== exceptId && x.role === role && (!x.school || x.school === z.id) && A.lockedStaff(x); });
+    });
+  };
+
+  /* بيانات الاعتماد الحالية لمدرسة (من الإعدادات والمنسوبين) */
+  A.identFor = function (z, moe) {
+    return { moe: moe, name: String(z.name || "").trim(), stage: z.stage || "",
+      principal: baseStaffName("principal", z.id), deputy: baseStaffName("deputy", z.id), counselor: baseStaffName("counselor", z.id) };
+  };
+  A.identMissing = function (id) { return FIELDS.filter(function (f) { return !String(id[f[0]] || "").trim(); }).map(function (f) { return f[1]; }); };
+
+  /* مدارس مرخّصة بانتظار الاعتماد */
+  A.needApproval = function () {
+    var out = [];
+    ((C.lic && C.lic.schools) || []).forEach(function (l) {
+      if (!l.ok) return;
+      var z = A.S.settings.schools.find(function (s) { return A.schoolMoes(s).indexOf(l.moe) >= 0; });
+      var k = z ? A.lockFor(z) : null;
+      if (!l.id || (k && k.unlock)) out.push({ moe: l.moe, school: z || null, re: !!l.id });
+    });
+    return out;
+  };
+
+  /* تطبيق البيانات المعتمدة من الخادم على هذا الجهاز (جهاز جديد، أو تعديل محلي غير مأذون) */
+  A.applyIdentity = async function () {
+    var ls = (C.lic && C.lic.schools) || [], cfg = A.S.settings, changed = false, recs = [];
+    ls.forEach(function (l) {
+      var id = l.id;
+      if (!id) { /* ترخيص بلا اعتماد بعد: يُربط الرقم بمدرسة ليظهر زر الاعتماد */
+        if (cfg.schools.some(function (s) { return A.schoolMoes(s).indexOf(l.moe) >= 0; })) return;
+        var free = cfg.schools.find(function (s) { return !s.moeCode; });
+        if (free) free.moeCode = l.moe; else cfg.schools.push({ id: "C" + SL.rid(6), name: "", stage: "متوسط", region: "", admin: "", moeCode: l.moe });
+        changed = true; return;
+      }
+      var z = cfg.schools.find(function (s) { return A.schoolMoes(s).indexOf(l.moe) >= 0; });
+      if (!z) {
+        z = cfg.schools.find(function (s) { return !s.moeCode && A.norm(s.name) === A.norm(id.name); }) ||
+            cfg.schools.find(function (s) { return !s.moeCode && !s.name; });
+        if (z) z.moeCode = l.moe;
+        else { z = { id: "C" + SL.rid(6), name: id.name, stage: id.stage || "متوسط", region: "", admin: "", moeCode: l.moe }; cfg.schools.push(z); }
+        changed = true;
+      }
+      var k = A.lockFor(z);
+      if (!k.open.name && id.name && z.name !== id.name) { z.name = id.name; changed = true; }
+      LOCK_ROLES.forEach(function (role) {
+        if (!id[role] || k.open[role]) return;
+        var mine = A.S.staff.filter(function (x) { return x.role === role && (!x.school || x.school === z.id); });
+        var same = mine.find(function (x) { return A.norm(x.name) === A.norm(id[role]); });
+        if (same) return;
+        if (mine.length === 1 && mine[0].school === z.id) { mine[0].name = id[role]; recs.push(mine[0]); return; }
+        recs.push({ t: "stf", id: "T" + SL.rid(10), name: id[role], role: role, school: z.id, phone: "", sid: "" });
+      });
+    });
+    if (changed) await A.saveSettings();
+    if (recs.length) await A.saveMany(recs);
+  };
+
+  /* نافذة تأكيد بمحتوى منسّق */
+  A.ask = function (title, html, ok) {
+    return new Promise(function (res) {
+      var done = false, sh = A.sheet(title, html + '<div class="actions"><button class="btn pri" type="button" id="ask-ok">' + SL.esc(ok || "موافق") + '</button><button class="btn" type="button" id="ask-no">إلغاء</button></div>',
+        { onClose: function () { if (!done) { done = true; res(false); } } });
+      sh.body.querySelector("#ask-ok").onclick = function () { done = true; sh.close(); res(true); };
+      sh.body.querySelector("#ask-no").onclick = function () { sh.close(); };
+    });
+  };
+
+  /* اعتماد مدرسة (أو إعادة اعتمادها بعد إذن المزوّد) */
+  A.approveSchool = async function (z) {
+    var moes = A.schoolMoes(z);
+    if (!moes.length) return A.toast("أدخل الرقم الوزاري أولاً", "err");
+    var id = A.identFor(z, moes[0]), miss = A.identMissing(id);
+    if (miss.length) return A.toast("أكمل قبل الاعتماد: " + miss.join("، "), "err");
+    var html = '<p>بعد الاعتماد <b>لا يمكن تعديل</b> البيانات التالية إلا بإذن من المزوّد (تقناس). تُطبع في كل النماذج الرسمية وتظهر على أجهزة المدرسة الثلاثة:</p><table class="tbl"><tbody>' +
+      FIELDS.map(function (f) { return "<tr><th>" + f[1] + "</th><td>" + SL.esc(f[0] === "moe" ? moes.join(" + ") : id[f[0]]) + "</td></tr>"; }).join("") +
+      "</tbody></table><p class=\"mut\">تأكد من كتابة الأسماء كما في نظام نور.</p>";
+    if (!(await A.ask("اعتماد بيانات المدرسة", html, "اعتماد نهائي"))) return;
+    for (var i = 0; i < moes.length; i++) {
+      var r = await C.approve(moes[i], Object.assign({}, id, { moe: moes[i] }));
+      if (!r.ok) { A.toast(r.why, "err"); return; }
+    }
+    A.log("اعتماد بيانات المدرسة: " + id.name + " (" + moes.join("، ") + ")");
+    C.lic = await C.license(); await A.applyIdentity();
+    A.toast("تم اعتماد بيانات المدرسة"); A.drawTop(); A.route(); A.ping();
+  };
+})();
+
 /* سَمْت — الشاشات */
 (function () {
   "use strict";
@@ -1123,6 +1285,8 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     $$(".nav a, .snav a").forEach(function (a) { a.classList.toggle("on", a.getAttribute("href") === "#" + p[0] || (p[0] === "student" && a.getAttribute("href") === "#students") || (p[0] === "inc" && a.getAttribute("href") === "#incidents") || (p[0] === "doc" && a.getAttribute("href") === "#incidents")); });
     var mn = main(); mn.classList.remove("enter"); void mn.offsetWidth; mn.classList.add("enter");
     window.scrollTo(0, 0);
+    /* مدرسة مرخّصة لم تُعتمد بياناتها بعد: تُستكمل البيانات وتُعتمد أولاً */
+    if (A.needApproval().some(function (x) { return !x.re; }) && ["settings", "staff", "import"].indexOf(p[0]) < 0) { location.replace("#settings?tab=school"); return; }
     var fn = V[p[0]] || V.home;
     try { fn(p.slice(1), q); } catch (err) { console.error(err); main().innerHTML = empty("حدث خطأ في عرض الصفحة: " + err.message); }
   };
@@ -1906,7 +2070,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       function row(x) {
         var ok = can(x);
         return '<li class="frow selrow' + (ok && sel[x.id] ? " on" : "") + '"><label class="sel"><input type="checkbox" data-pick="' + e(x.id) + '"' + (ok && sel[x.id] ? " checked" : "") + (ok ? "" : " disabled") + ">" +
-          '<span class="row1"><b>' + e(x.name) + '</b> <span class="chip">' + e(ROLE[x.role] || x.role) + "</span>" +
+          '<span class="row1"><b>' + e(x.name) + '</b> <span class="chip">' + e(ROLE[x.role] || x.role) + "</span>" + (A.lockedStaff(x) ? ' <span class="chip lockc" title="معتمد — لا يُعدَّل إلا بإذن المزوّد">🔒 معتمد</span>' : "") +
           (x.subject ? ' <small class="mut">' + e(x.subject) + "</small>" : "") +
           (x.classes ? ' <small class="mut">' + e(x.classes) + "</small>" : "") +
           (SL.validPhone(x.phone) ? ' <small class="mut" dir="ltr">' + e(SL.showPhone(x.phone)) + "</small>" : ' <span class="chip warnc">بلا جوال</span>') + "</span></label>" +
@@ -1936,17 +2100,22 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     draw();
   };
   function editStaff(x) {
-    var s = x || { role: "teacher", school: (A.S.settings.schools[0] || {}).id };
-    var sh = A.sheet(x ? "تعديل" : "إضافة منسوب", '<form class="form" id="fsf">' + A.fld("name", "الاسم", s.name, 1) + A.fld("sid", "رقم السجل المدني", s.sid) +
-      '<label>الوظيفة<select name="role">' + Object.keys(ROLE).map(function (r) { return '<option value="' + r + '"' + (r === s.role ? " selected" : "") + ">" + ROLE[r] + "</option>"; }).join("") + "</select></label>" +
-      (A.S.settings.schools.length > 1 ? '<label>المدرسة<select name="school"><option value="">كل المدارس</option>' + A.S.settings.schools.map(function (z) { return '<option value="' + e(z.id) + '"' + (z.id === s.school ? " selected" : "") + ">" + e(z.name) + "</option>"; }).join("") + "</select></label>" : "") +
+    var s = x || { role: "teacher", school: (A.S.settings.schools[0] || {}).id }, lk = x ? A.lockedStaff(x) : null;
+    var sh = A.sheet(x ? "تعديل" : "إضافة منسوب", '<form class="form" id="fsf">' +
+      (lk ? '<p class="alert sm lockn">🔒 ' + e(ROLE[s.role]) + " معتمد لمدرسة «" + e(lk.name) + "»: الاسم والوظيفة لا يُعدَّلان إلا بإذن من المزوّد. يمكنك تعديل الجوال والمادة والفصول.</p>" :
+        '<p class="note">أسماء <b>مدير المدرسة ووكيل شؤون الطلبة والموجه الطلابي</b> تُعتمد عند تفعيل الاشتراك، ولا تُعدَّل بعدها إلا بإذن من المزوّد — اكتبها كما في نظام نور.</p>') +
+      '<label>الاسم<input name="name" value="' + e(s.name || "") + '" required' + (lk ? " readonly" : "") + "></label>" + A.fld("sid", "رقم السجل المدني", s.sid) +
+      '<label>الوظيفة<select name="role"' + (lk ? " disabled" : "") + ">" + Object.keys(ROLE).map(function (r) { return '<option value="' + r + '"' + (r === s.role ? " selected" : "") + ">" + ROLE[r] + "</option>"; }).join("") + "</select></label>" +
+      (A.S.settings.schools.length > 1 ? '<label>المدرسة<select name="school"' + (lk ? " disabled" : "") + '><option value="">كل المدارس</option>' + A.S.settings.schools.map(function (z) { return '<option value="' + e(z.id) + '"' + (z.id === s.school ? " selected" : "") + ">" + e(z.name) + "</option>"; }).join("") + "</select></label>" : "") +
       A.fld("phone", "الجوال", SL.showPhone(s.phone), 0, "tel") + A.fld("subject", "المادة / التخصص", s.subject) +
       A.fld("classes", "الفصول (اختياري — مثال: الأول/1، الثاني/2)", s.classes) +
-      '<div class="actions"><button class="btn pri" type="submit">حفظ</button>' + (x ? '<button class="btn danger" type="button" id="fsf-del">حذف</button>' : "") + "</div></form>");
+      '<div class="actions"><button class="btn pri" type="submit">حفظ</button>' + (x && !lk ? '<button class="btn danger" type="button" id="fsf-del">حذف</button>' : "") + "</div></form>");
     $("#fsf", sh.body).onsubmit = async function (ev) {
       ev.preventDefault(); var f = new FormData(this);
-      var rec = Object.assign({}, s, { t: "stf", id: s.id || "T" + SL.rid(10), name: String(f.get("name")).trim(), sid: String(f.get("sid") || "").trim(), role: f.get("role"), phone: SL.normPhone(f.get("phone")), subject: f.get("subject"), classes: f.get("classes") });
+      var rec = Object.assign({}, s, { t: "stf", id: s.id || "T" + SL.rid(10), name: String(f.get("name")).trim(), sid: String(f.get("sid") || "").trim(), role: f.get("role") || s.role, phone: SL.normPhone(f.get("phone")), subject: f.get("subject"), classes: f.get("classes") });
       if (f.has("school")) rec.school = f.get("school");
+      if (lk) { rec.name = s.name; rec.role = s.role; rec.school = s.school; }
+      else if (A.roleTaken(rec.role, rec.school, rec.id)) return A.toast(ROLE[rec.role] + " معتمد لهذه المدرسة ولا يُغيَّر إلا بإذن من المزوّد", "err");
       await A.save(rec); sh.close(); A.route();
     };
     var d = $("#fsf-del", sh.body); if (d) d.onclick = async function () { if (await A.confirm("حذف " + s.name + "؟")) { await A.remove(s); sh.close(); A.route(); } };
@@ -2169,6 +2338,8 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
           } else {
             var t = { t: "stf", name: name, sid: sid, role: guessRole(g(r, "role")), roleText: g(r, "role"), phone: SL.normPhone(g(r, "phone")), subject: g(r, "subject"), classes: g(r, "classes"), school: g(r, "school") ? schoolId(g(r, "school"), def) : "" };
             var o2 = stfBy[sid || A.norm(name)];
+            if (A.LOCK_ROLES.indexOf(t.role) >= 0 && (!o2 || !A.lockedStaff(o2)) && A.roleTaken(t.role, t.school, o2 && o2.id)) t.role = "admin"; /* الوظيفة معتمدة لغيره */
+            if (o2 && A.lockedStaff(o2)) { ["name", "role", "school"].forEach(function (k) { delete t[k]; }); } /* المعتمد لا يتغير بالاستيراد */
             if (o2) {
               var both = o2.school && t.school && o2.school !== t.school; /* منسوب يعمل في مدرستين: يُتاح للجميع */
               Object.keys(t).forEach(function (k) { if (t[k]) o2[k] = t[k]; });
@@ -2195,6 +2366,9 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var tabs = [["school", "المدرسة"], ["links", "الروابط والتوقيع"], ["msgs", "الرسائل"], ["backup", "النسخ الاحتياطي"], ["lic", "الاشتراك والتحديث"], ["sec", "القفل"]];
     var html = '<div class="tabs">' + tabs.map(function (t) { return '<a href="#settings?tab=' + t[0] + '" class="' + (t[0] === tab ? "on" : "") + '">' + t[1] + "</a>"; }).join("") + "</div>";
     if (tab === "school") {
+      var need = A.needApproval();
+      if (need.length) html += '<div class="alert warn"><b>' + (need.some(function (x) { return !x.re; }) ? "اعتماد بيانات المدرسة مطلوب قبل استخدام المنصة." : "سمح المزوّد بتعديل بيانات معتمدة.") + "</b> راجع البيانات أدناه ثم اضغط «" + (need.some(function (x) { return !x.re; }) ? "اعتماد بيانات المدرسة" : "إعادة اعتماد البيانات") + "».</div>";
+      html += '<section class="card id-note"><h3>' + SLI("shield") + ' بيانات تُعتمد ولا تُعدَّل</h3><p>عند تفعيل الاشتراك تُعتمد بيانات المدرسة التالية: <b>اسم المدرسة، الرقم الوزاري، مدير المدرسة، وكيل شؤون الطلبة، الموجه الطلابي</b>. تُطبع في كل النماذج الرسمية وتظهر على أجهزة المدرسة الثلاثة، و<b>لا يمكن تعديلها بعد الاعتماد إلا بإذن من المزوّد (تقناس)</b>. اكتبها كما هي في نظام نور وراجعها قبل الاعتماد.</p><p class="mut">أسماء المدير والوكيل والموجه تُدخل من صفحة <a href="#staff">المعلمون والإدارة</a> أو باستيراد ملف نور.</p></section>';
       html += '<section class="card"><h3>المدارس</h3><p class="mut">تحدد المرحلة المواد المطبقة: الابتدائية (6–9) أو المتوسطة والثانوية (10–14)، والمادتان (15–16) لجميع المراحل. في المدرسة المدمجة (ابتدائي + متوسط، أو متوسط + ثانوي) تُحدد مرحلة كل طالب من نص الصف (مثل «الأول المتوسط» أو «الثاني الثانوي»)، أو من عمود «المرحلة» في ملف Excel.</p><div id="sc-l">' +
         cfg.schools.map(function (z, i) { return schoolForm(z, i); }).join("") + '</div><button class="btn" id="sc-add" type="button">＋ إضافة مدرسة</button></section>' +
         '<section class="card"><label class="row-check"><input type="checkbox" id="sc-logo"' + (cfg.useLogo ? " checked" : "") + "> إظهار شعار وزارة التعليم في ترويسة النماذج</label></section>" +
@@ -2224,12 +2398,19 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         '<p class="mut">آخر نسخة: ' + (cfg.lastBackup ? e(SL.hijri(cfg.lastBackup)) + " " + e(SL.time(cfg.lastBackup)) : "لا يوجد") + "</p>" +
         '<label>كلمة مرور لتشفير النسخة (اختياري لكن يُنصح به)<input id="bk-pw" type="password" autocomplete="new-password"></label>' +
         '<div class="actions wrap"><button class="btn pri" id="bk-dl" type="button">تنزيل نسخة احتياطية</button><label class="btn">استعادة من نسخة<input id="bk-up" type="file" accept=".json,.samt" hidden></label></div></section>' +
-        '<section class="card"><h3>نقل البيانات لجهاز آخر</h3><p class="mut">نزّل نسخة من هذا الجهاز ثم استعدها في الجهاز الجديد. الاشتراك مرتبط بالجهاز، فيحتاج الجهاز الجديد كوداً خاصاً به.</p></section>' +
+        '<section class="card"><h3>نقل البيانات لجهاز آخر</h3><p class="mut">نزّل نسخة من هذا الجهاز ثم استعدها في الجهاز الجديد. اشتراك المدرسة يعمل على ثلاثة أجهزة: أدخل نفس كود المدرسة في الجهاز الجديد.</p></section>' +
         '<section class="card danger-zone"><h3>حذف جميع البيانات</h3><button class="btn danger" id="bk-wipe" type="button">حذف كل بيانات الطلاب والمخالفات</button></section>';
     } else if (tab === "lic") {
-      var L = C.lic || {};
-      html += '<section class="card"><h3>الاشتراك</h3><p>الحالة: <b>' + e(C.licLabel(L)) + '</b></p><div class="lock-dev"><span>رقم الجهاز</span><b dir="ltr">' + e(L.dev || "") + '</b><button class="btn sm" type="button" id="lc-copy">نسخ</button></div>' +
-        '<label>كود الاشتراك<textarea id="lc-code" rows="3" dir="ltr" placeholder="SL1.…"></textarea></label><p class="note">يُرسل للمزوّد عند كل تشغيل: رقم الجهاز، واسم المدرسة، وتاريخ انتهاء الاشتراك، وآخر خمس مرات دخول، وأعداد مجمّعة (الطلاب والمخالفات). لا تُرسل بيانات الطلاب ولا أولياء الأمور.</p><div class="actions"><button class="btn pri" id="lc-act" type="button">تفعيل / تجديد</button></div><p id="lc-msg"></p></section>' +
+      var L = C.lic || {}, schools = L.schools || [];
+      html += '<section class="card"><h3>اشتراك المدرسة</h3><p>الحالة: <b>' + e(C.licLabel(L)) + "</b></p>" +
+        '<p class="mut">الاشتراك للمدرسة بالرقم الوزاري، ويعمل على <b>' + C.SLOTS + " أجهزة</b> فيها. المدرسة ذات المرحلتين برقمين وزاريين لها ترخيصان. التفعيل والاعتماد من <a href=\"#settings?tab=school\">بيانات المدرسة</a>.</p>" +
+        (schools.length ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الرقم الوزاري</th><th>المدرسة المعتمدة</th><th>الحالة</th><th>هذا الجهاز</th></tr></thead><tbody>' + schools.map(function (x) {
+          return "<tr><td dir=\"ltr\">" + e(x.moe) + "</td><td>" + e(x.id ? x.id.name : "— بانتظار الاعتماد —") + "</td><td>" + (x.ok ? '<span class="chip ok">حتى ' + e(SL.greg(x.end)) + "</span>" : '<span class="chip red">' + e(x.why) + "</span>") + "</td><td>" + (x.slot ? "رقم " + x.slot + " من " + C.SLOTS : "—") + "</td></tr>";
+        }).join("") + "</tbody></table></div>" : "") +
+        '<label>هذا الجهاز هو<select id="lc-role">' + C.DEV_ROLES.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + "</option>"; }).join("") + "</select></label>" +
+        '<p class="mut">رقم الجهاز: <b dir="ltr">' + e(L.dev || "") + '</b> <button class="btn sm" type="button" id="lc-copy">نسخ</button></p>' +
+        '<p class="note">يُرسل للمزوّد عند كل تشغيل: رقم الجهاز ونوعه، والرقم الوزاري واسم المدرسة وأسماء المدير والوكيل والموجه المعتمدة، وتاريخ انتهاء الاشتراك، وآخر خمس مرات دخول، وأعداد مجمّعة (الطلاب والمخالفات). لا تُرسل بيانات الطلاب ولا أولياء الأمور.</p>' +
+        '<label>كود اشتراك المدرسة<textarea id="lc-code" rows="3" dir="ltr" placeholder="SL2.الرقم الوزاري.…"></textarea></label><p class="mut">للجهاز الثاني والثالث في المدرسة: الصق نفس كود المدرسة هنا — تُطبَّق بياناتها المعتمدة على هذا الجهاز تلقائياً.</p><div class="actions"><button class="btn pri" id="lc-act" type="button">تفعيل</button></div><p id="lc-msg"></p></section>' +
         '<section class="card"><h3>التحديث</h3><p>الإصدار الحالي: <b>' + e(C.version || C.BUILTIN) + '</b></p><p class="mut">عند وصول ملف تحديث (.slu) اختره هنا؛ يتحقق التطبيق من توقيعه ثم يثبته ويعيد التشغيل. بياناتك لا تتأثر.</p>' +
         '<div class="actions wrap"><label class="btn pri">اختيار ملف التحديث<input id="up-f" type="file" accept=".slu,application/json" hidden></label><button class="btn" id="up-rb" type="button">الرجوع للإصدار المدمج</button></div><p id="up-msg"></p></section>';
     } else if (tab === "sec") {
@@ -2243,6 +2424,10 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   /* الرقم الوزاري: رقم واحد، أو رقمان للمدرسة المدمجة (ابتدائي + متوسط) — كل رقم يُربط بوهج */
   function moeFields(z) {
     var pair = A.combinedStages(z), L = { "ابتدائي": "الابتدائية", "متوسط": "المتوسطة", "ثانوي": "الثانوية" };
+    if (A.fieldLocked && A.fieldLocked(z, "moe")) {
+      var ms = A.schoolMoes(z);
+      return '<label>' + (ms.length > 1 ? "الأرقام الوزارية" : "الرقم الوزاري") + ' <span class="chip lockc">🔒 معتمد</span><input dir="ltr" value="' + e(ms.join(" + ")) + '" readonly disabled></label>';
+    }
     if (!pair) return '<label>الرقم الوزاري (لربط وهج)<input data-k="moeCode" dir="ltr" inputmode="numeric" value="' + e(z.moeCode || "") + '"></label>';
     var two = z.moeMode === "two";
     return '<label>الأرقام الوزارية<select data-k="moeMode" data-rerender="1"><option value="one"' + (two ? "" : " selected") + '>رقم وزاري واحد للمرحلتين</option><option value="two"' + (two ? " selected" : "") + ">رقمان: رقم لـ" + L[pair[0]] + " ورقم لـ" + L[pair[1]] + "</option></select></label>" +
@@ -2252,13 +2437,35 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   }
   A.moeFields = moeFields;
   function schoolForm(z, i) {
-    return '<div class="school" data-i="' + i + '"><div class="grid2">' +
-      '<label>اسم المدرسة<input data-k="name" value="' + e(z.name) + '"></label>' +
+    var k = A.lockFor ? A.lockFor(z) : { locked: false, open: {} }, nl = k.locked && !k.open.name;
+    return '<div class="school' + (k.locked ? " locked" : "") + '" data-i="' + i + '"><div class="grid2">' +
+      '<label>اسم المدرسة' + (nl ? ' <span class="chip lockc">🔒 معتمد</span>' : k.open.name ? ' <span class="chip warnc">🔓 مسموح بالتعديل</span>' : "") + '<input data-k="name" value="' + e(z.name) + '"' + (nl ? " readonly" : "") + "></label>" +
       '<label>المرحلة<select data-k="stage">' + [["ابتدائي", "ابتدائي"], ["متوسط", "متوسط"], ["ثانوي", "ثانوي"], ["مدمجة", "مدمجة (ابتدائي + متوسط)"], ["مدمجة-ث", "مدمجة (متوسط + ثانوي)"]].map(function (s) { return "<option value=\"" + s[0] + "\"" + (s[0] === z.stage ? " selected" : "") + ">" + s[1] + "</option>"; }).join("") + "</select></label>" +
       '<label>المنطقة/المحافظة<input data-k="region" value="' + e(z.region || "") + '"></label>' +
       '<label>إدارة التعليم<input data-k="admin" value="' + e(z.admin || "") + '" placeholder="الإدارة العامة للتعليم بمنطقة …"></label>' +
-      moeFields(z) + '</div>' +
-      '<button class="link danger" type="button" data-rm="' + i + '">حذف هذه المدرسة</button></div>';
+      moeFields(z) + '</div>' + licBox(z) +
+      (k.locked ? "" : '<button class="link danger" type="button" data-rm="' + i + '">حذف هذه المدرسة</button>') + "</div>";
+  }
+  /* ترخيص كل رقم وزاري وحالة الاعتماد */
+  function licBox(z) {
+    if (!A.schoolMoes) return "";
+    var moes = A.schoolMoes(z), k = A.lockFor(z), L = C.lic || {}, need = false;
+    if (!moes.length) return '<div class="licbox"><p class="mut">أدخل الرقم الوزاري ثم اضغط «حفظ» لتفعيل اشتراك المدرسة.</p></div>';
+    var rows = moes.map(function (m) {
+      var l = A.licOf(m), st;
+      if (!l) st = '<span class="chip">' + (L.trial ? "الفترة التجريبية — غير مفعّل" : "غير مفعّل") + "</span>";
+      else if (!l.ok) st = '<span class="chip red">' + e(l.why) + "</span>";
+      else {
+        st = '<span class="chip ok">مشترك حتى ' + e(SL.greg(l.end)) + '</span> <span class="chip">هذا الجهاز: ' + l.slot + " من " + C.SLOTS + "</span> " + (l.id ? '<span class="chip lockc">🔒 معتمدة</span>' : '<span class="chip warnc">بانتظار الاعتماد</span>');
+        if (!l.id) need = true;
+      }
+      return '<div class="lic-row"><span class="mut">الرقم الوزاري</span> <b dir="ltr">' + e(m) + "</b> " + st +
+        (!l || !l.ok ? '<div class="lic-act"><input class="lic-code" data-moe="' + e(m) + '" dir="ltr" placeholder="الصق كود اشتراك المدرسة SL2.' + e(m) + '.…"><select class="lic-role" data-moe="' + e(m) + '">' + C.DEV_ROLES.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + "</option>"; }).join("") + '</select><button class="btn sm pri" type="button" data-act="' + e(m) + '">تفعيل</button></div>' : "") + "</div>";
+    }).join("");
+    var fl = k.unlock ? String(k.unlock.fields || "").split(",").map(function (f) { var x = (A.ID_FIELDS || []).find(function (y) { return y[0] === f; }); return x ? x[1] : ""; }).filter(Boolean).join("، ") : "";
+    return '<div class="licbox"><h4>الاشتراك والاعتماد</h4>' + rows +
+      (k.unlock ? '<p class="alert warn sm">🔓 سمح المزوّد بتعديل: <b>' + e(fl) + "</b> حتى " + e(SL.greg(+k.unlock.until)) + ". عدّل البيانات ثم اضغط «حفظ» ثم «إعادة اعتماد البيانات».</p>" : "") +
+      (need || k.unlock ? '<button class="btn pri" type="button" data-approve="' + e(z.id) + '">' + SLI("shield") + " " + (k.unlock ? "إعادة اعتماد البيانات" : "اعتماد بيانات المدرسة") + "</button>" : "") + "</div>";
   }
   function bindSettings(tab) {
     var cfg = A.S.settings;
@@ -2269,7 +2476,28 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       $("#sc-l").addEventListener("change", function (ev) { var k = ev.target.dataset && ev.target.dataset.k; if (k === "stage" || k === "moeMode") { collect(); $("#sc-l").innerHTML = cfg.schools.map(schoolForm).join(""); rm(); } });
       function rm() { $$("[data-rm]").forEach(function (b) { b.onclick = async function () { var i = +b.dataset.rm; if (A.S.students.some(function (s) { return s.school === cfg.schools[i].id; })) return A.toast("المدرسة مرتبطة بطلاب", "err"); collect(); cfg.schools.splice(i, 1); $("#sc-l").innerHTML = cfg.schools.map(schoolForm).join(""); rm(); }; }); }
       rm();
-      $("#sc-save").onclick = async function () { collect(); cfg.schools = cfg.schools.filter(function (z) { return z.name; }); cfg.useLogo = $("#sc-logo").checked; await A.saveSettings(); A.toast("تم الحفظ"); A.route(); };
+      function guard() { /* البيانات المعتمدة لا تتغير من هنا مهما حدث في الحقول */
+        cfg.schools.forEach(function (z) {
+          var k = A.lockFor(z); if (!k.locked || !k.id) return;
+          if (!k.open.name) z.name = k.id.name;
+          if (!k.open.moe) { var ms = A.schoolMoes(z); if (ms.indexOf(k.id.moe) < 0) z.moeCode = k.id.moe; }
+        });
+      }
+      async function saveAll() { collect(); guard(); cfg.schools = cfg.schools.filter(function (z) { return z.name || z.moeCode; }); cfg.useLogo = $("#sc-logo").checked; await A.saveSettings(); }
+      $("#sc-save").onclick = async function () { await saveAll(); A.toast("تم الحفظ"); A.route(); };
+      $("#sc-l").addEventListener("click", async function (ev) {
+        var b = ev.target.closest("[data-act],[data-approve]"); if (!b) return;
+        if (b.dataset.approve) { await saveAll(); var z = cfg.schools.find(function (x) { return x.id === b.dataset.approve; }); if (z) A.approveSchool(z); return; }
+        var m = b.dataset.act, inp = $('.lic-code[data-moe="' + m + '"]'), code = inp ? inp.value.trim() : "", pc = C.parseCode(code);
+        if (!pc || pc.v !== 2) return A.toast("الصق كود اشتراك المدرسة (يبدأ بـ SL2)", "err");
+        if (pc.moe !== m) return A.toast("هذا الكود للرقم الوزاري " + pc.moe + " وليس لـ " + m, "err");
+        await saveAll(); b.disabled = true; b.textContent = "جارٍ التفعيل…";
+        var rs = $('.lic-role[data-moe="' + m + '"]'), r = await C.activate(code, rs ? rs.value : ((await C.DB.get("devRole")) || ""));
+        if (!r.ok) { A.toast(r.why, "err"); b.disabled = false; b.textContent = "تفعيل"; return; }
+        C.lic = await C.license(); await A.applyIdentity(); A.drawTop(); A.ping();
+        A.toast(r.id ? "تم التفعيل — بيانات المدرسة معتمدة مسبقاً وطُبّقت على هذا الجهاز" : "تم التفعيل — راجع البيانات ثم اضغط «اعتماد بيانات المدرسة»");
+        A.route();
+      });
     } else if (tab === "links") {
       $("#ln-save").onclick = async function () {
         cfg.publicBase = $("#ln-base").value.trim(); cfg.relayUrl = $("#ln-relay").value.trim().replace(/\/+$/, ""); cfg.schoolWa = SL.normPhone($("#ln-wa").value); cfg.linkHours = Math.max(1, +$("#ln-h").value || 72);
@@ -2317,7 +2545,15 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       };
     } else if (tab === "lic") {
       $("#lc-copy").onclick = function () { try { navigator.clipboard.writeText(C.lic.dev); A.toast("نُسخ رقم الجهاز"); } catch (err) {} };
-      $("#lc-act").onclick = async function () { var r = await C.activate($("#lc-code").value), m = $("#lc-msg"); m.className = "alert sm " + (r.ok ? "ok" : "err"); m.textContent = r.ok ? "تم التفعيل حتى " + SL.greg(r.end) : r.why; if (r.ok) { C.lic = await C.license(); A.drawTop(); } };
+      $("#lc-act").onclick = async function () {
+        var m = $("#lc-msg"); m.className = "mut"; m.textContent = "جارٍ التفعيل…";
+        var r = await C.activate($("#lc-code").value, $("#lc-role").value);
+        m.className = "alert sm " + (r.ok ? "ok" : "err");
+        m.textContent = r.ok ? "تم التفعيل حتى " + SL.greg(r.end) + (r.slot ? " — هذا الجهاز رقم " + r.slot + " من " + C.SLOTS : "") + (r.v === 2 ? (r.id ? " — طُبّقت بيانات المدرسة المعتمدة" : " — راجع بيانات المدرسة ثم اعتمدها") : "") : r.why;
+        if (r.ok) { C.lic = await C.license(); await A.applyIdentity(); A.drawTop(); A.ping(); setTimeout(function () { A.route(); }, 1200); }
+      };
+      C.DB.get("devRole").then(function (v) { if (v) $("#lc-role").value = v; });
+      $("#lc-role").onchange = async function () { await C.setRole(this.value); A.toast("تم الحفظ"); A.ping(); };
       $("#up-f").onchange = async function () {
         var f = this.files[0]; if (!f) return; var m = $("#up-msg");
         var r = await C.installUpdate(f); m.className = "alert sm " + (r.ok ? "ok" : "err");
@@ -2666,8 +2902,14 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
 
   /* ————— نبضة التسجيل للمزوّد (رقم الجهاز واسم المدرسة والاشتراك وآخر الدخول) —————
      لا تُرسل أي بيانات طلاب أو أولياء أمور — أرقام مجمّعة فقط. */
+  function browserName() {
+    var u = navigator.userAgent || "";
+    var os = /Windows/.test(u) ? "Windows" : /iPhone|iPad/.test(u) ? "iOS" : /Mac OS/.test(u) ? "Mac" : /Android/.test(u) ? "Android" : /Linux/.test(u) ? "Linux" : "";
+    var br = /Edg\//.test(u) ? "Edge" : /Chrome\//.test(u) ? "Chrome" : /Safari\//.test(u) ? "Safari" : /Firefox\//.test(u) ? "Firefox" : "";
+    return [os, br].filter(Boolean).join(" ");
+  }
   A.ping = async function () {
-    var cfg = A.S.settings, base = cfg.relayUrl || A.RELAY;
+    var cfg = A.S.settings, base = typeof C.REG === "string" ? C.REG : (cfg.relayUrl || A.RELAY);
     if (!base || cfg.noPing) return;
     try {
       var L = C.lic || {}, now = Date.now();
@@ -2679,7 +2921,11 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         region: (A.S.settings.schools[0] || {}).region || "", admin: (A.S.settings.schools[0] || {}).admin || "",
         ver: C.version || C.BUILTIN, trial: !!L.trial, end: L.end ? new Date(L.end).toISOString().slice(0, 10) : "", days: L.days || 0, hours: L.hours || 0,
         logins: logins, first: first, at: now, n: { stu: A.S.students.length, stf: A.S.staff.length, inc: A.S.incidents.length, sig: pend, mer: A.S.merits.length },
-        wa: !!cfg.relayUrl, ua: (navigator.platform || "") + " · " + (navigator.language || "") };
+        wa: !!cfg.relayUrl, ua: (navigator.platform || "") + " · " + (navigator.language || "") + " · " + browserName(),
+        role: (await C.DB.get("devRole")) || "",
+        lics: (L.schools || []).map(function (x) { var z = A.S.settings.schools.find(function (s) { return A.schoolMoes(s).indexOf(x.moe) >= 0; }) || {};
+          return { moe: x.moe, slot: x.slot || 0, ok: !!x.ok, end: x.end ? new Date(x.end).toISOString().slice(0, 10) : "", why: x.ok ? "" : String(x.why || "").slice(0, 160), approved: !!x.id, idAt: x.id ? x.id.at || 0 : 0,
+            name: x.id ? x.id.name : z.name || "", principal: x.id ? x.id.principal : "", deputy: x.id ? x.id.deputy : "", counselor: x.id ? x.id.counselor : "" }; }) };
       await fetch(String(base).replace(/\/+$/, "") + "/reg/" + encodeURIComponent(L.dev || "unknown") + ".json",
         { method: "PUT", body: JSON.stringify(JSON.stringify(rec)) });
     } catch (err) {}
@@ -2741,6 +2987,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
 
   (async function init() {
     await A.load();
+    try { await A.applyIdentity(); } catch (err) { console.warn(err); }
     shell();
     await pinGate();
     window.addEventListener("hashchange", function () { Array.prototype.forEach.call(document.querySelectorAll(".sheet-wrap"), function (w) { w.remove(); }); A.route(); A.drawTop(); });
@@ -2748,5 +2995,19 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     A.route();
     A.startPolling();
     A.ping();
+    maintWatch(C.maint);
+    setInterval(function () { if (document.visibilityState === "visible") C.maintFetch().then(maintWatch); }, 180000);
+    document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") C.maintFetch().then(maintWatch); });
   })();
+
+  /* صيانة المنصة: عند بدئها يُعاد التحميل فتظهر شاشة الصيانة؛ وقبلها يظهر تنبيه بالموعد */
+  function maintWatch(m) {
+    if (!C.maintFetch) return;
+    if (C.maintActive(m)) { location.reload(); return; }
+    var bar = document.getElementById("mt-bar");
+    if (m && m.on && +m.from > Date.now()) {
+      if (!bar) { bar = document.createElement("div"); bar.id = "mt-bar"; bar.className = "mt-bar"; var sh = document.querySelector(".shell"); if (sh) sh.insertBefore(bar, sh.children[1] || null); }
+      bar.innerHTML = SLI("clock") + " <span>صيانة مجدولة للمنصة تبدأ <b>" + SL.esc(C.whenAr(+m.from)) + "</b>" + (m.until ? " وتنتهي تقريباً <b>" + SL.esc(C.whenAr(+m.until)) + "</b>" : "") + ". احفظ عملك قبلها.</span>";
+    } else if (bar) bar.remove();
+  }
 })();

@@ -24,6 +24,7 @@
   function doneKey() { return "samt_signed_" + P.tok; }
 
   (async function () {
+    if (await SL.maintGate(app)) return;
     var h = location.hash.slice(1);
     try { if (h) sessionStorage.setItem("samt_p", h); else h = sessionStorage.getItem("samt_p") || ""; } catch (err) {}
     if (!h) return fail("الرابط غير مكتمل");

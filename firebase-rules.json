@@ -23,6 +23,25 @@
       "$dev": {
         ".read": true
       }
+    },
+    "lic": {
+      ".read": "auth != null && auth.uid === 's0Ckx7lIpiXuEcnMJF1IJeuzsbp2'",
+      ".write": "auth != null && auth.uid === 's0Ckx7lIpiXuEcnMJF1IJeuzsbp2'",
+      "$moe": {
+        ".read": "$moe.matches(/^[0-9]{3,12}$/)",
+        "id": {
+          ".write": "$moe.matches(/^[0-9]{3,12}$/) && newData.isString() && newData.val().length < 4000 && (!data.exists() || root.child('lic').child($moe).child('unlock').child('until').val() > now)"
+        },
+        "slots": {
+          "$s": {
+            ".write": "$moe.matches(/^[0-9]{3,12}$/) && $s.matches(/^[123]$/) && !data.exists() && newData.isString() && newData.val().length < 40"
+          }
+        }
+      }
+    },
+    "sys": {
+      ".read": true,
+      ".write": "auth != null && auth.uid === 's0Ckx7lIpiXuEcnMJF1IJeuzsbp2'"
     }
   }
 }

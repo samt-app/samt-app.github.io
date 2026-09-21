@@ -108,13 +108,82 @@
       o.at = Date.now(); await DB.set("remote", o); return o;
     } catch (e) { return await DB.get("remote"); }
   }
+  /* ————— الترخيص بالرقم الوزاري: SL2.<الرقم الوزاري>.<YYYYMMDD>.<سر المدرسة>.<توقيع> —————
+     • الكود للمدرسة لا للجهاز، ويعمل على 3 أجهزة (خانات على الخادم لا يستبدلها إلا المزوّد).
+     • «سر المدرسة» ثابت عبر التجديدات؛ منه يُشتق مفتاح تشفير بيانات اعتماد المدرسة على الخادم.
+     • يُتحقق من الخادم عند كل تشغيل؛ وبلا إنترنت يعمل حتى 30 يوماً من آخر تحقق. */
+  var SLOTS = 3, GRACE_DAYS = 30;
+  var DEV_ROLES = [["deputy", "جهاز وكيل شؤون الطلبة"], ["counselor", "جهاز الموجه الطلابي"], ["principal", "جهاز مدير المدرسة"], ["other", "جهاز آخر"]];
+  function parseCode(code) {
+    var p = String(code || "").trim().replace(/\s+/g, "").split(".");
+    if (p[0] === "SL2" && p.length === 5 && /^\d{3,12}$/.test(p[1]) && /^\d{8}$/.test(p[2]) && /^[A-Za-z0-9_-]{16}$/.test(p[3])) return { v: 2, moe: p[1], exp: p[2], s: p[3], sig: p[4], code: p.join(".") };
+    if (p[0] === "SL1" && p.length === 4) return { v: 1 };
+    return null;
+  }
+  function expDate(x) { return new Date(+x.slice(0, 4), +x.slice(4, 6) - 1, +x.slice(6, 8), 23, 59, 59); }
+  async function verifySchool(code) {
+    var c = parseCode(code);
+    if (!c || c.v !== 2) return { ok: false, why: "صيغة كود الاشتراك غير صحيحة." };
+    if (!(await verifySig("SL2|" + c.moe + "|" + c.exp + "|" + c.s, c.sig))) return { ok: false, why: "كود الاشتراك غير صالح." };
+    var end = expDate(c.exp), exp = Date.now() > end;
+    return { ok: !exp, c: c, moe: c.moe, end: end, expired: exp, why: exp ? "انتهى اشتراك المدرسة (" + c.moe + ") بتاريخ " + fmt(end) + "." : "" };
+  }
+  async function idKey(moe, s) { var raw = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("samt-id|" + moe + "|" + s)); return crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]); }
+  async function sealId(moe, s, obj) {
+    var iv = crypto.getRandomValues(new Uint8Array(12));
+    var ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv }, await idKey(moe, s), new TextEncoder().encode(JSON.stringify(obj))));
+    return b64u(iv) + "." + b64u(ct);
+  }
+  async function openId(moe, s, str) {
+    try { var p = String(str).split("."); return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64u(p[0]) }, await idKey(moe, s), unb64u(p[1])))); }
+    catch (e) { return null; }
+  }
+  function parseJ(v) { if (typeof v === "string") { try { return JSON.parse(v); } catch (e) { return null; } } return v || null; }
+  async function licFetch(moe) {
+    if (!REG) return null;
+    var c = new AbortController(), t = setTimeout(function () { c.abort(); }, 3500);
+    try { var r = await fetch(REG + "/lic/" + moe + ".json", { cache: "no-store", signal: c.signal }); clearTimeout(t); return r.ok ? ((await r.json()) || {}) : null; }
+    catch (e) { clearTimeout(t); return null; }
+  }
+  async function getLics() { return (await DB.get("lics")) || {}; }
+  async function saveLic(moe, rec) { var l = await getLics(); if (rec) l[moe] = rec; else delete l[moe]; await DB.set("lics", l); }
+  function unlockOn(u) { return !!(u && +u.until > Date.now()); }
+  async function checkSchool(moe, rec, dev, now) {
+    var v = await verifySchool(rec.code), out = { moe: moe, slot: rec.slot || 0, role: rec.role || "" };
+    if (!v.c) return Object.assign(out, { ok: false, why: v.why });
+    var srv = await licFetch(moe), end = +v.end;
+    if (srv) {
+      var slots = srv.slots || {}, mine = 0;
+      for (var n = 1; n <= SLOTS; n++) if (slots[n] === dev) mine = n;
+      rec.slot = mine; rec.okAt = now; rec.cmd = parseJ(srv.cmd); rec.unlock = srv.unlock || null;
+      rec.id = srv.id ? ((await openId(moe, v.c.s, srv.id)) || rec.id || null) : null;
+      await saveLic(moe, rec);
+      if (!mine) return Object.assign(out, { ok: false, slot: 0, unslotted: true, id: rec.id, why: "هذا الجهاز غير مسجّل ضمن أجهزة المدرسة (" + moe + "). أدخل كود الاشتراك لتسجيله، وإن اكتملت الأجهزة الثلاثة فاطلب من المزوّد فصل جهاز." });
+    } else if (!rec.okAt || now - rec.okAt > GRACE_DAYS * 864e5) {
+      return Object.assign(out, { ok: false, offline: true, id: rec.id, why: "يلزم الاتصال بالإنترنت للتحقق من اشتراك المدرسة (" + moe + ") — مرة كل " + GRACE_DAYS + " يوماً." });
+    }
+    var cmd = rec.cmd || {};
+    Object.assign(out, { slot: rec.slot, id: rec.id || null, unlock: unlockOn(rec.unlock) ? rec.unlock : null, okAt: rec.okAt });
+    if (cmd.stop) return Object.assign(out, { ok: false, stopped: true, why: cmd.why || "أُوقف اشتراك المدرسة (" + moe + ") من المزوّد. تواصل مع متجر تقناس لتفعيله." });
+    if (cmd.end) { var ce = new Date(cmd.end + "T23:59:59").getTime(); if (ce > end) end = ce; }
+    if (now > end) return Object.assign(out, { ok: false, expired: true, end: new Date(end), why: "انتهى اشتراك المدرسة (" + moe + ") بتاريخ " + fmt(new Date(end)) + "." });
+    return Object.assign(out, { ok: true, end: new Date(end), days: Math.ceil((end - now) / 864e5) });
+  }
   async function license() {
     var dev = await deviceId(), now = Date.now();
-    var rem = await remoteFetch(dev);
-    if (rem && rem.stop) return { ok: false, dev: dev, stopped: true, why: rem.why || "أُوقف الاشتراك من المزوّد. تواصل مع متجر تقناس لتفعيله." };
     var last = (await DB.get("lastSeen")) || 0;
     if (last && now < last - 3 * 3600e3) return { ok: false, dev: dev, why: "تاريخ الجهاز أقدم من آخر استخدام. صحّح تاريخ ووقت الجهاز ثم أعد فتح التطبيق.", clock: true };
     await DB.set("lastSeen", Math.max(now, last));
+    var lics = await getLics(), moes = Object.keys(lics);
+    if (moes.length) {
+      var schools = await Promise.all(moes.map(function (m) { return checkSchool(m, lics[m], dev, now); }));
+      var good = schools.filter(function (x) { return x.ok; }).sort(function (a, b) { return b.end - a.end; });
+      if (good.length) return { ok: true, v: 2, dev: dev, schools: schools, end: good[0].end, days: good[0].days };
+      return { ok: false, v: 2, dev: dev, schools: schools, stopped: schools.some(function (x) { return x.stopped; }), why: schools.map(function (x) { return x.why; }).join(" ") };
+    }
+    /* النظام السابق: كود مرتبط بالجهاز (SL1) + أوامر المزوّد للجهاز */
+    var rem = await remoteFetch(dev);
+    if (rem && rem.stop) return { ok: false, dev: dev, stopped: true, why: rem.why || "أُوقف الاشتراك من المزوّد. تواصل مع متجر تقناس لتفعيله." };
     var remEnd = rem && rem.end ? new Date(rem.end + "T23:59:59").getTime() : 0;
     var code = await DB.get("license");
     if (code) {
@@ -127,9 +196,48 @@
     if (!start) { start = now; await DB.set("trialStart", start); }
     var end = new Date(start + TRIAL_HOURS * 3600e3), left = end - now;
     if (left > 0) return { ok: true, trial: true, dev: dev, end: end, hours: Math.ceil(left / 3600e3) };
-    return { ok: false, trial: true, dev: dev, end: end, why: "انتهت الفترة التجريبية (ثلاثة أيام). أدخل كود الاشتراك للمتابعة." };
+    return { ok: false, trial: true, dev: dev, end: end, why: "انتهت الفترة التجريبية (ثلاثة أيام). أدخل كود اشتراك المدرسة للمتابعة." };
   }
-  async function activate(code) {
+  /* تفعيل كود مدرسة: تسجيل الجهاز في إحدى الخانات الثلاث ثم جلب بيانات الاعتماد إن وُجدت */
+  async function activateSchool(code, role) {
+    var dev = await deviceId(), v = await verifySchool(code);
+    if (!v.c || v.expired) return v;
+    var moe = v.moe, srv = await licFetch(moe);
+    if (!srv) return { ok: false, why: "التفعيل يحتاج اتصالاً بالإنترنت لتسجيل هذا الجهاز ضمن أجهزة المدرسة." };
+    var slots = srv.slots || {}, mine = 0, n;
+    for (n = 1; n <= SLOTS; n++) if (slots[n] === dev) mine = n;
+    for (n = 1; !mine && n <= SLOTS; n++) {
+      if (slots[n]) continue;
+      try { var r = await fetch(REG + "/lic/" + moe + "/slots/" + n + ".json", { method: "PUT", body: JSON.stringify(dev) }); if (r.ok) mine = n; } catch (e) {}
+    }
+    if (!mine) return { ok: false, full: true, why: "اكتمل عدد الأجهزة المسموح لهذه المدرسة (" + SLOTS + " أجهزة). اطلب من المزوّد فصل جهاز لا يُستخدم." };
+    var old = (await getLics())[moe] || {};
+    var rec = { code: v.c.code, slot: mine, okAt: Date.now(), role: role || old.role || (await DB.get("devRole")) || "", cmd: parseJ(srv.cmd), unlock: srv.unlock || null, id: srv.id ? await openId(moe, v.c.s, srv.id) : null };
+    await saveLic(moe, rec);
+    if (role) await DB.set("devRole", role);
+    await fsWriteCore();
+    return { ok: true, v: 2, moe: moe, end: v.end, slot: mine, id: rec.id };
+  }
+  /* اعتماد بيانات المدرسة (الاسم، الرقم الوزاري، المدير، الوكيل، الموجه) — لا تُغيَّر بعده إلا بإذن المزوّد */
+  async function approve(moe, ident) {
+    var rec = (await getLics())[moe];
+    if (!rec) return { ok: false, why: "لا يوجد ترخيص مفعّل لهذا الرقم الوزاري." };
+    var c = parseCode(rec.code), obj = Object.assign({ v: 1, moe: moe }, ident, { at: Date.now() });
+    try {
+      var r = await fetch(REG + "/lic/" + moe + "/id.json", { method: "PUT", body: JSON.stringify(await sealId(moe, c.s, obj)) });
+      if (!r.ok) return { ok: false, why: r.status === 401 || r.status === 403 ? "بيانات هذه المدرسة معتمدة مسبقاً ولا تُغيَّر إلا بإذن من المزوّد." : "تعذّر الاعتماد (" + r.status + ")." };
+    } catch (e) { return { ok: false, why: "الاعتماد يحتاج اتصالاً بالإنترنت." }; }
+    rec.id = obj; await saveLic(moe, rec); await fsWriteCore();
+    return { ok: true, id: obj };
+  }
+  async function dropLic(moe) { await saveLic(moe, null); await fsWriteCore(); }
+  async function setRole(role) {
+    await DB.set("devRole", role || ""); var l = await getLics();
+    Object.keys(l).forEach(function (m) { l[m].role = role || ""; }); await DB.set("lics", l);
+  }
+  async function activate(code, role) {
+    var c = parseCode(code);
+    if (c && c.v === 2) return activateSchool(c.code, role);
     var dev = await deviceId(), r = await verifyCode(code, dev);
     if (r.ok) { await DB.set("license", String(code).trim().replace(/\s+/g, "")); await fsWriteCore(); }
     return r;
@@ -164,7 +272,7 @@
   /* ————— نسخة احتياطية (تعمل حتى والتطبيق مقفل) ————— */
   async function backupObject() {
     var kv = await DB.kvAll(), recs = await DB.all();
-    delete kv.bundle; delete kv.license; delete kv.trialStart; delete kv.lastSeen; delete kv.deviceId;
+    delete kv.bundle; delete kv.license; delete kv.lics; delete kv.devRole; delete kv.remote; delete kv.trialStart; delete kv.lastSeen; delete kv.deviceId;
     return { format: "sulook-backup", v: 1, at: new Date().toISOString(), kv: kv, recs: recs };
   }
   function download(name, text, mime) {
@@ -185,27 +293,54 @@
     return BUILTIN;
   }
 
+  /* ————— صيانة المنصة (يعلنها المزوّد من لوحة التراخيص) ————— */
+  async function maintFetch() {
+    if (!REG) return null;
+    var c = new AbortController(), t = setTimeout(function () { c.abort(); }, 3000);
+    try { var r = await fetch(REG + "/sys/maint.json", { cache: "no-store", signal: c.signal }); clearTimeout(t); return r.ok ? await r.json() : null; }
+    catch (e) { clearTimeout(t); return null; }
+  }
+  function maintActive(m) { return !!(m && m.on && (!m.from || Date.now() >= +m.from)); }
+  function whenAr(t) {
+    try { return new Date(t).toLocaleString("ar-SA-u-nu-latn", { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" }); }
+    catch (e) { return fmt(new Date(t)); }
+  }
+  function maintScreen(m) {
+    var root = document.getElementById("boot");
+    root.innerHTML = '<div class="lock"><div class="lock-card maint"><div class="lock-logo">' + MARK + "</div><h1>المنصة متوقفة مؤقتاً للصيانة</h1>" +
+      '<p class="lock-why" style="white-space:pre-line">' + esc(m.msg || "نعتذر عن التوقف المؤقت لإجراء أعمال صيانة وتحسين. بياناتكم محفوظة ولن تتأثر.") + "</p>" +
+      (m.until ? '<p class="lock-hint">العودة المتوقعة: <b>' + esc(whenAr(+m.until)) + "</b></p>" : "") +
+      '<button class="btn pri" id="mt-retry" type="button">إعادة المحاولة</button>' +
+      '<details><summary>خيارات أخرى</summary><button class="btn" id="lk-bak" type="button">تنزيل نسخة احتياطية من بياناتي</button></details>' +
+      "</div></div>";
+    document.getElementById("mt-retry").onclick = function () { location.reload(); };
+    document.getElementById("lk-bak").onclick = async function () { download("sulook-backup-" + new Date().toISOString().slice(0, 10) + ".json", JSON.stringify(await backupObject())); };
+    setInterval(async function () { var x = await maintFetch(); if (x !== undefined && !maintActive(x)) location.reload(); }, 60000);
+  }
+
   /* ————— شاشة القفل ————— */
   function lockScreen(L) {
     var root = document.getElementById("boot");
-    var wa = VENDOR.wa ? "https://wa.me/" + VENDOR.wa + "?text=" + encodeURIComponent("السلام عليكم، أرغب بالاشتراك في تطبيق «سَمْت».\nرقم الجهاز: " + L.dev) : "";
+    var wa = VENDOR.wa ? "https://wa.me/" + VENDOR.wa + "?text=" + encodeURIComponent("السلام عليكم، أرغب بالاشتراك في منصة «سَمْت».\nالرقم الوزاري للمدرسة: ") : "";
     root.innerHTML =
       '<div class="lock"><div class="lock-card">' +
       '<div class="lock-logo">' + MARK + '</div><h1>سَمْت</h1>' +
       '<p class="lock-why">' + esc(L.why || "") + "</p>" +
-      '<div class="lock-dev"><span>رقم الجهاز</span><b id="lk-dev">' + esc(L.dev) + '</b><button id="lk-copy" type="button">نسخ</button></div>' +
-      '<p class="lock-hint">أرسل رقم الجهاز إلى ' + esc(VENDOR.name) + " للحصول على كود الاشتراك.</p>" +
+      '<p class="lock-hint">الاشتراك للمدرسة لا للجهاز: أرسل <b>الرقم الوزاري للمدرسة</b> إلى ' + esc(VENDOR.name) + " تصلك كود يعمل على ثلاثة أجهزة في المدرسة. المدرسة ذات المرحلتين برقمين وزاريين تحتاج كودين.</p>" +
       (wa ? '<a class="btn wa" href="' + wa + '" rel="noopener">طلب الاشتراك عبر واتساب</a>' : "") +
-      '<label class="lock-l">كود الاشتراك<textarea id="lk-code" rows="3" dir="ltr" placeholder="SL1.XXXXX-XXXXX.YYYYMMDD.…"></textarea></label>' +
+      '<label class="lock-l">كود اشتراك المدرسة<textarea id="lk-code" rows="3" dir="ltr" placeholder="SL2.123456789.YYYYMMDD.…"></textarea></label>' +
+      '<label class="lock-l">هذا الجهاز هو<select id="lk-role">' + DEV_ROLES.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + "</option>"; }).join("") + "</select></label>" +
       '<button class="btn pri" id="lk-act" type="button">تفعيل</button><p id="lk-msg" class="lock-msg"></p>' +
       '<details><summary>خيارات أخرى</summary>' +
+      '<p class="lock-hint">رقم هذا الجهاز: <b id="lk-dev" dir="ltr">' + esc(L.dev) + '</b> <button id="lk-copy" type="button">نسخ</button></p>' +
       '<label class="btn">تثبيت ملف تحديث (.slu)<input id="lk-upd" type="file" accept=".slu,application/json" hidden></label>' +
       '<button class="btn" id="lk-bak" type="button">تنزيل نسخة احتياطية من بياناتي</button>' + (FS.supported ? '<button class="btn" id="lk-fs" type="button">ربط مجلد sammt (استعادة البيانات والاشتراك)</button>' : "") + '</details>' +
       "</div></div>";
     document.getElementById("lk-copy").onclick = function () { try { navigator.clipboard.writeText(L.dev); this.textContent = "تم"; } catch (e) {} };
     document.getElementById("lk-act").onclick = async function () {
-      var r = await activate(document.getElementById("lk-code").value), m = document.getElementById("lk-msg");
-      if (r.ok) { m.className = "lock-msg ok"; m.textContent = "تم التفعيل حتى " + fmt(r.end) + " — جارٍ الفتح…"; setTimeout(function () { location.reload(); }, 900); }
+      var m = document.getElementById("lk-msg"); m.className = "lock-msg"; m.textContent = "جارٍ التحقق…";
+      var r = await activate(document.getElementById("lk-code").value, document.getElementById("lk-role").value);
+      if (r.ok) { m.className = "lock-msg ok"; m.textContent = "تم التفعيل حتى " + fmt(r.end) + (r.slot ? " — الجهاز رقم " + r.slot + " من " + SLOTS : "") + " — جارٍ الفتح…"; setTimeout(function () { location.reload(); }, 900); }
       else { m.className = "lock-msg err"; m.textContent = r.why; }
     };
     document.getElementById("lk-upd").onchange = async function () {
@@ -246,7 +381,7 @@
   }
   async function fsWriteCore() {
     if (!FS.ok) return;
-    try { await fsWrite("samt-core.json", { format: "samt-core", deviceId: await DB.get("deviceId"), license: (await DB.get("license")) || "", trialStart: (await DB.get("trialStart")) || 0, lastSeen: (await DB.get("lastSeen")) || 0, at: Date.now() }); } catch (e) { console.warn(e); }
+    try { await fsWrite("samt-core.json", { format: "samt-core", deviceId: await DB.get("deviceId"), license: (await DB.get("license")) || "", lics: await getLics(), devRole: (await DB.get("devRole")) || "", trialStart: (await DB.get("trialStart")) || 0, lastSeen: (await DB.get("lastSeen")) || 0, at: Date.now() }); } catch (e) { console.warn(e); }
   }
   /* استعادة من المجلد: الاشتراك دائماً، والبيانات إذا كان المتصفح فارغاً */
   async function fsRestore() {
@@ -254,6 +389,8 @@
     if (core && core.deviceId) {
       await DB.set("deviceId", core.deviceId); try { localStorage.setItem("sulook_device", core.deviceId); } catch (e) {}
       if (core.license) await DB.set("license", core.license);
+      if (core.lics && typeof core.lics === "object") { var cur = await getLics(); Object.keys(core.lics).forEach(function (m) { if (!cur[m]) cur[m] = core.lics[m]; }); await DB.set("lics", cur); }
+      if (core.devRole && !(await DB.get("devRole"))) await DB.set("devRole", core.devRole);
       var ts = (await DB.get("trialStart")) || 0; if (core.trialStart && (!ts || core.trialStart < ts)) await DB.set("trialStart", core.trialStart);
       var ls = (await DB.get("lastSeen")) || 0; if (core.lastSeen > ls) await DB.set("lastSeen", core.lastSeen);
       restored.core = true;
@@ -323,6 +460,7 @@
 
   window.SLCore = {
     DB: DB, BUILTIN: BUILTIN, VENDOR: VENDOR, license: license, activate: activate, licLabel: licLabel, deviceId: deviceId,
+    REG: REG, parseCode: parseCode, approve: approve, maintFetch: maintFetch, maintActive: maintActive, whenAr: whenAr, getLics: getLics, dropLic: dropLic, setRole: setRole, DEV_ROLES: DEV_ROLES, SLOTS: SLOTS, unlockOn: unlockOn,
     installUpdate: installUpdate, readUpdate: readUpdate, currentVersion: currentVersion, rollback: rollback,
     backupObject: backupObject, download: download, vcmp: vcmp,
     FS: FS, fsPick: fsPick, fsRestore: fsRestore, fsSaveData: fsSaveData, fsSchedule: fsSchedule, fsWriteCore: fsWriteCore, fsPerm: fsPerm
@@ -333,9 +471,10 @@
     if (!window.indexedDB || !window.crypto || !crypto.subtle) { el.innerHTML = '<div class="lock"><div class="lock-card"><h1>المتصفح غير مدعوم</h1><p>استخدم متصفح Chrome أو Safari حديثاً.</p></div></div>'; return; }
     try {
       await folderBoot();
-      var L = await license();
+      var both = await Promise.all([maintFetch(), license()]), M = both[0], L = both[1];
       await fsWriteCore();
-      window.SLCore.lic = L;
+      window.SLCore.lic = L; window.SLCore.maint = M;
+      if (maintActive(M)) { maintScreen(M); return; }
       if (!L.ok) { lockScreen(L); return; }
       window.SLCore.version = await loadApp();
     } catch (e) {

@@ -18,6 +18,7 @@ window.addEventListener("hashchange", function () { location.reload(); });
 (async function () {
   var app = document.getElementById("app"), c = location.hash.slice(1).replace(/[^A-Za-z0-9]/g, "");
   function fail(m) { app.innerHTML = '<div class="pub-h"><div class="logo">' + SL.LOGO + '</div><div><b>سَمْت</b><small>رابط من المدرسة</small></div></div><div class="card done"><div class="ic" style="color:#c62828;background:#fdecec;box-shadow:0 0 0 6px #fef5f5">!</div><h2>' + SL.esc(m) + '</h2><p class="mut">تواصل مع المدرسة إن احتجت رابطاً جديداً.</p></div>'; }
+  if (await SL.maintGate(app)) return;
   if (c.length < 8) return fail("الرابط غير مكتمل");
   try {
     var P = await SL.short.get(SL.linkRelay(location.href), c);

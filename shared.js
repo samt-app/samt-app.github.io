@@ -39,7 +39,8 @@
     var n = SL.normPhone(phone);
     return "https://wa.me/" + (n || "") + "?text=" + encodeURIComponent(text || "");
   };
-  SL.openWa = function (phone, text) { var w = window.open(SL.wa(phone, text), "_blank"); if (!w) location.href = SL.wa(phone, text); };
+  /* واتساب يفتح في التبويب نفسه — لا تُفتح تبويبات جديدة داخل المنصة */
+  SL.openWa = function (phone, text) { var u = SL.wa(phone, text); if (!window.open(u, "_self")) location.href = u; };
 
   /* ————— عشوائي وبصمات ————— */
   var B32 = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -204,6 +205,19 @@
   async function codeKey(c) { var b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("samt-link|" + c)); return b64u(new Uint8Array(b)); }
   async function codeId(c) { return (await SL.sha256("samt-lid|" + c)).slice(0, 24); }
   SL.linkRelay = function (base) { var h = ""; try { h = new URL(base).hostname; } catch (e) {} return /^(localhost|127\.)/.test(h) ? new URL(base).origin : SL.DEFAULT_RELAY; };
+  /* صيانة المنصة: إن أعلنها المزوّد تظهر رسالة الاعتذار بدل الصفحة */
+  SL.maintGate = async function (el) {
+    var base = typeof window.SAMT_REG === "string" ? window.SAMT_REG : SL.DEFAULT_RELAY; if (!base) return false;
+    try {
+      var c = new AbortController(), t = setTimeout(function () { c.abort(); }, 3000);
+      var r = await fetch(base + "/sys/maint.json", { cache: "no-store", signal: c.signal }); clearTimeout(t);
+      var m = r.ok ? await r.json() : null;
+      if (!(m && m.on && (!m.from || Date.now() >= +m.from))) return false;
+      var w = m.until ? new Date(+m.until).toLocaleString("ar-SA-u-nu-latn", { weekday: "long", day: "numeric", month: "long", hour: "numeric", minute: "2-digit" }) : "";
+      (el || document.body).innerHTML = '<div class="pub-h"><div class="logo">' + SL.LOGO + '</div><div><b>سَمْت</b><small>منصة ضبط السلوك والمواظبة</small></div></div><div class="card done"><h2>المنصة متوقفة مؤقتاً للصيانة</h2><p style="white-space:pre-line">' + SL.esc(m.msg || "") + "</p>" + (w ? '<p class="mut">العودة المتوقعة: ' + SL.esc(w) + "</p>" : "") + '<p class="mut">الرابط يبقى صالحاً — أعد فتحه بعد انتهاء الصيانة.</p></div>';
+      return true;
+    } catch (e) { return false; }
+  };
   SL.short = {
     put: async function (relay, obj) { var c = code(11); await SL.relay.put(relay, "L", await codeId(c), await SL.seal(await codeKey(c), obj)); return c; },
     get: async function (relay, c) {

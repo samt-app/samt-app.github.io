@@ -23,6 +23,7 @@
   function fail(m) { app.innerHTML = '<div class="card done"><div class="ic" style="color:#c62828">!</div><h2>' + e(m) + "</h2></div>"; }
 
   (async function () {
+    if (await SL.maintGate(app)) return;
     var h = location.hash.slice(1);
     try { if (h) localStorage.setItem(LS, h); else h = localStorage.getItem(LS) || ""; } catch (err) {}
     if (!h) return fail("الرابط غير مكتمل");

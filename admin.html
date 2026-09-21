@@ -50,6 +50,43 @@ tr.det td { background: var(--bg-2); white-space: normal; }
 .login-card h1 { font-size: 1.4rem; }
 .hide { display: none !important; }
 .foot { text-align: center; color: var(--mut); font-size: .8rem; margin-top: 22px; }
+.views { margin: 0 0 16px; background: #fff; border-color: var(--frame); }
+.views button { padding: 9px 18px; font-size: .92rem; }
+.cards { display: grid; gap: 14px; }
+.scard { background: #fff; border: 1px solid var(--frame); border-radius: 20px; padding: 16px 18px; box-shadow: var(--sh); }
+.scard .top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.scard .top .sch { font-size: 1.12rem; }
+.scard .moe { font-family: ui-monospace, Menlo, Consolas, monospace; direction: ltr; background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 1px 8px; font-size: .84rem; }
+.scard .who { margin: 8px 0 12px; font-size: .88rem; color: var(--ink); display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.scard .who b { color: var(--mut); font-weight: 500; }
+.slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 820px) { .slots { grid-template-columns: 1fr; } }
+.slot { position: relative; border: 1px solid var(--line); border-radius: 16px; padding: 12px 12px 10px; padding-inline-start: 56px; min-height: 86px; background: var(--bg-2); }
+.slot .no { position: absolute; inset-inline-start: 10px; top: 12px; width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; font-weight: 800; font-size: 1.05rem; color: #fff; }
+.slot.s1 .no { background: #0c2233; } .slot.s2 .no { background: #0d6b61; } .slot.s3 .no { background: #b8913c; }
+.slot.s1 { border-color: #0c2233; } .slot.s2 { border-color: #0d6b61; } .slot.s3 { border-color: #b8913c; }
+.slot.empty { background: #fff; border-style: dashed; color: var(--mut); }
+.slot.empty .no { opacity: .35; }
+.slot b { display: block; color: var(--navy); font-size: .92rem; }
+.slot .mini { line-height: 1.6; }
+.slot .x { margin-top: 6px; }
+.acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-2); align-items: center; }
+.unl { margin-top: 10px; padding: 12px; border: 1px dashed var(--gold); border-radius: 14px; background: var(--gold-soft); }
+.unl .checks-inline label { font-size: .88rem; }
+.checks-inline { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; margin: 8px 0; }
+.checks-inline label { display: flex; gap: 6px; align-items: center; margin: 0; color: var(--ink); }
+.checks-inline input[type=checkbox] { width: auto; min-height: 0; }
+.checks-inline select { width: auto; min-height: 36px; }
+.empty { text-align: center; padding: 30px; color: var(--mut); background: #fff; border: 1px dashed var(--frame); border-radius: 18px; }
+details.sub { border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; margin: 12px 0; background: var(--bg-2); }
+.p-lock { background: var(--navy); color: #f3e6c4; } .p-wait { background: var(--warn-soft); color: var(--warn); } .p-open { background: var(--gold-soft); color: #7a5a17; }
+.mnt { background: #fff; border: 1px solid var(--frame); border-radius: 20px; padding: 20px; box-shadow: var(--sh); max-width: 760px; }
+.mnt .state { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-weight: 700; }
+.mnt .state i { width: 12px; height: 12px; border-radius: 50%; background: #22c55e; }
+.mnt .state.off i { background: var(--red); } .mnt .state.sch i { background: var(--gold); }
+.prev { margin-top: 16px; border-radius: 18px; padding: 22px; text-align: center; color: #fff; background: radial-gradient(600px 240px at 100% 0%, rgba(201,162,76,.3), transparent 60%), linear-gradient(135deg, #0a1a27, #0c2233 45%, #0f3b45); }
+.prev h3 { color: #fff; margin: 8px 0; } .prev p { color: rgba(255,255,255,.85); white-space: pre-line; } .prev small { color: #ecd08a; }
+
 @media (max-width: 720px) { th:nth-child(n+5), td:nth-child(n+5) { display: none; } }
 </style>
 </head>
@@ -80,6 +117,35 @@ tr.det td { background: var(--bg-2); white-space: normal; }
     </div>
   </header>
 
+  <div class="seg views" id="views">
+    <button data-v="sch" class="on" type="button">المدارس والتراخيص</button>
+    <button data-v="dev" type="button">كل الأجهزة</button>
+    <button data-v="mnt" type="button">صيانة المنصة</button>
+  </div>
+
+  <section id="v-sch">
+    <div class="kpis" id="skpis"></div>
+    <div class="bar"><input id="sq" type="search" placeholder="بحث باسم المدرسة أو الرقم الوزاري أو اسم المدير أو الوكيل…"></div>
+    <div class="cards" id="scards"></div>
+    <p class="foot">لكل رقم وزاري ترخيص يعمل على ثلاثة أجهزة. الأوامر (تمديد، إيقاف، فصل جهاز، السماح بالتعديل) تصل للمدرسة عند أول تشغيل متصل بالإنترنت.</p>
+  </section>
+
+  <section id="v-mnt" class="hide">
+    <div class="mnt">
+      <div class="state" id="mst"><i></i><span>المنصة متاحة</span></div>
+      <p class="mut">عند الإيقاف تظهر لكل المدارس شاشة الصيانة برسالتك عند فتح المنصة (وتُغلق المفتوحة خلال دقائق). البيانات لا تتأثر. تبقى متوقفة حتى تضغط «إتاحة المنصة».</p>
+      <div class="grid2">
+        <label>بداية الصيانة<input id="m-from" type="datetime-local"></label>
+        <label>العودة المتوقعة<input id="m-until" type="datetime-local"></label>
+      </div>
+      <label>رسالة الاعتذار<textarea id="m-msg" rows="4"></textarea></label>
+      <div class="actions wrap"><button class="btn danger" id="m-on" type="button">إيقاف المنصة للصيانة</button><button class="btn pri" id="m-off" type="button">إتاحة المنصة</button></div>
+      <p id="m-res" class="mini"></p>
+      <div class="prev" id="m-prev"></div>
+    </div>
+  </section>
+
+  <section id="v-dev" class="hide">
   <div class="kpis" id="kpis"></div>
 
   <div class="bar">
@@ -111,6 +177,7 @@ tr.det td { background: var(--bg-2); white-space: normal; }
     </table>
   </div>
   <p class="foot">تُرسل الأجهزة هذه البيانات عند كل تشغيل. لا تحتوي على أي بيانات طلاب أو أولياء أمور.</p>
+  </section>
 </main>
 
 </div>
@@ -119,7 +186,7 @@ tr.det td { background: var(--bg-2); white-space: normal; }
 (function () {
   "use strict";
   var SL = window.SL, e = SL.esc, $ = function (s) { return document.querySelector(s); };
-  var DB = SL.DEFAULT_RELAY, KEY = "AIzaSyAUfytIrA1q-RRqwGqKiJvyhuGyn_4IdvI", ROWS = [], sortBy = "end", sortDir = 1, filter = "all", timer = null;
+  var DB = SL.DEFAULT_RELAY, KEY = "AIzaSyAUfytIrA1q-RRqwGqKiJvyhuGyn_4IdvI", ROWS = [], RAW = {}, LIC = {}, MAINT = null, SCH = [], sortBy = "end", sortDir = 1, filter = "all", timer = null;
   try { var sk = localStorage.getItem("samt_admin_key"); if (/^AIza/.test(sk || "")) KEY = sk; } catch (err) {}
   document.querySelectorAll(".lg, .lock-logo").forEach(function (el) { el.innerHTML = SL.LOGO; });
   $("#ak").value = KEY; $("#keybox").hidden = false;
@@ -173,8 +240,10 @@ tr.det td { background: var(--bg-2); white-space: normal; }
           Object.keys(raw).forEach(function (k) { try { cmds[k] = typeof raw[k] === "string" ? JSON.parse(raw[k]) : raw[k]; } catch (err) {} });
         }
       } catch (err) {}
+      RAW = {};
       ROWS = Object.keys(box).map(function (k) {
         var o = {}; try { o = typeof box[k] === "string" ? JSON.parse(box[k]) : box[k] || {}; } catch (err) {}
+        RAW[o.dev || k] = o;
         var logins = o.logins || [], last = logins[logins.length - 1] || o.at || 0;
         var endT = o.end ? new Date(o.end + "T23:59:59").getTime() : 0;
         var days = o.trial ? Math.ceil((o.hours || 0) / 24) : endT ? Math.ceil((endT - Date.now()) / 864e5) : 0;
@@ -184,8 +253,10 @@ tr.det td { background: var(--bg-2); white-space: normal; }
           trial: !!o.trial, end: o.end || "", endT: endT, days: days, last: last, logins: logins, first: o.first || 0,
           stu: (o.n || {}).stu || 0, inc: (o.n || {}).inc || 0, sig: (o.n || {}).sig || 0, stf: (o.n || {}).stf || 0, mer: (o.n || {}).mer || 0, ua: o.ua || "" };
       });
+      try { var rl = await fetch(DB + "/lic.json?auth=" + encodeURIComponent(window.__tok), { cache: "no-store" }); LIC = rl.ok ? ((await rl.json()) || {}) : {}; } catch (err) { LIC = {}; }
+      try { var rm = await fetch(DB + "/sys/maint.json", { cache: "no-store" }); MAINT = rm.ok ? await rm.json() : null; } catch (err) {}
       $("#upd").textContent = "آخر تحديث " + SL.time(Date.now());
-      draw();
+      draw(); drawSchools(); drawMaint();
     } catch (err) { $("#upd").textContent = "تعذّر التحديث"; }
   }
   function state(r) {
@@ -200,6 +271,7 @@ tr.det td { background: var(--bg-2); white-space: normal; }
   function ago(t) {
     if (!t) return "—";
     var m = Math.floor((Date.now() - t) / 6e4);
+    if (m < 1) return "الآن";
     if (m < 60) return "قبل " + m + " دقيقة";
     var h = Math.floor(m / 60); if (h < 24) return "قبل " + h + " ساعة";
     var d = Math.floor(h / 24); return d === 1 ? "أمس" : "قبل " + d + " يوماً";
@@ -296,6 +368,174 @@ tr.det td { background: var(--bg-2); white-space: normal; }
     });
     function kpi(v, l, c) { return '<div class="kpi ' + c + '"><b>' + v + "</b><span>" + l + "</span></div>"; }
   }
+
+  /* ————— كتابة بصلاحية المزوّد (تجديد الجلسة تلقائياً) ————— */
+  async function put(path, val) {
+    var r = await fetch(DB + path + ".json?auth=" + encodeURIComponent(window.__tok), { method: val === null ? "DELETE" : "PUT", body: val === null ? undefined : JSON.stringify(val) });
+    if (r.status === 401) { save(await refresh(localStorage.getItem("samt_admin_rt"))); r = await fetch(DB + path + ".json?auth=" + encodeURIComponent(window.__tok), { method: val === null ? "DELETE" : "PUT", body: val === null ? undefined : JSON.stringify(val) }); }
+    if (!r.ok) throw new Error("HTTP " + r.status);
+  }
+  async function act(btn, fn, done) {
+    btn.disabled = true; var old = btn.textContent; btn.textContent = "جارٍ…";
+    try { await fn(); btn.textContent = done || "تم"; await load(); }
+    catch (err) { btn.textContent = "تعذّر — أعد المحاولة"; btn.disabled = false; setTimeout(function () { btn.textContent = old; }, 2500); }
+  }
+  function isoDay(d) { return new Date(d).toISOString().slice(0, 10); }
+  function pj(v) { if (typeof v === "string") { try { return JSON.parse(v); } catch (err) { return null; } } return v || null; }
+
+  /* ————— المدارس (بالرقم الوزاري) ————— */
+  var ROLE_DEV = { deputy: "جهاز وكيل شؤون الطلبة", counselor: "جهاز الموجه الطلابي", principal: "جهاز مدير المدرسة", other: "جهاز آخر", "": "لم يُحدَّد نوعه" };
+  var FIELDS = [["name", "اسم المدرسة"], ["moe", "الرقم الوزاري"], ["principal", "مدير المدرسة"], ["deputy", "وكيل شؤون الطلبة"], ["counselor", "الموجه الطلابي"]];
+  function buildSchools() {
+    SCH = Object.keys(LIC).map(function (moe) {
+      var L = LIC[moe] || {}, slots = L.slots || {}, info = null, infoAt = 0, devs = [];
+      Object.keys(RAW).forEach(function (d) {
+        var o = RAW[d]; (o.lics || []).forEach(function (x) { if (x.moe === moe && (o.at || 0) > infoAt) { info = x; infoAt = o.at || 0; } });
+      });
+      for (var n = 1; n <= 3; n++) {
+        var dev = slots[n] || "", o = dev ? RAW[dev] || null : null, lg = o ? (o.logins || []) : [];
+        devs.push({ n: n, dev: dev, o: o, last: lg[lg.length - 1] || (o && o.at) || 0 });
+      }
+      var cmd = pj(L.cmd) || {}, un = L.unlock && +L.unlock.until > Date.now() ? L.unlock : null;
+      if (un && info && info.idAt > +un.at) un = Object.assign({ used: true }, un); /* أعادت المدرسة الاعتماد بعد السماح */
+      var endT = info && info.end ? new Date(info.end + "T23:59:59").getTime() : 0;
+      if (cmd.end) { var ce = new Date(cmd.end + "T23:59:59").getTime(); if (ce > endT) endT = ce; }
+      var last = devs.reduce(function (m, x) { return Math.max(m, x.last); }, 0);
+      return { moe: moe, info: info || {}, approved: !!L.id, devs: devs, used: devs.filter(function (x) { return x.dev; }).length, cmd: cmd, unlock: un, endT: endT, last: last,
+        days: endT ? Math.ceil((endT - Date.now()) / 864e5) : 0 };
+    }).sort(function (a, b) { return (a.endT || 0) - (b.endT || 0); });
+  }
+  function sState(x) {
+    if (x.cmd.stop) return ["موقوف", "p-end"];
+    if (!x.endT) return ["لم يتصل بعد", "p-idle"];
+    if (x.endT < Date.now()) return ["منتهٍ", "p-end"];
+    if (x.days <= 14) return ["ينتهي بعد " + x.days + " يوماً", "p-soon"];
+    return ["فعّال", "p-ok"];
+  }
+  function drawSchools() {
+    buildSchools();
+    var q = ($("#sq").value || "").trim().toLowerCase();
+    var list = SCH.filter(function (x) { var i = x.info; return !q || (x.moe + " " + (i.name || "") + " " + (i.principal || "") + " " + (i.deputy || "") + " " + (i.counselor || "")).toLowerCase().indexOf(q) >= 0; });
+    var act_ = SCH.filter(function (x) { return !x.cmd.stop && x.endT > Date.now(); }).length, soon = SCH.filter(function (x) { return !x.cmd.stop && x.endT > Date.now() && x.days <= 14; }).length;
+    var devs = SCH.reduce(function (m, x) { return m + x.used; }, 0), wait = SCH.filter(function (x) { return !x.approved; }).length;
+    $("#skpis").innerHTML = k(SCH.length, "مدرسة مرخّصة", "") + k(act_, "اشتراك فعّال", "ok") + k(soon, "ينتهي خلال 14 يوماً", "warn") + k(devs + " / " + SCH.length * 3, "أجهزة مسجّلة", "") +
+      k(wait, "بانتظار الاعتماد", wait ? "warn" : "") + k(SCH.filter(function (x) { return x.unlock; }).length, "مسموح لها بالتعديل", "") + k(SCH.filter(function (x) { return x.cmd.stop; }).length, "موقوفة", "red") + k(MAINT && MAINT.on ? "متوقفة" : "متاحة", "حالة المنصة", MAINT && MAINT.on ? "red" : "ok");
+    $("#scards").innerHTML = list.length ? list.map(function (x) {
+      var i = x.info, st = sState(x);
+      var fl = x.unlock ? String(x.unlock.fields || "").split(",").map(function (f) { var y = FIELDS.find(function (z) { return z[0] === f; }); return y ? y[1] : ""; }).filter(Boolean).join("، ") : "";
+      return '<article class="scard" data-moe="' + e(x.moe) + '"><div class="top"><span class="sch">' + e(i.name || "— لم تُعتمد بعد —") + '</span><span class="moe">' + e(x.moe) + "</span>" +
+        '<span class="pill ' + st[1] + '">' + e(st[0]) + "</span>" + (x.endT ? '<span class="mini">حتى ' + e(isoDay(x.endT)) + "</span>" : "") +
+        (x.approved ? '<span class="pill p-lock">🔒 معتمدة</span>' : '<span class="pill p-wait">بانتظار الاعتماد</span>') +
+        (x.unlock ? (x.unlock.used ? '<span class="pill p-ok">✓ عدّلت المدرسة وأعادت الاعتماد</span>' : '<span class="pill p-open">🔓 مسموح بتعديل: ' + e(fl) + " حتى " + e(isoDay(+x.unlock.until)) + "</span>") : "") +
+        '<span class="mini" style="margin-inline-start:auto">آخر نشاط: ' + e(ago(x.last)) + "</span></div>" +
+        '<div class="who"><span><b>المدير:</b> ' + e(i.principal || "—") + "</span><span><b>الوكيل:</b> " + e(i.deputy || "—") + "</span><span><b>الموجه الطلابي:</b> " + e(i.counselor || "—") + "</span></div>" +
+        '<div class="slots">' + x.devs.map(function (d) {
+          if (!d.dev) return '<div class="slot empty s' + d.n + '"><span class="no">' + d.n + "</span><b>جهاز " + d.n + "</b><span class=\"mini\">خانة فارغة — تُشغل عند تفعيل الكود في جهاز جديد</span></div>";
+          var o = d.o || {};
+          return '<div class="slot s' + d.n + '"><span class="no">' + d.n + "</span><b>" + e(ROLE_DEV[o.role || ""] || "جهاز") + '</b><div class="mini"><span class="dev">' + e(d.dev) + "</span> · " + e(String(o.ua || "").split(" · ").pop() || "—") +
+            "<br>آخر دخول: " + e(ago(d.last)) + (o.ver ? " · الإصدار " + e(o.ver) : "") + "</div>" +
+            '<button class="btn sm x" type="button" data-unslot="' + e(x.moe) + "|" + d.n + '">فصل الجهاز</button></div>';
+        }).join("") + "</div>" +
+        '<div class="acts"><button class="btn sm pri" type="button" data-sext="' + e(x.moe) + '" data-m="3">تمديد 3 أشهر</button><button class="btn sm pri" type="button" data-sext="' + e(x.moe) + '" data-m="12">تمديد سنة</button>' +
+        '<button class="btn sm" type="button" data-sextd="' + e(x.moe) + '">تمديد حتى تاريخ…</button>' +
+        (x.cmd.stop ? '<button class="btn sm" type="button" data-srun="' + e(x.moe) + '">إلغاء الإيقاف</button>' : '<button class="btn sm danger" type="button" data-sstop="' + e(x.moe) + '">إيقاف الاشتراك</button>') +
+        (x.unlock ? '<button class="btn sm" type="button" data-lock="' + e(x.moe) + '">إلغاء السماح بالتعديل</button>' : '<button class="btn sm" type="button" data-unl="' + e(x.moe) + '">السماح بتعديل البيانات…</button>') +
+        '<button class="btn sm" type="button" data-swa="' + e(x.moe) + '">رسالة تجديد</button>' +
+        (x.cmd.end ? '<span class="pill p-ok">تمديد من اللوحة حتى ' + e(x.cmd.end) + "</span>" : "") + "</div>" +
+        '<div class="unl hide" id="unl-' + e(x.moe) + '"><b>اختر ما يُسمح للمدرسة بتعديله:</b><div class="checks-inline">' +
+          FIELDS.map(function (f) { return '<label><input type="checkbox" value="' + f[0] + '"> ' + f[1] + "</label>"; }).join("") + "</div>" +
+          '<div class="checks-inline"><label>مدة السماح <select class="udays"><option value="3">3 أيام</option><option value="7" selected>أسبوع</option><option value="14">أسبوعان</option><option value="30">شهر</option></select></label>' +
+          '<button class="btn sm pri" type="button" data-unlgo="' + e(x.moe) + '">سماح</button></div>' +
+          '<p class="mini">بعد التعديل تضغط المدرسة «إعادة اعتماد البيانات» فتُقفل من جديد. تغيير الرقم الوزاري يتطلب كوداً جديداً للرقم الجديد.</p></div>' +
+        "</article>";
+    }).join("") : '<div class="empty"><p>' + (SCH.length ? "لا نتائج." : "لا توجد مدارس مرخّصة بالرقم الوزاري بعد. تظهر هنا عند أول تفعيل لكود SL2.") + "</p></div>";
+    bindSchools();
+  }
+  function k(v, l, c) { return '<div class="kpi ' + c + '"><b>' + v + "</b><span>" + l + "</span></div>"; }
+  function bindSchools() {
+    function each(sel, fn) { document.querySelectorAll(sel).forEach(function (b) { b.onclick = function (ev) { ev.stopPropagation(); fn(b); }; }); }
+    function sx(moe) { return SCH.find(function (x) { return x.moe === moe; }) || { cmd: {} }; }
+    each("[data-sext]", function (b) {
+      var x = sx(b.dataset.sext), base = new Date(Math.max(Date.now(), x.endT || 0)); base.setMonth(base.getMonth() + (+b.dataset.m));
+      if (!confirm("تمديد اشتراك " + (x.info.name || b.dataset.sext) + " حتى " + isoDay(base) + "؟")) return;
+      act(b, function () { return put("/lic/" + b.dataset.sext + "/cmd", { end: isoDay(base), by: "admin", at: Date.now() }); }, "تم حتى " + isoDay(base));
+    });
+    each("[data-sextd]", function (b) {
+      var v = prompt("تاريخ نهاية الاشتراك (YYYY-MM-DD):", isoDay(Date.now() + 365 * 864e5)); if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v.trim())) return;
+      act(b, function () { return put("/lic/" + b.dataset.sextd + "/cmd", { end: v.trim(), by: "admin", at: Date.now() }); }, "تم حتى " + v.trim());
+    });
+    each("[data-sstop]", function (b) {
+      if (!confirm("إيقاف اشتراك المدرسة؟ تُقفل المنصة في أجهزتها الثلاثة عند أول تشغيل متصل بالإنترنت.")) return;
+      var x = sx(b.dataset.sstop);
+      act(b, function () { return put("/lic/" + b.dataset.sstop + "/cmd", Object.assign({}, x.cmd, { stop: true, by: "admin", at: Date.now() })); }, "أُوقف");
+    });
+    each("[data-srun]", function (b) {
+      var x = sx(b.dataset.srun), c = Object.assign({}, x.cmd); delete c.stop; delete c.why;
+      act(b, function () { return put("/lic/" + b.dataset.srun + "/cmd", c.end ? c : null); }, "أُلغي الإيقاف");
+    });
+    each("[data-unslot]", function (b) {
+      var z = b.dataset.unslot.split("|");
+      if (!confirm("فصل الجهاز رقم " + z[1] + " من ترخيص المدرسة " + z[0] + "؟ ستفرغ خانته ويمكن تفعيل الكود في جهاز آخر.")) return;
+      act(b, function () { return put("/lic/" + z[0] + "/slots/" + z[1], null); }, "فُصل");
+    });
+    each("[data-unl]", function (b) { var box = document.getElementById("unl-" + b.dataset.unl); if (box) box.classList.toggle("hide"); });
+    each("[data-unlgo]", function (b) {
+      var moe = b.dataset.unlgo, box = document.getElementById("unl-" + moe);
+      var f = Array.prototype.filter.call(box.querySelectorAll("input[type=checkbox]"), function (c) { return c.checked; }).map(function (c) { return c.value; });
+      if (!f.length) return alert("اختر حقلاً واحداً على الأقل");
+      var d = +box.querySelector(".udays").value, until = Date.now() + d * 864e5;
+      act(b, function () { return put("/lic/" + moe + "/unlock", { fields: f.join(","), until: until, at: Date.now(), by: "admin" }); }, "تم السماح");
+    });
+    each("[data-lock]", function (b) { act(b, function () { return put("/lic/" + b.dataset.lock + "/unlock", null); }, "أُلغي السماح"); });
+    each("[data-swa]", function (b) {
+      var x = sx(b.dataset.swa);
+      var t = "السلام عليكم، بخصوص اشتراك منصة «سَمْت» لـ" + (x.info.name || "المدرسة") + " (الرقم الوزاري " + x.moe + ")" + (x.endT ? "، ينتهي بتاريخ " + isoDay(x.endT) : "") + ".\nيسعدنا تجديد الاشتراك عبر متجر تقناس: www.TiqNas.com";
+      navigator.clipboard.writeText(t); b.textContent = "نُسخت الرسالة";
+    });
+  }
+  $("#sq").oninput = drawSchools;
+
+  /* ————— صيانة المنصة ————— */
+  var MDEF = "نعتذر عن التوقف المؤقت لمنصة «سَمْت» لإجراء أعمال صيانة وتحسين.\nبياناتكم محفوظة ولن تتأثر، ونعود للعمل قريباً بإذن الله.\nشكراً لتفهمكم.";
+  function localDT(t) { var d = new Date(t - new Date().getTimezoneOffset() * 6e4); return d.toISOString().slice(0, 16); }
+  function fmtDT(t) { return SL.hijri(t) + " — " + SL.greg(t) + " الساعة " + SL.time(t); }
+  var mInit = false;
+  function drawMaint() {
+    var m = MAINT && MAINT.on ? MAINT : null, sched = m && +m.from > Date.now();
+    var st = $("#mst"); st.className = "state" + (m ? (sched ? " sch" : " off") : "");
+    st.querySelector("span").textContent = !m ? "المنصة متاحة للمدارس" : sched ? "صيانة مجدولة تبدأ " + fmtDT(+m.from) : "المنصة متوقفة للصيانة منذ " + fmtDT(+m.from || +m.at);
+    if (!mInit) {
+      mInit = true;
+      $("#m-from").value = localDT(m ? +m.from || Date.now() : Date.now());
+      $("#m-until").value = localDT(m && m.until ? +m.until : Date.now() + 2 * 3600e3);
+      $("#m-msg").value = (m && m.msg) || MDEF;
+    }
+    prev();
+  }
+  function prev() {
+    var from = new Date($("#m-from").value).getTime(), until = new Date($("#m-until").value).getTime();
+    $("#m-prev").innerHTML = '<span class="lg" style="display:inline-grid;width:56px;height:56px;border-radius:16px;background:linear-gradient(145deg,#12384a,#0d6b61);box-shadow:inset 0 0 0 2px #c9a24c;place-items:center">' + SL.LOGO + "</span>" +
+      "<h3>المنصة متوقفة مؤقتاً للصيانة</h3><p>" + e($("#m-msg").value) + "</p>" + (until ? "<small>العودة المتوقعة: " + e(fmtDT(until)) + "</small>" : "") + '<div class="mini" style="color:rgba(255,255,255,.6);margin-top:6px">معاينة لما تراه المدارس</div>';
+  }
+  ["#m-from", "#m-until", "#m-msg"].forEach(function (id) { $(id).addEventListener("input", prev); });
+  $("#m-on").onclick = function () {
+    var from = new Date($("#m-from").value).getTime() || Date.now(), until = new Date($("#m-until").value).getTime() || 0, msg = $("#m-msg").value.trim() || MDEF;
+    if (until && until <= from) return alert("وقت العودة يجب أن يكون بعد وقت البداية");
+    if (!confirm(from > Date.now() + 6e4 ? "جدولة إيقاف المنصة لكل المدارس يبدأ " + fmtDT(from) + "؟" : "إيقاف المنصة الآن لكل المدارس؟")) return;
+    var b = this; act(b, function () { return put("/sys/maint", { on: true, from: from, until: until, msg: msg, at: Date.now(), by: "admin" }); }, "تم الإيقاف").then(function () { b.disabled = false; b.textContent = "إيقاف المنصة للصيانة"; $("#m-res").textContent = "حُفظ — تظهر شاشة الصيانة للمدارس."; });
+  };
+  $("#m-off").onclick = function () {
+    if (!confirm("إتاحة المنصة لكل المدارس الآن؟")) return;
+    var b = this; act(b, function () { return put("/sys/maint", null); }, "أُتيحت").then(function () { b.disabled = false; b.textContent = "إتاحة المنصة"; $("#m-res").textContent = "المنصة متاحة — تعود للمدارس عند الفتح أو خلال دقائق."; mInit = false; drawMaint(); });
+  };
+
+  /* ————— التبديل بين الشاشات ————— */
+  document.querySelectorAll("#views button").forEach(function (b) {
+    b.onclick = function () {
+      document.querySelectorAll("#views button").forEach(function (x) { x.classList.toggle("on", x === b); });
+      ["sch", "dev", "mnt"].forEach(function (v) { $("#v-" + v).classList.toggle("hide", v !== b.dataset.v); });
+    };
+  });
   $("#q").oninput = draw;
   document.querySelectorAll("#seg button").forEach(function (b) {
     b.onclick = function () { document.querySelectorAll("#seg button").forEach(function (x) { x.classList.toggle("on", x === b); }); filter = b.dataset.f; draw(); };
