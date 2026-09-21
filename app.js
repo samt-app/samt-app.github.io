@@ -2686,7 +2686,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         '<p class="note">يُرسل للمزوّد عند كل تشغيل: رقم الجهاز ونوعه، والرقم الوزاري واسم المدرسة وأسماء المدير والوكيل والموجه المعتمدة، وتاريخ انتهاء الاشتراك، وآخر خمس مرات دخول، وأعداد مجمّعة (الطلاب والمخالفات). لا تُرسل بيانات الطلاب ولا أولياء الأمور.</p>' +
         '<label>كود اشتراك المدرسة<textarea id="lc-code" rows="3" dir="ltr" placeholder="SL2.الرقم الوزاري.…"></textarea></label><p class="mut">للجهاز الثاني والثالث في المدرسة: الصق نفس كود المدرسة هنا — تُطبَّق بياناتها المعتمدة على هذا الجهاز تلقائياً.</p><div class="actions"><button class="btn pri" id="lc-act" type="button">تفعيل</button></div><p id="lc-msg"></p></section>' +
         '<section class="card"><h3>التحديث</h3><p>الإصدار الحالي: <b>' + e(C.version || C.BUILTIN) + '</b></p><p class="mut">عند وصول ملف تحديث (.slu) اختره هنا؛ يتحقق التطبيق من توقيعه ثم يثبته ويعيد التشغيل. بياناتك لا تتأثر.</p>' +
-        '<div class="actions wrap"><label class="btn pri">اختيار ملف التحديث<input id="up-f" type="file" accept=".slu,application/json" hidden></label><button class="btn" id="up-rb" type="button">الرجوع للإصدار المدمج</button></div><p id="up-msg"></p></section>';
+        '<div class="actions wrap"><label class="btn pri">اختيار ملف التحديث<input id="up-f" type="file" accept=".slu,application/json" hidden></label></div><p id="up-msg"></p></section>';
     } else if (tab === "sec") {
       html += '<section class="card"><h3>قفل التطبيق</h3><p>رمز يُطلب عند فتح التطبيق لحماية بيانات الطلاب إن استُخدم الجهاز من آخرين.</p>' +
         '<label>الرمز (4–8 أرقام، اتركه فارغاً للإلغاء)<input id="pn" type="password" inputmode="numeric" autocomplete="new-password"></label><div class="actions"><button class="btn pri" id="pn-save" type="button">حفظ</button></div>' +
@@ -2834,7 +2834,6 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         m.textContent = r.ok ? "تم تثبيت الإصدار " + r.version + (r.notes ? " — " + r.notes : "") + ". جارٍ إعادة التشغيل…" : r.why;
         if (r.ok) setTimeout(function () { location.reload(); }, 1500);
       };
-      $("#up-rb").onclick = async function () { if (!(await A.confirm("الرجوع إلى الإصدار المدمج " + C.BUILTIN + "؟"))) return; await C.rollback(); location.reload(); };
     } else if (tab === "sec") {
       $("#pn-save").onclick = async function () {
         var v = $("#pn").value.trim();

@@ -470,3 +470,11 @@ main > .list, main > #st-list > .list, main > #inc-list > .list, .list.panel { b
 .list > li .btn { min-height: 0; height: 30px; padding: 0 11px; font-size: .82rem; border-radius: 9px; }
 .list > li .btn.sm, .list > li .row3 .btn { height: 28px; }
 .list .chip { padding-block: 1px; font-size: .75rem; }
+/* ————— r28: محددات الفلاتر وأزرار التحديد بارزة بإطار القالب ————— */
+main select, main input[type=search], .toolbar input, .toolbar select, .scope select {
+  border: 2px solid var(--frame) !important; color: var(--navy); font-weight: 600; background-color: #fff; }
+main select:focus, main input[type=search]:focus, .toolbar input:focus { box-shadow: 0 0 0 3px rgba(13,107,97,.22); border-color: var(--pri) !important; }
+main input[type=search]::placeholder { color: #55606b; font-weight: 500; }
+main .actions .btn:not(.pri):not(.danger):not(.wa), main .toolbar .btn:not(.pri) { border: 2px solid var(--frame); color: var(--navy); }
+.degtabs button { border: 2px solid var(--frame) !important; color: var(--navy); }
+.degtabs button.on { color: #fff; }
