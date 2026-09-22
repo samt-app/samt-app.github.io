@@ -27,6 +27,10 @@ body { background: #f4f1ea; }
 .kpi.warn b { color: var(--warn); } .kpi.red b { color: var(--red); } .kpi.ok b { color: var(--ok); }
 .bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
 .bar input[type=search] { flex: 1 1 260px; }
+main input:not([type=checkbox]):not([type=radio]), main select, main textarea, .bar input, #sq, #q, .modal input:not([type=checkbox]) { border: 2px solid var(--frame) !important; color: var(--navy); font-weight: 600; }
+main input:focus, main select:focus, main textarea:focus { border-color: var(--pri) !important; box-shadow: 0 0 0 3px rgba(13,107,97,.22); }
+.seg { border: 2px solid var(--frame) !important; }
+.seg button:not(.on) { color: var(--navy); }
 .seg { display: flex; padding: 4px; border-radius: 12px; gap: 2px; background: #fff; border: 1px solid var(--line); }
 .seg button { border: 0; background: none; padding: 7px 14px; border-radius: 9px; font-size: .86rem; cursor: pointer; color: var(--mut); font-weight: 600; }
 .seg button.on { background: var(--navy); color: #fff; }
@@ -90,6 +94,10 @@ details.sub { border: 1px solid var(--line); border-radius: 14px; padding: 10px 
 .modal ul { margin: 8px 0 12px; padding-inline-start: 20px; line-height: 1.9; }
 .modal .who2 { background: var(--bg-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin: 8px 0; }
 .modal .actions { display: flex; gap: 8px; justify-content: flex-start; margin-top: 12px; }
+.dels { margin-top: 16px; background: #fff; border: 2px solid var(--frame); border-radius: 16px; padding: 14px 16px; }
+.dels h4 { margin: 0 0 4px; color: var(--red); }
+.dels .drow { display: flex; gap: 12px; align-items: center; padding: 8px 0; border-top: 1px solid #b9c4ce; }
+.dels .drow .btn { margin-inline-start: auto; }
 td.dcol, th.dcol { width: 52px; text-align: center; }
 td.dcol .del, .scard .top .del { width: 38px; height: 38px; border-radius: 11px; border: 1px solid #f2c3c3; background: var(--red-soft); color: var(--red); display: inline-grid; place-items: center; cursor: pointer; }
 td.dcol .del:hover { background: var(--red); color: #fff; }
@@ -194,6 +202,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
       <tbody id="rows"></tbody>
     </table>
   </div>
+  <div id="dels"></div>
   <p class="foot">تُرسل الأجهزة هذه البيانات عند كل تشغيل. لا تحتوي على أي بيانات طلاب أو أولياء أمور.</p>
   </section>
 </main>
@@ -204,7 +213,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
 (function () {
   "use strict";
   var SL = window.SL, e = SL.esc, $ = function (s) { return document.querySelector(s); };
-  var DB = SL.DEFAULT_RELAY, KEY = "AIzaSyAUfytIrA1q-RRqwGqKiJvyhuGyn_4IdvI", ROWS = [], RAW = {}, LIC = {}, MAINT = null, SCH = [], sortBy = "end", sortDir = 1, filter = "all", timer = null;
+  var DELS = [], DB = SL.DEFAULT_RELAY, KEY = "AIzaSyAUfytIrA1q-RRqwGqKiJvyhuGyn_4IdvI", ROWS = [], RAW = {}, LIC = {}, MAINT = null, SCH = [], sortBy = "end", sortDir = 1, filter = "all", timer = null;
   try { var sk = localStorage.getItem("samt_admin_key"); if (/^AIza/.test(sk || "")) KEY = sk; } catch (err) {}
   document.querySelectorAll(".lg, .lock-logo").forEach(function (el) { el.innerHTML = SL.LOGO; });
   $("#ak").value = KEY; $("#keybox").hidden = false;
@@ -258,7 +267,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
           Object.keys(raw).forEach(function (k) { try { cmds[k] = typeof raw[k] === "string" ? JSON.parse(raw[k]) : raw[k]; } catch (err) {} });
         }
       } catch (err) {}
-      RAW = {};
+      RAW = {}; DELS = Object.keys(cmds).filter(function (k) { return cmds[k] && cmds[k].del; }).map(function (k) { return { dev: k, at: cmds[k].at || 0 }; });
       ROWS = Object.keys(box).filter(function (k) { var c = cmds[k]; if (!c) { try { var oo = typeof box[k] === "string" ? JSON.parse(box[k]) : box[k]; c = cmds[(oo || {}).dev]; } catch (err) {} } return !(c && c.del); }).map(function (k) {
         var o = {}; try { o = typeof box[k] === "string" ? JSON.parse(box[k]) : box[k] || {}; } catch (err) {}
         RAW[o.dev || k] = o;
@@ -339,6 +348,9 @@ td.dcol .del svg { width: 19px; height: 19px; }
     document.querySelectorAll(".row").forEach(function (tr) {
       tr.onclick = function () { var d = document.querySelector('[data-d="' + tr.dataset.i + '"]'); if (d) d.classList.toggle("hide"); };
     });
+    $("#dels").innerHTML = DELS.length ? '<section class="dels"><h4>أجهزة محذوفة ومقفلة (' + DELS.length + ')</h4><p class="mini">هذه الأجهزة مقفلة ولا تظهر في الجدول. «استعادة» يرفع الإقفال فيعود الجهاز للعمل ويظهر هنا عند أول تشغيل متصل.</p>' +
+      DELS.map(function (d) { return '<div class="drow"><span class="dev">' + e(d.dev) + '</span><span class="mini">حُذف ' + e(d.at ? ago(d.at) : "") + '</span><button class="btn sm" type="button" data-undel="' + e(d.dev) + '">استعادة</button></div>'; }).join("") + "</section>" : "";
+    document.querySelectorAll("[data-undel]").forEach(function (b) { b.onclick = function () { act(b, function () { return put("/cmd/" + encodeURIComponent(b.dataset.undel), null); }, "استُعيد"); }; });
     document.querySelectorAll("[data-ddel]").forEach(function (b) { b.onclick = function (ev) { ev.stopPropagation(); delDevice(ROWS.find(function (x) { return x.dev === b.dataset.ddel; }) || { dev: b.dataset.ddel }); }; });
     document.querySelectorAll("[data-copy]").forEach(function (b) { b.onclick = function (ev) { ev.stopPropagation(); navigator.clipboard.writeText(b.dataset.copy); b.textContent = "تم النسخ"; }; });
     function iso(d) { return new Date(d).toISOString().slice(0, 10); }

@@ -311,10 +311,9 @@
       '<p class="lock-why" style="white-space:pre-line">' + esc(m.msg || "نعتذر عن التوقف المؤقت لإجراء أعمال صيانة وتحسين. بياناتكم محفوظة ولن تتأثر.") + "</p>" +
       (m.until ? '<p class="lock-hint">العودة المتوقعة: <b>' + esc(whenAr(+m.until)) + "</b></p>" : "") +
       '<button class="btn pri" id="mt-retry" type="button">إعادة المحاولة</button>' +
-      '<details><summary>خيارات أخرى</summary><button class="btn" id="lk-bak" type="button">تنزيل نسخة احتياطية من بياناتي</button></details>' +
       "</div></div>";
     document.getElementById("mt-retry").onclick = function () { location.reload(); };
-    document.getElementById("lk-bak").onclick = async function () { download("sulook-backup-" + new Date().toISOString().slice(0, 10) + ".json", JSON.stringify(await backupObject())); };
+    (document.getElementById("lk-bak")||{}).onclick = async function () { download("sulook-backup-" + new Date().toISOString().slice(0, 10) + ".json", JSON.stringify(await backupObject())); };
     setInterval(async function () { var x = await maintFetch(); if (x !== undefined && !maintActive(x)) location.reload(); }, 60000);
   }
 
@@ -331,25 +330,21 @@
       '<label class="lock-l">كود اشتراك المدرسة<textarea id="lk-code" rows="3" dir="ltr" placeholder="SL2.123456789.YYYYMMDD.…"></textarea></label>' +
       '<label class="lock-l">هذا الجهاز هو<select id="lk-role">' + DEV_ROLES.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + "</option>"; }).join("") + "</select></label>" +
       '<button class="btn pri" id="lk-act" type="button">تفعيل</button><p id="lk-msg" class="lock-msg"></p>' +
-      '<details><summary>خيارات أخرى</summary>' +
-      '<p class="lock-hint">رقم هذا الجهاز: <b id="lk-dev" dir="ltr">' + esc(L.dev) + '</b> <button id="lk-copy" type="button">نسخ</button></p>' +
-      '<label class="btn">تثبيت ملف تحديث (.slu)<input id="lk-upd" type="file" accept=".slu,application/json" hidden></label>' +
-      '<button class="btn" id="lk-bak" type="button">تنزيل نسخة احتياطية من بياناتي</button>' + (FS.supported ? '<button class="btn" id="lk-fs" type="button">ربط مجلد sammt (استعادة البيانات والاشتراك)</button>' : "") + '</details>' +
       "</div></div>";
-    document.getElementById("lk-copy").onclick = function () { try { navigator.clipboard.writeText(L.dev); this.textContent = "تم"; } catch (e) {} };
+    (document.getElementById("lk-copy")||{}).onclick = function () { try { navigator.clipboard.writeText(L.dev); this.textContent = "تم"; } catch (e) {} };
     document.getElementById("lk-act").onclick = async function () {
       var m = document.getElementById("lk-msg"); m.className = "lock-msg"; m.textContent = "جارٍ التحقق…";
       var r = await activate(document.getElementById("lk-code").value, document.getElementById("lk-role").value);
       if (r.ok) { m.className = "lock-msg ok"; m.textContent = "تم التفعيل حتى " + fmt(r.end) + (r.slot ? " — الجهاز رقم " + r.slot + " من " + SLOTS : "") + " — جارٍ الفتح…"; setTimeout(function () { location.reload(); }, 900); }
       else { m.className = "lock-msg err"; m.textContent = r.why; }
     };
-    document.getElementById("lk-upd").onchange = async function () {
+    (document.getElementById("lk-upd")||{}).onchange = async function () {
       var f = this.files[0]; if (!f) return; var r = await installUpdate(f), m = document.getElementById("lk-msg");
       m.className = "lock-msg " + (r.ok ? "ok" : "err"); m.textContent = r.ok ? "تم تثبيت الإصدار " + r.version : r.why;
     };
     var lkfs = document.getElementById("lk-fs");
     if (lkfs) lkfs.onclick = async function () { try { await fsPick(); await fsRestore(); location.reload(); } catch (e) {} };
-    document.getElementById("lk-bak").onclick = async function () { download("sulook-backup-" + new Date().toISOString().slice(0, 10) + ".json", JSON.stringify(await backupObject())); };
+    (document.getElementById("lk-bak")||{}).onclick = async function () { download("sulook-backup-" + new Date().toISOString().slice(0, 10) + ".json", JSON.stringify(await backupObject())); };
   }
 
   /* ————— مجلد البيانات «sammt» على قرص الجهاز (File System Access API — Chrome/Edge على الكمبيوتر) —————

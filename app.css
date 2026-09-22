@@ -478,3 +478,11 @@ main input[type=search]::placeholder { color: #55606b; font-weight: 500; }
 main .actions .btn:not(.pri):not(.danger):not(.wa), main .toolbar .btn:not(.pri) { border: 2px solid var(--frame); color: var(--navy); }
 .degtabs button { border: 2px solid var(--frame) !important; color: var(--navy); }
 .degtabs button.on { color: #fff; }
+/* r29: كل حقول الإدخال والقوائم والبحث بإطار القالب البارز — داخل الصفحات والنوافذ المنبثقة */
+main input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]), main textarea, main select,
+.sheet input:not([type=checkbox]):not([type=radio]):not([type=file]), .sheet textarea, .sheet select, .modal input, .modal select {
+  border: 2px solid var(--frame) !important; color: var(--navy); font-weight: 600; background-color: #fff; }
+main input:focus, main textarea:focus, main select:focus, .sheet input:focus, .sheet select:focus, .sheet textarea:focus { border-color: var(--pri) !important; box-shadow: 0 0 0 3px rgba(13,107,97,.22); }
+.search { border: 2px solid var(--frame) !important; }
+.search input { font-weight: 600; color: var(--navy); }
+main input::placeholder, main textarea::placeholder, .sheet input::placeholder { color: #55606b; font-weight: 500; }
