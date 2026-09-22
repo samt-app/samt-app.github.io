@@ -244,6 +244,69 @@
     if (/^https?:/.test(location.protocol)) return location.href.replace(/[#?].*$/, "").replace(/[^/]*$/, "");
     return "";
   };
+
+  /* ————— صيغة المؤنث لمدارس البنات: تحويل النماذج والرسائل (ولي الأمر يبقى بصيغة المذكر) ————— */
+  var FEM_KEEP = [["مدير التعليم", "\u0001A"], ["مديري التعليم", "\u0001B"], ["التوجيه الطلابي", "\u0001C"], ["ولي الأمر", "\u0001D"], ["أولياء الأمور", "\u0001E"], ["ولي أمر", "\u0001F"], ["إدارة التعليم", "\u0001G"]];
+  var FEM_PHR = [
+    ["موجه الطلابي", "موجهة الطلابية"], ["وكيل شؤون الطلبة", "وكيلة شؤون الطالبات"], ["وكيل شؤون الطلاب", "وكيلة شؤون الطالبات"], ["شؤون الطلبة", "شؤون الطالبات"], ["شؤون الطلاب", "شؤون الطالبات"],
+    ["وكيل المدرسة", "وكيلة المدرسة"], ["رائد النشاط", "رائدة النشاط"], ["المرشد الطلابي", "المرشدة الطلابية"],
+    ["الطالب المخالف", "الطالبة المخالفة"], ["الطالب المصاب", "الطالبة المصابة"], ["الطالب المتغيب", "الطالبة المتغيبة"], ["الطلبة المتغيبين", "الطالبات المتغيبات"], ["الطلاب المتغيبين", "الطالبات المتغيبات"],
+    ["كان الطالب متواجداً", "كانت الطالبة متواجدة"], ["المنقول إليها الطالب", "المنقولة إليها الطالبة"], ["سينتقل إليها الطالب", "ستنتقل إليها الطالبة"],
+    ["ينقل الطالب", "تُنقل الطالبة"], ["يُحال الطالب", "تُحال الطالبة"], ["يحال الطالب", "تحال الطالبة"], ["يُمنح الطالب", "تُمنح الطالبة"], ["يُحرم الطالب", "تُحرم الطالبة"],
+    ["ما أتلفه الطالب", "ما أتلفته الطالبة"], ["الذي يحققه الطالب", "الذي تحققه الطالبة"], ["الطالب الموضح اسمه", "الطالبة الموضح اسمها"],
+    ["قام الطالب", "قامت الطالبة"], ["يلتزم الطالب", "تلتزم الطالبة"], ["تغيب الطالب", "تغيب الطالبة"], ["يتعهد الطالب", "تتعهد الطالبة"], ["التزام الطالب", "التزام الطالبة"],
+    ["الطالب قام", "الطالبة قامت"], ["معلم متميز", "معلمة متميزة"], ["مصلحة ابني", "مصلحة ابنتي"], ["ليكون ملتزماً", "لتكون ملتزمة"], ["اسمه وبياناته", "اسمها وبياناتها"], ["يباشر المعلم", "تباشر المعلمة"], ["يرصدها المعلم ويسلّمها", "ترصدها المعلمة وتسلّمها"], ["يرصد المعلم", "ترصد المعلمة"], ["بلّغ المعلم", "بلّغت المعلمة"]
+  ];
+  var FEM_W = {
+    "الطالب": "الطالبة", "طالب": "طالبة", "الطلاب": "الطالبات", "طلاب": "طالبات", "الطلبة": "الطالبات", "طلبة": "طالبات", "الطالبين": "الطالبتين",
+    "المعلم": "المعلمة", "معلم": "معلمة", "المعلمين": "المعلمات", "معلمين": "معلمات", "المعلمون": "المعلمات", "معلمون": "معلمات",
+    "المدير": "المديرة", "مدير": "مديرة", "الوكيل": "الوكيلة", "وكيل": "وكيلة", "الموجه": "الموجهة", "موجه": "موجهة", "الإداريين": "الإداريات", "الإداريون": "الإداريات",
+    "الأستاذ": "الأستاذة", "أستاذ": "أستاذة", "ابنكم": "ابنتكم", "ابنك": "ابنتك", "لابنكم": "لابنتكم", "حالته": "حالتها", "مشكلته": "مشكلتها", "غيابه": "غيابها", "سلوكه": "سلوكها",
+    "طالبنا": "طالبتنا", "المتغيبين": "المتغيبات", "ابنه": "ابنته", "تمكينه": "تمكينها", "مخالفته": "مخالفتها", "حقه": "حقها", "استمراره": "استمرارها", "منحه": "منحها",
+    "له": "لها", "تهديدهم": "تهديدهن", "حضوره": "حضورها", "انضباطه": "انضباطها", "درجاته": "درجاتها", "ملفه": "ملفها", "اسمه": "اسمها", "بياناته": "بياناتها"
+  };
+  var FEM_POST = [["المعلمة المباشر", "المعلمة المباشرة"], ["ارتكب المشكلة", "ارتكبت المشكلة"], ["يقوم بها الموجهة", "تقوم بها الموجهة"], 
+    ["إصلاح ما أتلفته الطالبة أو إحضار بديل عنه", "إصلاح ما أتلفته الطالبة أو إحضار بديل عنه"]];
+  function femWord(w) {
+    if (FEM_W[w]) return FEM_W[w];
+    var m = w.match(/^([وف]?)(.*)$/), a = m[1], r = m[2];
+    if (a && FEM_W[r]) return a + FEM_W[r];
+    var m2 = r.match(/^([بكل])(.+)$/);
+    if (m2) {
+      if (FEM_W[m2[2]]) return a + m2[1] + FEM_W[m2[2]];
+      if (m2[1] === "ل" && /^ل/.test(m2[2]) && FEM_W["ا" + m2[2]]) return a + "ل" + FEM_W["ا" + m2[2]].slice(1);   /* للطالب ← للطالبة */
+    }
+    return w;
+  }
+  SL.fem = function (s) {
+    if (s == null) return s; s = String(s);
+    s = s.split("ولي أمره").join("ولي أمرها").split("أولياء أمورهم").join("أولياء أمورهن");
+    FEM_KEEP.forEach(function (k) { s = s.split(k[0]).join(k[1]); });
+    FEM_PHR.forEach(function (k) { s = s.split(k[0]).join(k[1]); });
+    s = s.replace(/[ء-يـً-ْ]+/g, femWord);
+    FEM_POST.forEach(function (k) { s = s.split(k[0]).join(k[1]); });
+    FEM_KEEP.forEach(function (k) { s = s.split(k[1]).join(k[0]); });
+    return s;
+  };
+  /* تحويل كل النصوص داخل كائن (نموذج) مع الإبقاء على الأسماء والأرقام كما هي */
+  SL.femDeep = function (o, skip) {
+    skip = skip || { name: 1, parentName: 1, school: 1, sid: 1, phone: 1, parentPhone: 1, cls: 1, region: 1, admin: 1, by: 1, byName: 1, stuName: 1 };
+    if (typeof o === "string") return SL.fem(o);
+    if (Array.isArray(o)) return o.map(function (x) { return SL.femDeep(x, skip); });
+    if (o && typeof o === "object") { var r = {}; Object.keys(o).forEach(function (k) { r[k] = skip[k] ? o[k] : SL.femDeep(o[k], skip); }); return r; }
+    return o;
+  };
+  /* تحويل نصوص صفحة (صفحة التوقيع وصفحة المعلم) كلما تغيّرت */
+  SL.femWatch = function (root) {
+    function walk(n) {
+      if (n.nodeType === 3) { var t = SL.fem(n.nodeValue); if (t !== n.nodeValue) n.nodeValue = t; return; }
+      if (n.nodeType !== 1 || /^(SCRIPT|STYLE|TEXTAREA)$/.test(n.nodeName) || n.hasAttribute("data-nofem")) return;
+      if (n.placeholder) n.placeholder = SL.fem(n.placeholder);
+      for (var c = n.firstChild; c; c = c.nextSibling) walk(c);
+    }
+    walk(root);
+    new MutationObserver(function (ms) { ms.forEach(function (m) { m.addedNodes.forEach(walk); if (m.type === "characterData") walk(m.target); }); }).observe(root, { childList: true, subtree: true });
+  };
 })();
 
 /* سَمْت — أيقونات خطية موحّدة (SVG) */
@@ -1050,7 +1113,14 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     ctx.committeeMembers = [A.staffName("deputy", stu.school), A.staffName("deputyEdu", stu.school), A.staffName("counselor", stu.school)];
     return ctx;
   };
+  /* نوع المدرسة: بنين (افتراضي) أو بنات — يحوّل النماذج والرسائل لصيغة المؤنث */
+  A.isGirls = function (schoolId) { var z = schoolId != null ? A.school(schoolId) : null; return !!(z && z.gender === "g"); };
+  A.stuGirls = function (stu) { return !!stu && A.isGirls(stu.school); };
   A.doc = function (kind, ref, fid) {
+    var d = A.docRaw(kind, ref, fid), r = A.byId[ref], stu = r ? (r.t === "stu" ? r : A.byId[r.stu]) : null;
+    return A.stuGirls(stu) ? SL.femDeep(d) : d;
+  };
+  A.docRaw = function (kind, ref, fid) {
     var parts = fid.split(":"), ctx = A.ctxFor(kind, ref, fid), doc = window.FORMS.build(parts[0], ctx);
     if (parts[1]) {
       var lv = parts[1].slice(2);
@@ -1071,7 +1141,8 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
 
   /* ————— قوالب الرسائل ————— */
   A.fill = function (tpl, vars) {
-    return String(tpl || "").replace(/\{([^}]+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; });
+    var out = String(tpl || "").replace(/\{([^}]+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; });
+    return vars && vars.__g ? SL.fem(out) : out;
   };
 
   /* ————— أدوات الواجهة ————— */
@@ -1818,7 +1889,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     bindFormRows();
   };
   function vars(s, extra) {
-    return Object.assign({ "الطالب": s.name, "الصف": A.classKey(s), "المدرسة": A.school(s.school).name || "", "المدة": A.S.settings.linkHours }, extra || {});
+    return Object.assign({ "الطالب": s.name, "الصف": A.classKey(s), "المدرسة": A.school(s.school).name || "", "المدة": A.S.settings.linkHours, __g: A.stuGirls(s) }, extra || {});
   }
   A.vars = vars;
 
@@ -2155,7 +2226,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var g = { id: tok, t: "sig", ref: ref, kind: kind, form: fid, role: "parent", status: "pending", key: key, hash: hash, exp: exp, createdAt: Date.now(), via: "link", stu: stu.id };
     await A.save(g);
     var payload = { v: 1, tok: tok, box: cfg.box, relay: cfg.relayUrl, k: key, exp: exp, school: A.school(stu.school).name, wa: SL.normPhone(cfg.schoolWa),
-      h4: last4 ? (await SL.sha256(tok + last4)).slice(0, 12) : "", doc: doc, reply: fid === "F10" };
+      h4: last4 ? (await SL.sha256(tok + last4)).slice(0, 12) : "", doc: doc, reply: fid === "F10", g: A.stuGirls(stu) ? 1 : 0 };
     var lk = await SL.makeLink(base, "sign.html", cfg.relayUrl, payload), link = lk.url;
     if (lk.code) { g.lk = lk.code; await A.save(g); }
     SL.openWa(stu.parentPhone, A.fill(cfg.tpl.sign, vars(stu, { "النموذج": doc.title, "الرابط": link })));
@@ -2386,11 +2457,11 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     Object.keys(cls).forEach(function (k) { cls[k].sort(function (a, b) { return a.localeCompare(b, "ar"); }); });
     var stages = {}; A.S.settings.schools.forEach(function (z) { if (!x.school || z.id === x.school) stages[R.stageOf(z.stage)] = 1; });
     var payload = { v: 1, kind: "teacher", tid: x.id, name: x.name, subject: x.subject || "", school: x.school ? A.school(x.school).name : A.S.settings.schools.map(function (z) { return z.name; }).join(" و"),
-      stage: Object.keys(stages).length === 1 ? Object.keys(stages)[0] : "ms", box: cfg.box, relay: cfg.relayUrl, k: x.key, wa: SL.normPhone(cfg.schoolWa), cls: cls, cst: cst, role: isC ? "counselor" : "teacher" };
+      stage: Object.keys(stages).length === 1 ? Object.keys(stages)[0] : "ms", box: cfg.box, relay: cfg.relayUrl, k: x.key, wa: SL.normPhone(cfg.schoolWa), cls: cls, cst: cst, role: isC ? "counselor" : "teacher", g: (x.school ? A.isGirls(x.school) : A.S.settings.schools.length && A.S.settings.schools.every(function (z) { return z.gender === "g"; })) ? 1 : 0 };
     if (x.lk) SL.short.del(cfg.relayUrl, x.lk);
     var lk = await SL.makeLink(base, "teacher.html", cfg.relayUrl, payload), link = lk.url;
     x.lk = lk.code; await A.save(x);
-    SL.openWa(x.phone, A.fill(isC ? cfg.tpl.counselorLink : cfg.tpl.teacherLink, { "المعلم": x.name, "الرابط": link, "المدرسة": payload.school }));
+    SL.openWa(x.phone, A.fill(isC ? cfg.tpl.counselorLink : cfg.tpl.teacherLink, { "المعلم": x.name, "الرابط": link, "المدرسة": payload.school, __g: !!payload.g }));
     A.log("إرسال رابط الرصد " + (isC ? "للموجه الطلابي " : "للمعلم ") + x.name);
   };
 
@@ -2719,6 +2790,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     return '<div class="school' + (k.locked ? " locked" : "") + '" data-i="' + i + '"><div class="grid2">' +
       '<label>اسم المدرسة' + (nl ? ' <span class="chip lockc">🔒 معتمد</span>' : k.open.name ? ' <span class="chip warnc">🔓 مسموح بالتعديل</span>' : "") + '<input data-k="name" value="' + e(z.name) + '"' + (nl ? " readonly" : "") + "></label>" +
       '<label>المرحلة<select data-k="stage">' + [["ابتدائي", "ابتدائي"], ["متوسط", "متوسط"], ["ثانوي", "ثانوي"], ["مدمجة", "مدمجة (ابتدائي + متوسط)"], ["مدمجة-ث", "مدمجة (متوسط + ثانوي)"]].map(function (s) { return "<option value=\"" + s[0] + "\"" + (s[0] === z.stage ? " selected" : "") + ">" + s[1] + "</option>"; }).join("") + "</select></label>" +
+      '<label>نوع المدرسة<select data-k="gender"><option value="b"' + (z.gender !== "g" ? " selected" : "") + '>بنين</option><option value="g"' + (z.gender === "g" ? " selected" : "") + '>بنات</option></select><small class="mut">بنات: تُكتب النماذج والرسائل بصيغة المؤنث (الطالبة، المديرة، المعلمة…) ويبقى «ولي الأمر» كما هو.</small></label>' +
       '<label>المنطقة/المحافظة<input data-k="region" value="' + e(z.region || "") + '"></label>' +
       '<label>إدارة التعليم<input data-k="admin" value="' + e(z.admin || "") + '" placeholder="الإدارة العامة للتعليم بمنطقة …"></label>' +
       moeFields(z) + '</div>' + licBox(z) +

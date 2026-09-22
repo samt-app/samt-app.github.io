@@ -32,6 +32,7 @@
     history.replaceState(null, "", location.pathname); /* لا يبقى محتوى النموذج في شريط العنوان */
     window.__payload = P;
     if (!P || !P.doc || !P.tok) return fail("الرابط غير صالح");
+    if (P.g && SL.femWatch) SL.femWatch(document.body);
     try { if (localStorage.getItem(doneKey())) return showDone(true); } catch (err) {}
     if (P.exp && Date.now() > P.exp) return fail("انتهت صلاحية رابط التوقيع");
     if (P.h4) verify(); else render();

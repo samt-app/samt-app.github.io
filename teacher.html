@@ -29,6 +29,7 @@
     if (!h) return fail("الرابط غير مكتمل");
     try { P = await SL.unpack(h); } catch (err) { return fail("تعذّر قراءة الرابط"); }
     if (!P || P.kind !== "teacher") return fail("الرابط غير صالح");
+    if (P.g && SL.femWatch) SL.femWatch(document.body);
     history.replaceState(null, "", location.pathname);
     form();
   })();
