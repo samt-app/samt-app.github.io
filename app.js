@@ -1550,7 +1550,9 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var linkSigs = S.sigs.filter(function (g) { return g.via === "link" && g.status !== "replaced"; });
     var pend = linkSigs.filter(function (g) { return g.status === "pending" && g.exp > Date.now(); });
     var signedToday = linkSigs.filter(function (g) { return g.status === "signed" && (g.recvAt || g.at) >= t0; });
-    var low = S.students.filter(function (s) { return !A.qualitative(s) && A.score(s).total < 80; }).sort(function (a, b) { return A.score(a).total - A.score(b).total; }).slice(0, 8);
+    var rep14 = {}; live.forEach(function (x) { if (x.stu && new Date(x.date).getTime() >= t0 - 13 * DAY) rep14[x.stu] = (rep14[x.stu] || 0) + 1; });
+    var low = S.students.filter(function (s) { return (!A.qualitative(s) && A.score(s).total < 80) || (rep14[s.id] || 0) >= 3; })
+      .sort(function (a, b) { return (rep14[b.id] || 0) >= 3 && (rep14[a.id] || 0) < 3 ? 1 : (rep14[a.id] || 0) >= 3 && (rep14[b.id] || 0) < 3 ? -1 : A.score(a).total - A.score(b).total; }).slice(0, 8);
     var recent = S.incidents.filter(function (x) { return x.status !== "void"; }).sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); }).slice(0, 7);
     var withInc = {}; monthInc.forEach(function (x) { if (x.stu) withInc[x.stu] = 1; });
     var discipline = S.students.length ? Math.round((1 - Object.keys(withInc).length / S.students.length) * 100) : 100;
@@ -1572,6 +1574,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       '<a href="#absence">' + SLI("calendar") + '<span><b>الغياب</b><small>مستويات 3 / 5 / 10 أيام</small></span></a><a href="#import">' + SLI("upload") + '<span><b>استيراد Excel</b><small>الطلاب والمنسوبون</small></span></a>' +
       '<button type="button" class="inst-btn" id="hm-inst">' + SLI("download") + "<span><b>تثبيت التطبيق</b><small>على هذا الجهاز</small></span></button></div></section>" + alerts;
 
+    html += A.liveStrip(S);
     var dm = prevInc.length ? Math.round((monthInc.length - prevInc.length) / prevInc.length * 100) : null;
     html += '<section class="kpis">' +
       kpi("users", "الطلاب", S.students.length, "#students", "c1", Object.keys(classes).length + " فصل", null) +
@@ -1601,10 +1604,10 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     html += '<section class="card"><div class="c-h"><div><h3>التوقيعات عن بُعد</h3><small>آخر 7 أيام</small></div><a class="more" href="#sigs">التفاصيل ' + SLI("chevron") + '</a></div><div class="ringw"><svg viewBox="0 0 120 120" class="ring"><circle cx="60" cy="60" r="50" class="rg-bg"/><circle cx="60" cy="60" r="50" class="rg" stroke-dasharray="' + (314 * rate / 100).toFixed(0) + ' 314"/></svg><div class="rg-c"><b data-n="' + rate + '" data-s="%">0</b><small>نسبة التوقيع</small></div></div>' +
       '<div class="minis"><div><b>' + wS + "</b><small>وقّع</small></div><div><b>" + wP + "</b><small>بانتظار</small></div><div><b>" + wR + "</b><small>رفض</small></div></div></section>";
 
-    html += '<section class="card span2"><div class="c-h"><div><h3>طلاب يحتاجون متابعة</h3><small>درجة السلوك أقل من 80</small></div><a class="more" href="#students">كل الطلاب ' + SLI("chevron") + "</a></div>" + (low.length ? '<ul class="lows">' + low.map(function (st) {
+    html += '<section class="card span2"><div class="c-h"><div><h3>طلاب يحتاجون متابعة</h3><small>درجة أقل من 80 أو 3 مخالفات فأكثر خلال أسبوعين</small></div><a class="more" href="#students">كل الطلاب ' + SLI("chevron") + "</a></div>" + (low.length ? '<ul class="lows">' + low.map(function (st) {
       var v = A.score(st).total, c = v < 65 ? "r" : v < 75 ? "o" : "y";
-      return '<li><a href="#student/' + st.id + '"><span class="av sm ' + c + '">' + e(st.name.trim().charAt(0)) + "</span><span><b>" + e(st.name) + "</b><small>" + e(A.classKey(st)) + '</small></span><span class="sc"><span class="sc-b"><i class="' + c + '" style="width:' + v + '%"></i></span><b>' + v + "</b></span></a></li>";
-    }).join("") + "</ul>" : '<div class="empty-s">' + SLI("shield") + "<p>جميع الطلاب درجاتهم 80 فأكثر — ممتاز.</p></div>") + "</section></div>";
+      return '<li><a href="#student/' + st.id + '"><span class="av sm ' + c + '">' + e(st.name.trim().charAt(0)) + "</span><span><b>" + e(st.name) + ((rep14[st.id] || 0) >= 3 ? ' <em class="rp">' + rep14[st.id] + " مخالفات/أسبوعين</em>" : "") + "</b><small>" + e(A.classKey(st)) + '</small></span><span class="sc"><span class="sc-b"><i class="' + c + '" style="width:' + v + '%"></i></span><b>' + v + "</b></span></a></li>";
+    }).join("") + "</ul>" : '<div class="empty-s">' + SLI("shield") + "<p>لا يوجد طلاب بحاجة لمتابعة الآن — ممتاز.</p></div>") + "</section>" + A.dashMore(S, live, monthInc, prevInc, t0, DAY) + "</div>";
 
     main().innerHTML = html;
     var hb = $("#hm-inst"); if (hb) hb.onclick = A.install;
@@ -1620,6 +1623,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     chart(6);
     $$("#ch-seg button").forEach(function (b) { b.onclick = function () { $$("#ch-seg button").forEach(function (x) { x.classList.toggle("on", x === b); }); chart(+b.dataset.m); }; });
     countUp(main());
+    clearInterval(A._liveT); A._liveT = setInterval(function () { var ls = $("#live-s"); if (!ls || !document.body.contains(ls)) return clearInterval(A._liveT); ls.outerHTML = A.liveStrip(A.S); }, 60000);
     function kpi(ic, l, n, href, c, sub, sp, tone) {
       return '<a class="kpi ' + c + '" href="' + href + '"><span class="k-top"><span class="k-i">' + SLI(ic) + "</span>" + (sub ? '<span class="k-sub ' + (tone || "") + '">' + e(sub) + "</span>" : "") + '</span><b data-n="' + n + '">0</b><span class="k-l">' + e(l) + "</span>" + (sp ? spark(sp) : '<span class="spark-e"></span>') + "</a>";
     }
@@ -2207,7 +2211,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       var f = new FormData(this), m = R.MERITS.find(function (x) { return x.id === f.get("practice"); });
       if (m.once && A.S.merits.some(function (x) { return x.stu === stu.id && x.practice === m.id; }) && !(await A.confirm("سبق احتساب هذه الممارسة للطالب. احتسابها مرة أخرى؟"))) return;
       var by = A.byId[f.get("by")];
-      await A.save({ id: "M" + SL.rid(10), t: "mer", stu: stu.id, practice: m.id, pts: Math.min(6, Math.max(1, +f.get("pts") || m.pts)), date: f.get("date"), topic: f.get("topic"), evidence: f.get("evidence"), note: f.get("note"), by: by ? by.id : "", byName: by ? by.name : "" });
+      await A.save({ id: "M" + SL.rid(10), t: "mer", at: Date.now(), stu: stu.id, practice: m.id, pts: Math.min(6, Math.max(1, +f.get("pts") || m.pts)), date: f.get("date"), topic: f.get("topic"), evidence: f.get("evidence"), note: f.get("note"), by: by ? by.id : "", byName: by ? by.name : "" });
       A.toast("تمت إضافة " + f.get("pts") + " درجات"); A.go("student/" + stu.id);
     };
   };
@@ -2858,6 +2862,128 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     try { return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: SL.unb64u(p[1]) }, await pwKey(pw, SL.unb64u(p[0])), SL.unb64u(p[2]))); }
     catch (err) { throw new Error("كلمة المرور غير صحيحة"); }
   }
+})();
+
+/* سَمْت — مؤشرات إضافية للصفحة الرئيسية (تُحسب محلياً من بيانات الجهاز) */
+(function () {
+  "use strict";
+  var R = window.RULES, SL = window.SL, A = window.APP, e = SL.esc;
+  var DAY = 864e5;
+
+  function card(cls, title, sub, body, more) {
+    return '<section class="card ' + (cls || "") + '"><div class="c-h"><div><h3>' + title + "</h3>" + (sub ? "<small>" + sub + "</small>" : "") + "</div>" + (more || "") + "</div>" + body + "</section>";
+  }
+  function emptyS(ic, t) { return '<div class="empty-s">' + SLI(ic) + "<p>" + t + "</p></div>"; }
+  function more(href, t) { return '<a class="more" href="' + href + '">' + t + " " + SLI("chevron") + "</a>"; }
+  function arrow(now, prev) {
+    if (prev == null) return "";
+    if (now > prev) return '<em class="tr up" title="أكثر من الشهر السابق">▲ ' + (now - prev) + "</em>";
+    if (now < prev) return '<em class="tr dn" title="أقل من الشهر السابق">▼ ' + (prev - now) + "</em>";
+    return '<em class="tr eq">=</em>';
+  }
+  /* أعمدة أفقية متحركة */
+  function hbars(rows, max, cls) {
+    return '<ul class="hbars ' + (cls || "") + '">' + rows.map(function (r, i) {
+      var w = max ? Math.max(4, Math.round(r.v / max * 100)) : 0;
+      return '<li><span class="hb-l">' + (r.href ? '<a href="' + r.href + '">' + e(r.l) + "</a>" : e(r.l)) + (r.x || "") + '</span><span class="hb-t"><i style="width:' + w + "%;animation-delay:" + i * 70 + 'ms"></i></span><b data-n="' + r.v + '"' + (r.s ? ' data-s="' + r.s + '"' : "") + ">0</b></li>";
+    }).join("") + "</ul>";
+  }
+
+  /* ————— شريط «الآن»: آخر حدث وصل ————— */
+  A.liveStrip = function (S) {
+    var ev = [], now = Date.now(), t0 = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
+    S.sigs.forEach(function (g) {
+      if (g.via === "link" && g.status === "signed" && (g.recvAt || g.at)) { var st = A.byId[g.stu] || {}; ev.push({ t: g.recvAt || g.at, ic: "check", c: "ok", x: "وقّع ولي أمر " + (st.name || "طالب") + " على النموذج", h: "#sigs" }); }
+      if (g.via === "link" && g.status === "refused" && (g.recvAt || g.at)) { var s2 = A.byId[g.stu] || {}; ev.push({ t: g.recvAt || g.at, ic: "alert", c: "red", x: "رفض ولي أمر " + (s2.name || "طالب") + " التوقيع", h: "#sigs" }); }
+    });
+    S.incidents.forEach(function (x) {
+      if (!x.createdAt || x.status === "void") return;
+      var st = A.byId[x.stu] || { name: x.stuName || "طالب" };
+      if (x.status === "reported") ev.push({ t: x.createdAt, ic: "inbox", c: "warn", x: "بلاغ من " + (x.byName || "معلم") + " عن " + st.name + " — " + (x.itemText || ""), h: "#inc/" + x.id });
+      else ev.push({ t: x.createdAt, ic: "alert", c: "", x: "رُصدت مخالفة على " + st.name + " — " + (x.itemText || ""), h: "#inc/" + x.id });
+    });
+    S.merits.forEach(function (m) { var t = m.at || m.createdAt; if (!t) return; var st = A.byId[m.stu] || {}; ev.push({ t: t, ic: "star", c: "gold", x: "سلوك متميز لـ " + (st.name || "طالب") + " (+" + (m.pts || 0) + ")", h: "#student/" + m.stu }); });
+    if (!ev.length) return '<div class="live" id="live-s"><span class="lv-dot off"></span><b>الآن</b><span class="lv-t">لا نشاط بعد — تظهر هنا آخر البلاغات والتوقيعات فور وصولها.</span></div>';
+    ev.sort(function (a, b) { return b.t - a.t; });
+    var L = ev[0], fresh = now - L.t < 15 * 6e4, today = ev.filter(function (x) { return x.t >= t0; }).length;
+    return '<a class="live' + (fresh ? " fresh" : "") + '" id="live-s" href="' + L.h + '"><span class="lv-dot ' + (fresh ? "" : "off") + '"></span><b>' + (fresh ? "الآن" : "آخر نشاط") + '</b><span class="lv-i ' + L.c + '">' + SLI(L.ic) + '</span><span class="lv-t">' + e(L.x) + '</span><span class="lv-w">' + e(A.ago(L.t)) + "</span>" +
+      (today ? '<span class="lv-n">' + today + " حدث اليوم</span>" : "") + "</a>";
+  };
+
+  /* ————— البطاقات الإضافية ————— */
+  A.dashMore = function (S, live, monthInc, prevInc, t0) {
+    var html = "";
+    var scored = S.students.filter(function (s) { return !A.qualitative(s); });
+
+    /* أكثر الفصول مخالفات */
+    var byC = {}, byP = {};
+    monthInc.forEach(function (x) { var s = A.byId[x.stu]; if (s) byC[A.classKey(s)] = (byC[A.classKey(s)] || 0) + 1; });
+    prevInc.forEach(function (x) { var s = A.byId[x.stu]; if (s) byP[A.classKey(s)] = (byP[A.classKey(s)] || 0) + 1; });
+    var cls = Object.keys(byC).map(function (k) { return { l: k, v: byC[k], x: arrow(byC[k], byP[k] || 0) }; }).sort(function (a, b) { return b.v - a.v; }).slice(0, 5);
+    html += card("span2", "أكثر الفصول مخالفات", "هذا الشهر — مع المقارنة بالشهر السابق", cls.length ? hbars(cls, cls[0].v, "c-cls") : emptyS("check", "لا مخالفات هذا الشهر."), more("#incidents", "السجل"));
+
+    /* مقياس انضباط المدرسة */
+    var avg = scored.length ? Math.round(scored.reduce(function (m, s) { return m + Math.min(100, A.score(s).total); }, 0) / scored.length) : 100;
+    var clean = scored.filter(function (s) { return A.score(s).total >= 100; }).length;
+    var tone = avg >= 95 ? "g" : avg >= 85 ? "y" : "r", ARC = 157.1, fill = (ARC * Math.max(0, Math.min(100, avg)) / 100).toFixed(1);
+    html += card("", "مؤشر انضباط المدرسة", "متوسط درجة السلوك لجميع الطلاب",
+      '<div class="gauge ' + tone + '"><svg viewBox="0 0 120 70"><path class="g-bg" d="M10 62 A50 50 0 0 1 110 62"/><path class="g-v" d="M10 62 A50 50 0 0 1 110 62" stroke-dasharray="' + fill + ' 200"/></svg>' +
+      '<div class="g-c"><b data-n="' + avg + '">0</b><small>من 100</small></div></div>' +
+      '<div class="minis"><div><b>' + clean + "</b><small>بلا حسم</small></div><div><b>" + scored.filter(function (s) { var v = A.score(s).total; return v < 100 && v >= 80; }).length + "</b><small>80–99</small></div><div><b>" + scored.filter(function (s) { return A.score(s).total < 80; }).length + "</b><small>أقل من 80</small></div></div>");
+
+    /* أكثر المخالفات تكراراً */
+    var byI = {}; monthInc.forEach(function (x) { var k = (x.itemText || "").replace(/[.。]$/, "").trim(); if (k) byI[k] = (byI[k] || 0) + 1; });
+    var its = Object.keys(byI).map(function (k) { return { l: k, v: byI[k] }; }).sort(function (a, b) { return b.v - a.v; }).slice(0, 5);
+    var tot = monthInc.length || 1;
+    its.forEach(function (r) { r.x = '<em class="tr eq">' + Math.round(r.v / tot * 100) + "%</em>"; });
+    html += card("span2", "أكثر المخالفات تكراراً", "هذا الشهر — النسبة من إجمالي المخالفات", its.length ? hbars(its, its[0].v, "c-its") : emptyS("check", "لا مخالفات هذا الشهر."), "");
+
+    /* لوحة الشرف */
+    var mNow = new Date(), mStart = new Date(mNow.getFullYear(), mNow.getMonth(), 1).getTime(), byM = {};
+    S.merits.forEach(function (m) { if (new Date(m.date).getTime() >= mStart) byM[m.stu] = (byM[m.stu] || 0) + (m.pts || 0); });
+    var hon = Object.keys(byM).filter(function (k) { return A.byId[k]; }).sort(function (a, b) { return byM[b] - byM[a]; }).slice(0, 5);
+    html += card("", "لوحة الشرف", "أعلى الطلاب في السلوك المتميز هذا الشهر", hon.length ? '<ol class="honor">' + hon.map(function (k, i) {
+      var s = A.byId[k];
+      return '<li><a href="#student/' + k + '"><span class="md m' + (i + 1) + '">' + (i + 1) + "</span><span><b>" + e(s.name) + "</b><small>" + e(A.classKey(s)) + '</small></span><em>+' + byM[k] + "</em></a></li>";
+    }).join("") + "</ol>" : emptyS("star", "سجّل السلوك المتميز ليظهر الطلاب هنا."), more("#merit", "رصد"));
+
+    /* إجراءات متأخرة */
+    var od = live.filter(function (x) {
+      if (x.status !== "open") return false;
+      var age = Date.now() - (x.approvedAt || x.createdAt || new Date(x.date).getTime());
+      if (age < 7 * DAY) return false;
+      var art = R.articleById && R.articleById(x.art), st = art && art.steps[x.stepIdx || 0];
+      if (!st) return true;
+      var dn = x.done || {}, n = st.actions.filter(function (a) { return !(/^(تحويل الطالب|إحالة الطالب من قبل)/.test(a) && /ما يلي:$/.test(a)); }).length;
+      return Object.keys(dn).filter(function (k) { return dn[k]; }).length < n;
+    }).sort(function (a, b) { return (a.approvedAt || a.createdAt || 0) - (b.approvedAt || b.createdAt || 0); });
+    html += card("", "إجراءات متأخرة", "مخالفات مفتوحة منذ أكثر من 7 أيام ولم تكتمل إجراءاتها", od.length ? '<ul class="odue">' + od.slice(0, 6).map(function (x) {
+      var s = A.byId[x.stu] || { name: x.stuName || "؟" }, d = Math.floor((Date.now() - (x.approvedAt || x.createdAt || new Date(x.date).getTime())) / DAY);
+      return '<li><a href="#inc/' + x.id + '"><span><b>' + e(s.name) + "</b><small>" + e(x.itemText || "") + '</small></span><em class="' + (d > 14 ? "r" : "o") + '">' + d + " يوماً</em></a></li>";
+    }).join("") + "</ul>" + (od.length > 6 ? '<p class="mut sm">و' + (od.length - 6) + " غيرها</p>" : "") : emptyS("check", "لا إجراءات متأخرة — كل المخالفات المفتوحة في وقتها."), od.length ? more("#incidents?f=open", "المفتوحة") : "");
+
+    /* هرم الغياب */
+    var ab = S.absences || [], lv = [[15, 1e9, "15 يوماً فأكثر"], [10, 14, "10–14 يوماً"], [5, 9, "5–9 أيام"], [3, 4, "3–4 أيام"]];
+    var rowsA = lv.map(function (L) { return { l: L[2], v: ab.filter(function (a) { return a.un >= L[0] && a.un <= L[1]; }).length }; });
+    var near = ab.filter(function (a) { return [2, 4, 9, 14].indexOf(a.un) >= 0; }).length, mxA = Math.max.apply(null, rowsA.map(function (r) { return r.v; }).concat([1]));
+    html += card("span2", "هرم الغياب بدون عذر", "عدد الطلاب في كل مستوى (من ملف وهج)", ab.length ? '<div class="pyr">' + rowsA.map(function (r, i) {
+      return '<div class="py-r"><span class="py-l">' + r.l + '</span><span class="py-b"><i class="p' + i + '" style="width:' + Math.max(r.v ? 6 : 0, Math.round(r.v / mxA * 100)) + "%;animation-delay:" + i * 80 + 'ms"></i></span><b data-n="' + r.v + '">0</b></div>';
+    }).join("") + "</div>" + (near ? '<p class="alert warn sm">' + near + " طالباً على بُعد يوم واحد من المستوى التالي.</p>" : "") : emptyS("calendar", "استورد ملف الغياب من وهج ليظهر الهرم."), more("#absence", "الغياب"));
+
+    /* مقارنة المراحل (للمدرسة المدمجة) */
+    var stg = {}; S.students.forEach(function (s) { var k = A.stageLabel(s) || "—"; (stg[k] = stg[k] || []).push(s); });
+    var keys = Object.keys(stg).filter(function (k) { return k !== "—"; });
+    if (keys.length > 1) {
+      html += card("", "مقارنة المراحل", "هذا الشهر", '<div class="stg">' + keys.map(function (k) {
+        var ids = {}; stg[k].forEach(function (s) { ids[s.id] = 1; });
+        var inc = monthInc.filter(function (x) { return ids[x.stu]; }), who = {}; inc.forEach(function (x) { who[x.stu] = 1; });
+        var sc = stg[k].filter(function (s) { return !A.qualitative(s); }), av = sc.length ? Math.round(sc.reduce(function (m, s) { return m + Math.min(100, A.score(s).total); }, 0) / sc.length) : null;
+        var disc = Math.round((1 - Object.keys(who).length / stg[k].length) * 100);
+        return '<div class="stg-c"><h4>' + e(k) + '</h4><div class="stg-n"><div><b data-n="' + stg[k].length + '">0</b><small>طالب</small></div><div><b data-n="' + inc.length + '">0</b><small>مخالفة</small></div><div><b data-n="' + disc + '" data-s="%">0</b><small>بلا مخالفات</small></div>' + (av != null ? '<div><b data-n="' + av + '">0</b><small>متوسط الدرجة</small></div>' : "") + "</div></div>";
+      }).join("") + "</div>");
+    }
+    return html;
+  };
 })();
 
 /* سَمْت — ربط «وهج» (ميزة اختيارية لمشتركي وهج): استيراد تقرير الغياب وتطبيق المادتين 33 و34 */
