@@ -1114,6 +1114,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     return ctx;
   };
   /* نوع المدرسة: بنين (افتراضي) أو بنات — يحوّل النماذج والرسائل لصيغة المؤنث */
+  A.wahaj = function () { return !!(C.lic && C.lic.wahaj); };
   A.isGirls = function (schoolId) { var z = schoolId != null ? A.school(schoolId) : null; return !!(z && z.gender === "g"); };
   A.stuGirls = function (stu) { return !!stu && A.isGirls(stu.school); };
   A.doc = function (kind, ref, fid) {
@@ -1881,7 +1882,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       var pr = R.MERITS.find(function (x) { return x.id === m.practice; }) || { t: "" };
       return '<li><div class="row1"><span class="chip ok">+' + m.pts + "</span> " + e(pr.t) + '</div><div class="row3">' + fmtDate(m.date) + (m.topic ? " · " + e(m.topic) : "") + ' <button class="link" data-del-mer="' + m.id + '" type="button">حذف</button></div></li>';
     }).join("") + "</ul>" : '<p class="mut">لا يوجد.</p>') + "</section>";
-    if (ab) html += '<section class="card"><h3>الغياب (من وهج)</h3><p>بدون عذر: <b class="red">' + ab.un + "</b> · بعذر: <b>" + ab.ex + "</b>" + (ab.late ? " · تأخير: " + ab.late : "") + ' <a href="#absence?s=' + s.id + '">الإجراءات</a></p></section>';
+    if (ab) html += '<section class="card wj"><h3>الغياب (من وهج)</h3><p>بدون عذر: <b class="red">' + ab.un + "</b> · بعذر: <b>" + ab.ex + "</b>" + (ab.late ? " · تأخير: " + ab.late : "") + ' <a href="#absence?s=' + s.id + '">الإجراءات</a></p></section>';
     main().innerHTML = html;
     $("#sp-edit").onclick = function () { editStudent(s); };
     var wa = $("#sp-wa"); if (wa) wa.onclick = function () { SL.openWa(s.parentPhone, A.fill(A.S.settings.tpl.notify, vars(s))); };
@@ -2735,7 +2736,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     } else if (tab === "msgs") {
       var names = { sign: "رابط التوقيع لولي الأمر", notify: "إشعار عام لولي الأمر", absence: "إشعار غياب", teacherLink: "رابط الرصد للمعلم", counselorLink: "رابط الرصد للموجه الطلابي", teacherDone: "إبلاغ المعلم بالاعتماد", referral: "إحالة للموجه الطلابي" };
       html += '<section class="card"><p class="mut">المتغيرات: {الطالب} {الصف} {المدرسة} {النموذج} {الرابط} {المدة} {المعلم} {المشكلة} {الإجراء} {الموجه} {النوع} {العدد}. لا تُذكر تفاصيل المخالفة في رسائل ولي الأمر حفاظاً على السرية.</p>' +
-        Object.keys(names).map(function (k) { return "<label>" + names[k] + '<textarea data-tpl="' + k + '" rows="5">' + e(cfg.tpl[k]) + "</textarea></label>"; }).join("") +
+        Object.keys(names).map(function (k) { return '<label' + (k === "absence" ? ' class="wj"' : "") + ">" + names[k] + '<textarea data-tpl="' + k + '" rows="5">' + e(cfg.tpl[k]) + "</textarea></label>"; }).join("") +
         '<div class="actions"><button class="btn pri" id="tp-save" type="button">حفظ</button><button class="btn" id="tp-reset" type="button">استعادة الافتراضي</button></div></section>';
     } else if (tab === "backup") {
       var FS = C.FS || {};
@@ -2777,12 +2778,12 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       var ms = A.schoolMoes(z);
       return '<label>' + (ms.length > 1 ? "الأرقام الوزارية" : "الرقم الوزاري") + ' <span class="chip lockc">🔒 معتمد</span><input dir="ltr" value="' + e(ms.join(" + ")) + '" readonly disabled></label>';
     }
-    if (!pair) return '<label>الرقم الوزاري (لربط وهج)<input data-k="moeCode" dir="ltr" inputmode="numeric" value="' + e(z.moeCode || "") + '"></label>';
+    if (!pair) return '<label>الرقم الوزاري<span class="wj"> (لربط وهج)</span><input data-k="moeCode" dir="ltr" inputmode="numeric" value="' + e(z.moeCode || "") + '"></label>';
     var two = z.moeMode === "two";
     return '<label>الأرقام الوزارية<select data-k="moeMode" data-rerender="1"><option value="one"' + (two ? "" : " selected") + '>رقم وزاري واحد للمرحلتين</option><option value="two"' + (two ? " selected" : "") + ">رقمان: رقم لـ" + L[pair[0]] + " ورقم لـ" + L[pair[1]] + "</option></select></label>" +
       (two ? '<label>الرقم الوزاري — ' + L[pair[0]] + '<input data-k="moeCode" dir="ltr" inputmode="numeric" value="' + e(z.moeCode || "") + '"></label>' +
              '<label>الرقم الوزاري — ' + L[pair[1]] + '<input data-k="moeCode2" dir="ltr" inputmode="numeric" value="' + e(z.moeCode2 || "") + '"></label>'
-           : '<label>الرقم الوزاري (لربط وهج)<input data-k="moeCode" dir="ltr" inputmode="numeric" value="' + e(z.moeCode || "") + '"></label>');
+           : '<label>الرقم الوزاري<span class="wj"> (لربط وهج)</span><input data-k="moeCode" dir="ltr" inputmode="numeric" value="' + e(z.moeCode || "") + '"></label>');
   }
   A.moeFields = moeFields;
   function schoolForm(z, i) {
@@ -3043,7 +3044,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var ab = S.absences || [], lv = [[15, 1e9, "15 يوماً فأكثر"], [10, 14, "10–14 يوماً"], [5, 9, "5–9 أيام"], [3, 4, "3–4 أيام"]];
     var rowsA = lv.map(function (L) { return { l: L[2], v: ab.filter(function (a) { return a.un >= L[0] && a.un <= L[1]; }).length }; });
     var near = ab.filter(function (a) { return [2, 4, 9, 14].indexOf(a.un) >= 0; }).length, mxA = Math.max.apply(null, rowsA.map(function (r) { return r.v; }).concat([1]));
-    html += card("span2", "هرم الغياب بدون عذر", "عدد الطلاب في كل مستوى (من ملف وهج)", ab.length ? '<div class="pyr">' + rowsA.map(function (r, i) {
+    html += card("span2 wj", "هرم الغياب بدون عذر", "عدد الطلاب في كل مستوى (من ملف وهج)", ab.length ? '<div class="pyr">' + rowsA.map(function (r, i) {
       return '<div class="py-r"><span class="py-l">' + r.l + '</span><span class="py-b"><i class="p' + i + '" style="width:' + Math.max(r.v ? 6 : 0, Math.round(r.v / mxA * 100)) + "%;animation-delay:" + i * 80 + 'ms"></i></span><b data-n="' + r.v + '">0</b></div>';
     }).join("") + "</div>" + (near ? '<p class="alert warn sm">' + near + " طالباً على بُعد يوم واحد من المستوى التالي.</p>" : "") : emptyS("calendar", "استورد ملف الغياب من وهج ليظهر الهرم."), more("#absence", "الغياب"));
 
@@ -3171,6 +3172,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   function levelOf(n) { return n >= 10 ? 10 : n >= 5 ? 5 : n >= 3 ? 3 : 0; }
 
   V.absence = function (p, q) {
+    if (!A.wahaj()) return A.go("home");
     document.getElementById("top-title").textContent = "الغياب — ربط وهج";
     var cfg = A.S.settings;
     A.wahajStatus().then(function (lic) {
@@ -3346,7 +3348,9 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     document.addEventListener("click", function (ev) { if (!$("#q-box").contains(ev.target)) box.hidden = true; else if (ev.target.closest && ev.target.closest(".q-res a")) close(); });
   }
   A.drawTop = function () {
-    var L = C.lic || {}, el = $("#top-lic"); if (!el) return;
+    var L = C.lic || {}, el = $("#top-lic");
+    document.body.classList.toggle("no-wj", !L.wahaj);   /* ميزات وهج (الغياب) لا تظهر إلا بتفعيل من المزوّد */
+    if (!el) return;
     var sn = $("#top-school"); if (sn) sn.textContent = A.S.settings.schools.map(function (z) { return z.name; }).filter(Boolean).join(" · ") || "ضبط السلوك والمواظبة";
     el.textContent = L.trial ? "تجريبي: " + L.hours + " ساعة" : L.ok && L.days <= 14 ? "ينتهي بعد " + L.days + " يوماً" : "";
     el.hidden = !el.textContent;

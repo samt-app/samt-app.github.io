@@ -276,7 +276,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
         var days = o.trial ? Math.ceil((o.hours || 0) / 24) : endT ? Math.ceil((endT - Date.now()) / 864e5) : 0;
         var cm = cmds[o.dev || k] || {};
         if (cm.end) { var ce = new Date(cm.end + "T23:59:59").getTime(); if (ce > endT) { endT = ce; days = Math.ceil((ce - Date.now()) / 864e5); o.trial = false; } }
-        return { stopped: !!cm.stop, cmdEnd: cm.end || "", dev: o.dev || k, school: o.school || "—", region: o.region || "", admin: o.admin || "", ver: o.ver || "—",
+        return { cmd: cm, wahaj: !!cm.wahaj, stopped: !!cm.stop, cmdEnd: cm.end || "", dev: o.dev || k, school: o.school || "—", region: o.region || "", admin: o.admin || "", ver: o.ver || "—",
           trial: !!o.trial, end: o.end || "", endT: endT, days: days, last: last, logins: logins, first: o.first || 0,
           stu: (o.n || {}).stu || 0, inc: (o.n || {}).inc || 0, sig: (o.n || {}).sig || 0, stf: (o.n || {}).stf || 0, mer: (o.n || {}).mer || 0, ua: o.ua || "" };
       });
@@ -324,7 +324,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
       kpi(stu.toLocaleString("ar-SA"), "طالب في كل المدارس", "") + kpi(inc.toLocaleString("ar-SA"), "مخالفة مسجّلة", "");
     $("#rows").innerHTML = list.length ? list.map(function (r, i) {
       var st = state(r), lb = LBL[st], txt = st === "soon" ? "ينتهي بعد " + r.days + " يوماً" : st === "trial" ? "تجريبي — " + r.days + " يوم" : lb[0];
-      return '<tr data-i="' + i + '" class="row"><td><span class="sch">' + e(r.school) + "</span>" + (r.region ? '<div class="mini">' + e(r.region) + "</div>" : "") + "</td>" +
+      return '<tr data-i="' + i + '" class="row"><td><span class="sch">' + e(r.school) + "</span>" + (r.wahaj ? ' <span class="pill p-ok">وهج</span>' : "") + (r.region ? '<div class="mini">' + e(r.region) + "</div>" : "") + "</td>" +
         '<td><span class="dev">' + e(r.dev) + "</span></td>" +
         '<td><span class="pill ' + lb[1] + '">' + e(txt) + "</span>" + (r.end ? '<div class="mini">حتى ' + e(r.end) + "</div>" : "") + "</td>" +
         "<td>" + e(ago(r.last)) + '<div class="mini">' + e(r.last ? SL.hijri(r.last) + " " + SL.time(r.last) : "") + "</div></td>" +
@@ -342,6 +342,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
           '<button class="btn sm" data-extd="' + e(r.dev) + '" type="button">تمديد حتى تاريخ…</button>' +
           (r.stopped ? '<button class="btn sm" data-run="' + e(r.dev) + '" type="button">إلغاء الإيقاف</button>'
                      : '<button class="btn sm danger" data-stop="' + e(r.dev) + '" type="button">إيقاف الاشتراك</button>') +
+          (r.wahaj ? '<button class="btn sm" data-wj="' + e(r.dev) + '" type="button">إيقاف ميزات وهج</button>' : '<button class="btn sm pri" data-wj="' + e(r.dev) + '" type="button">السماح بميزات وهج (الغياب)</button>') +
           (r.cmdEnd ? '<span class="pill p-ok">أمر ساري: حتى ' + e(r.cmdEnd) + "</span>" : "") + "</div>" +
         "</td></tr>";
     }).join("") : '<tr><td colspan="9"><div class="empty"><p>لا توجد أجهزة مطابقة.</p></div></td></tr>';
@@ -370,7 +371,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
         var r = ROWS.find(function (x) { return x.dev === b.dataset.ext; }) || {};
         var base = Math.max(Date.now(), r.endT || 0, r.cmdEnd ? new Date(r.cmdEnd + "T23:59:59").getTime() : 0);
         var d = new Date(base); d.setMonth(d.getMonth() + (+b.dataset.m));
-        cmd(b.dataset.ext, { end: iso(d), by: "admin", at: Date.now() }, b, "تم حتى " + iso(d));
+        cmd(b.dataset.ext, Object.assign({}, r.cmd, { end: iso(d), by: "admin", at: Date.now() }), b, "تم حتى " + iso(d));
       };
     });
     document.querySelectorAll("[data-extd]").forEach(function (b) {
@@ -378,18 +379,32 @@ td.dcol .del svg { width: 19px; height: 19px; }
         ev.stopPropagation();
         var v = prompt("تاريخ نهاية الاشتراك (YYYY-MM-DD):", iso(Date.now() + 365 * 864e5));
         if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v.trim())) return;
-        cmd(b.dataset.extd, { end: v.trim(), by: "admin", at: Date.now() }, b, "تم حتى " + v.trim());
+        var r = ROWS.find(function (x) { return x.dev === b.dataset.extd; }) || {};
+        cmd(b.dataset.extd, Object.assign({}, r.cmd, { end: v.trim(), by: "admin", at: Date.now() }), b, "تم حتى " + v.trim());
       };
     });
     document.querySelectorAll("[data-stop]").forEach(function (b) {
       b.onclick = function (ev) {
         ev.stopPropagation();
         if (!confirm("إيقاف الاشتراك لهذا الجهاز؟ سيُقفل التطبيق عند أول تشغيل متصل بالإنترنت.")) return;
-        cmd(b.dataset.stop, { stop: true, by: "admin", at: Date.now() }, b, "أُوقف");
+        var r = ROWS.find(function (x) { return x.dev === b.dataset.stop; }) || {};
+        cmd(b.dataset.stop, Object.assign({}, r.cmd, { stop: true, by: "admin", at: Date.now() }), b, "أُوقف");
       };
     });
     document.querySelectorAll("[data-run]").forEach(function (b) {
-      b.onclick = function (ev) { ev.stopPropagation(); cmd(b.dataset.run, null, b, "أُلغي الإيقاف"); };
+      b.onclick = function (ev) {
+        ev.stopPropagation();
+        var r = ROWS.find(function (x) { return x.dev === b.dataset.run; }) || {}, c = Object.assign({}, r.cmd); delete c.stop; delete c.why;
+        cmd(b.dataset.run, c.end || c.wahaj ? c : null, b, "أُلغي الإيقاف");
+      };
+    });
+    document.querySelectorAll("[data-wj]").forEach(function (b) {
+      b.onclick = function (ev) {
+        ev.stopPropagation();
+        var r = ROWS.find(function (x) { return x.dev === b.dataset.wj; }) || {}, c = Object.assign({}, r.cmd);
+        if (c.wahaj) delete c.wahaj; else c.wahaj = true;
+        cmd(b.dataset.wj, Object.keys(c).filter(function (k) { return k !== "by" && k !== "at"; }).length ? Object.assign(c, { by: "admin", at: Date.now() }) : null, b, c.wahaj ? "سُمح بوهج" : "أُوقف وهج");
+      };
     });
     document.querySelectorAll("[data-wa]").forEach(function (b) {
       b.onclick = function (ev) {
@@ -457,7 +472,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
       var fl = x.unlock ? String(x.unlock.fields || "").split(",").map(function (f) { var y = FIELDS.find(function (z) { return z[0] === f; }); return y ? y[1] : ""; }).filter(Boolean).join("، ") : "";
       return '<article class="scard" data-moe="' + e(x.moe) + '"><div class="top"><span class="sch">' + e(i.name || "— لم تُعتمد بعد —") + '</span><span class="moe">' + e(x.moe) + "</span>" +
         '<span class="pill ' + st[1] + '">' + e(st[0]) + "</span>" + (x.endT ? '<span class="mini">حتى ' + e(isoDay(x.endT)) + "</span>" : "") +
-        (x.approved ? '<span class="pill p-lock">🔒 معتمدة</span>' : '<span class="pill p-wait">بانتظار الاعتماد</span>') +
+        (x.approved ? '<span class="pill p-lock">🔒 معتمدة</span>' : '<span class="pill p-wait">بانتظار الاعتماد</span>') + (x.cmd.wahaj ? '<span class="pill p-ok">وهج مفعّل</span>' : "") +
         (x.unlock ? (x.unlock.used ? '<span class="pill p-ok">✓ عدّلت المدرسة وأعادت الاعتماد</span>' : '<span class="pill p-open">🔓 مسموح بتعديل: ' + e(fl) + " حتى " + e(isoDay(+x.unlock.until)) + "</span>") : "") +
         '<span class="mini" style="margin-inline-start:auto">آخر نشاط: ' + e(ago(x.last)) + "</span>" +
         '<button class="del" type="button" data-sdel="' + e(x.moe) + '" title="حذف المدرسة نهائياً" aria-label="حذف المدرسة نهائياً">' + TRASH + "</button></div>" +
@@ -473,6 +488,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
         '<button class="btn sm" type="button" data-sextd="' + e(x.moe) + '">تمديد حتى تاريخ…</button>' +
         (x.cmd.stop ? '<button class="btn sm" type="button" data-srun="' + e(x.moe) + '">إلغاء الإيقاف</button>' : '<button class="btn sm danger" type="button" data-sstop="' + e(x.moe) + '">إيقاف الاشتراك</button>') +
         (x.unlock ? '<button class="btn sm" type="button" data-lock="' + e(x.moe) + '">إلغاء السماح بالتعديل</button>' : '<button class="btn sm" type="button" data-unl="' + e(x.moe) + '">السماح بتعديل البيانات…</button>') +
+        '<button class="btn sm' + (x.cmd.wahaj ? "" : " pri") + '" type="button" data-swj="' + e(x.moe) + '">' + (x.cmd.wahaj ? "إيقاف ميزات وهج" : "السماح بميزات وهج (الغياب)") + "</button>" +
         '<button class="btn sm" type="button" data-swa="' + e(x.moe) + '">رسالة تجديد</button>' +
         (x.cmd.end ? '<span class="pill p-ok">تمديد من اللوحة حتى ' + e(x.cmd.end) + "</span>" : "") + "</div>" +
         '<div class="unl hide" id="unl-' + e(x.moe) + '"><b>اختر ما يُسمح للمدرسة بتعديله:</b><div class="checks-inline">' +
@@ -553,11 +569,12 @@ td.dcol .del svg { width: 19px; height: 19px; }
     each("[data-sext]", function (b) {
       var x = sx(b.dataset.sext), base = new Date(Math.max(Date.now(), x.endT || 0)); base.setMonth(base.getMonth() + (+b.dataset.m));
       if (!confirm("تمديد اشتراك " + (x.info.name || b.dataset.sext) + " حتى " + isoDay(base) + "؟")) return;
-      act(b, function () { return put("/lic/" + b.dataset.sext + "/cmd", { end: isoDay(base), by: "admin", at: Date.now() }); }, "تم حتى " + isoDay(base));
+      act(b, function () { return put("/lic/" + b.dataset.sext + "/cmd", Object.assign({}, x.cmd, { end: isoDay(base), by: "admin", at: Date.now() })); }, "تم حتى " + isoDay(base));
     });
     each("[data-sextd]", function (b) {
       var v = prompt("تاريخ نهاية الاشتراك (YYYY-MM-DD):", isoDay(Date.now() + 365 * 864e5)); if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v.trim())) return;
-      act(b, function () { return put("/lic/" + b.dataset.sextd + "/cmd", { end: v.trim(), by: "admin", at: Date.now() }); }, "تم حتى " + v.trim());
+      var x = sx(b.dataset.sextd);
+      act(b, function () { return put("/lic/" + b.dataset.sextd + "/cmd", Object.assign({}, x.cmd, { end: v.trim(), by: "admin", at: Date.now() })); }, "تم حتى " + v.trim());
     });
     each("[data-sstop]", function (b) {
       if (!confirm("إيقاف اشتراك المدرسة؟ تُقفل المنصة في أجهزتها الثلاثة عند أول تشغيل متصل بالإنترنت.")) return;
@@ -566,7 +583,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
     });
     each("[data-srun]", function (b) {
       var x = sx(b.dataset.srun), c = Object.assign({}, x.cmd); delete c.stop; delete c.why;
-      act(b, function () { return put("/lic/" + b.dataset.srun + "/cmd", c.end ? c : null); }, "أُلغي الإيقاف");
+      act(b, function () { return put("/lic/" + b.dataset.srun + "/cmd", c.end || c.wahaj ? c : null); }, "أُلغي الإيقاف");
     });
     each("[data-unslot]", function (b) {
       var z = b.dataset.unslot.split("|");
@@ -583,6 +600,12 @@ td.dcol .del svg { width: 19px; height: 19px; }
     });
     each("[data-lock]", function (b) { act(b, function () { return put("/lic/" + b.dataset.lock + "/unlock", null); }, "أُلغي السماح"); });
     each("[data-sdel]", function (b) { delSchool(sx(b.dataset.sdel)); });
+    each("[data-swj]", function (b) {
+      var x = sx(b.dataset.swj), c = Object.assign({}, x.cmd);
+      if (c.wahaj) delete c.wahaj; else c.wahaj = true;
+      var keep = Object.keys(c).filter(function (k) { return k !== "by" && k !== "at"; }).length;
+      act(b, function () { return put("/lic/" + b.dataset.swj + "/cmd", keep ? Object.assign(c, { by: "admin", at: Date.now() }) : null); }, c.wahaj ? "سُمح بوهج" : "أُوقف وهج");
+    });
     each("[data-swa]", function (b) {
       var x = sx(b.dataset.swa);
       var t = "السلام عليكم، بخصوص اشتراك منصة «سَمْت» لـ" + (x.info.name || "المدرسة") + " (الرقم الوزاري " + x.moe + ")" + (x.endT ? "، ينتهي بتاريخ " + isoDay(x.endT) : "") + ".\nيسعدنا تجديد الاشتراك عبر متجر تقناس: www.TiqNas.com";

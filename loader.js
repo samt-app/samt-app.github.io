@@ -167,7 +167,7 @@
     if (cmd.stop) return Object.assign(out, { ok: false, stopped: true, why: cmd.why || "أُوقف اشتراك المدرسة (" + moe + ") من المزوّد. تواصل مع متجر تقناس لتفعيله." });
     if (cmd.end) { var ce = new Date(cmd.end + "T23:59:59").getTime(); if (ce > end) end = ce; }
     if (now > end) return Object.assign(out, { ok: false, expired: true, end: new Date(end), why: "انتهى اشتراك المدرسة (" + moe + ") بتاريخ " + fmt(new Date(end)) + "." });
-    return Object.assign(out, { ok: true, end: new Date(end), days: Math.ceil((end - now) / 864e5) });
+    return Object.assign(out, { ok: true, end: new Date(end), days: Math.ceil((end - now) / 864e5), wahaj: !!cmd.wahaj });
   }
   async function license() {
     var dev = await deviceId(), now = Date.now();
@@ -178,13 +178,18 @@
     if (moes.length) {
       var schools = await Promise.all(moes.map(function (m) { return checkSchool(m, lics[m], dev, now); }));
       var good = schools.filter(function (x) { return x.ok; }).sort(function (a, b) { return b.end - a.end; });
-      if (good.length) return { ok: true, v: 2, dev: dev, schools: schools, end: good[0].end, days: good[0].days };
+      if (good.length) return { ok: true, v: 2, dev: dev, schools: schools, end: good[0].end, days: good[0].days, wahaj: good.some(function (x) { return x.wahaj; }) };
       return { ok: false, v: 2, dev: dev, schools: schools, stopped: schools.some(function (x) { return x.stopped; }), why: schools.map(function (x) { return x.why; }).join(" ") };
     }
     /* النظام السابق: كود مرتبط بالجهاز (SL1) + أوامر المزوّد للجهاز */
     var rem = await remoteFetch(dev);
     if (rem && rem.stop) return { ok: false, dev: dev, stopped: true, why: rem.why || "أُوقف الاشتراك من المزوّد. تواصل مع متجر تقناس لتفعيله." };
     var remEnd = rem && rem.end ? new Date(rem.end + "T23:59:59").getTime() : 0;
+    var wj = !!(rem && rem.wahaj), r0 = await legacyLic(rem, remEnd, dev, now);
+    if (r0) r0.wahaj = wj;
+    return r0;
+  }
+  async function legacyLic(rem, remEnd, dev, now) {
     var code = await DB.get("license");
     if (code) {
       var r = await verifyCode(code, dev); r.dev = dev; r.code = code;

@@ -563,3 +563,6 @@ main input::placeholder, main textarea::placeholder, .sheet input::placeholder {
 .odue li, .honor li { min-width: 0; }
 .odue a > span, .honor a > span:nth-child(2) { overflow: hidden; }
 .odue b, .honor b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* r35: ميزات وهج (الغياب) مخفية ما لم يفعّلها المزوّد */
+.no-wj .wj, .no-wj a[href="#absence"], .no-wj a[href^="#absence?"] { display: none !important; }
