@@ -1311,7 +1311,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   };
 
   /* اعتماد مدرسة (أو إعادة اعتمادها بعد إذن المزوّد) */
-  A.approveSchool = async function (z) {
+  A.approveSchool = async function (z, silent) {
     var moes = A.schoolMoes(z);
     if (!moes.length) return A.toast("أدخل الرقم الوزاري أولاً", "err");
     var id = A.identFor(z, moes[0]), miss = A.identMissing(id);
@@ -1319,7 +1319,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var html = '<p>بعد الاعتماد <b>لا يمكن تعديل</b> البيانات التالية إلا بإذن من المزوّد (تقناس). تُطبع في كل النماذج الرسمية وتظهر على أجهزة المدرسة الثلاثة:</p><table class="tbl"><tbody>' +
       FIELDS.map(function (f) { return "<tr><th>" + f[1] + "</th><td>" + SL.esc(f[0] === "moe" ? moes.join(" + ") : id[f[0]]) + "</td></tr>"; }).join("") +
       "</tbody></table><p class=\"mut\">تأكد من كتابة الأسماء كما في نظام نور.</p>";
-    if (!(await A.ask("اعتماد بيانات المدرسة", html, "اعتماد نهائي"))) return;
+    if (!silent && !(await A.ask("اعتماد بيانات المدرسة", html, "اعتماد نهائي"))) return;
     for (var i = 0; i < moes.length; i++) {
       var r = await C.approve(moes[i], Object.assign({}, id, { moe: moes[i] }));
       if (!r.ok) { A.toast(r.why, "err"); return; }
@@ -1327,6 +1327,53 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     A.log("اعتماد بيانات المدرسة: " + id.name + " (" + moes.join("، ") + ")");
     C.lic = await C.license(); await A.applyIdentity();
     A.toast("تم اعتماد بيانات المدرسة"); A.drawTop(); A.route(); A.ping();
+    return true;
+  };
+
+  /* خطوة واحدة بعد التفعيل: نافذة بيانات المدرسة + تحذير القفل + زر اعتماد واحد.
+     تظهر تلقائياً لمدرسة مرخّصة لم تُعتمد بعد (الجهاز الثاني والثالث يأخذان البيانات المعتمدة دون نافذة). */
+  var qaOpen = null, qaSkip = false;
+  A.quickApprove = function () {
+    if ((qaOpen && document.body.contains(qaOpen)) || qaSkip) return;
+    var p = A.needApproval().find(function (x) { return !x.re && x.school; }); if (!p) return;
+    var z = p.school, moes = A.schoolMoes(z), done = false;
+    function v(role) { return SL.esc(baseStaffName(role, z.id) || ""); }
+    var html = '<p>تم تفعيل اشتراك المدرسة (الرقم الوزاري <b dir="ltr">' + SL.esc(moes.join(" + ")) + "</b>). أكمل البيانات كما في نظام نور ثم اضغط «اعتماد وقفل البيانات».</p>" +
+      '<div class="grid2">' +
+      '<label>اسم المدرسة<input id="qa-name" value="' + SL.esc(z.name || "") + '"></label>' +
+      '<label>المرحلة<select id="qa-stage">' + [["ابتدائي", "ابتدائي"], ["متوسط", "متوسط"], ["ثانوي", "ثانوي"], ["مدمجة", "مدمجة (ابتدائي + متوسط)"], ["مدمجة-ث", "مدمجة (متوسط + ثانوي)"]].map(function (s) { return '<option value="' + s[0] + '"' + (s[0] === z.stage ? " selected" : "") + ">" + s[1] + "</option>"; }).join("") + "</select></label>" +
+      '<label>نوع المدرسة<select id="qa-g"><option value="b"' + (z.gender !== "g" ? " selected" : "") + '>بنين</option><option value="g"' + (z.gender === "g" ? " selected" : "") + ">بنات</option></select></label>" +
+      '<label>مدير المدرسة<input id="qa-principal" value="' + v("principal") + '"></label>' +
+      '<label>وكيل شؤون الطلبة<input id="qa-deputy" value="' + v("deputy") + '"></label>' +
+      '<label>الموجه الطلابي<input id="qa-counselor" value="' + v("counselor") + '"></label></div>' +
+      '<p class="alert warn sm">⚠️ <b>تنبيه:</b> بعد الاعتماد تُقفل هذه البيانات: <b>اسم المدرسة، الرقم الوزاري، مدير المدرسة، وكيل شؤون الطلبة، الموجه الطلابي</b>، ولا تُعدَّل إلا بإذن من المزوّد (تقناس). تأكد من صحتها قبل الضغط.</p>' +
+      '<div class="actions"><button class="btn pri" type="button" id="qa-ok">' + (window.SLI ? SLI("shield") + " " : "") + 'اعتماد وقفل البيانات</button><button class="btn" type="button" id="qa-later">لاحقاً</button></div><p id="qa-msg"></p>';
+    var sh = A.sheet("اعتماد بيانات المدرسة", html, { onClose: function () { qaOpen = null; if (!done) qaSkip = true; } });
+    qaOpen = sh.el;
+    var $ = function (s) { return sh.body.querySelector(s); };
+    $("#qa-later").onclick = function () { sh.close(); };
+    $("#qa-ok").onclick = async function () {
+      var name = $("#qa-name").value.trim(), vals = {}, miss = [];
+      if (!name) miss.push("اسم المدرسة");
+      LOCK_ROLES.forEach(function (r) { vals[r] = $("#qa-" + r).value.trim(); if (!vals[r]) miss.push(FIELDS.find(function (f) { return f[0] === r; })[1]); });
+      if (miss.length) { $("#qa-msg").className = "alert err sm"; $("#qa-msg").textContent = "أكمل: " + miss.join("، "); return; }
+      this.disabled = true;
+      var oldG = !!A.girlsUI;
+      z.name = name; z.gender = $("#qa-g").value; z.stage = $("#qa-stage").value;
+      var recs = [];
+      LOCK_ROLES.forEach(function (role) {
+        var mine = A.S.staff.filter(function (x) { return x.role === role && (!x.school || x.school === z.id); });
+        if (mine.some(function (x) { return A.norm(x.name) === A.norm(vals[role]); })) return;
+        if (mine.length) { var s = mine.find(function (x) { return x.school === z.id; }) || mine[0]; s.name = vals[role]; s.school = s.school || z.id; recs.push(s); }
+        else recs.push({ t: "stf", id: "T" + SL.rid(10), name: vals[role], role: role, school: z.id, phone: "", sid: "" });
+      });
+      await A.saveSettings(); if (recs.length) await A.saveMany(recs);
+      done = true; sh.close();
+      var ok = await A.approveSchool(z, true);
+      if (!ok) { done = false; qaSkip = false; return; }
+      var g = A.S.settings.schools.length > 0 && A.S.settings.schools.every(function (s) { return s.gender === "g"; });
+      if (g !== oldG) setTimeout(function () { location.reload(); }, 600);
+    };
   };
 })();
 
@@ -1601,6 +1648,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     if (A.needApproval().some(function (x) { return !x.re; }) && ["settings", "staff", "import"].indexOf(p[0]) < 0) { location.replace("#settings?tab=school"); return; }
     var fn = V[p[0]] || V.home;
     try { fn(p.slice(1), q); } catch (err) { console.error(err); main().innerHTML = empty("حدث خطأ في عرض الصفحة: " + err.message); }
+    if (A.quickApprove && A.needApproval().some(function (x) { return !x.re; })) A.quickApprove();   /* خطوة واحدة: نافذة الاعتماد بعد التفعيل مباشرة */
   };
 
   /* ————— الرئيسية ————— */
@@ -2851,7 +2899,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         var rs = $('.lic-role[data-moe="' + m + '"]'), r = await C.activate(code, rs ? rs.value : ((await C.DB.get("devRole")) || ""));
         if (!r.ok) { A.toast(r.why, "err"); b.disabled = false; b.textContent = "تفعيل"; return; }
         C.lic = await C.license(); await A.applyIdentity(); A.drawTop(); A.ping();
-        A.toast(r.id ? "تم التفعيل — بيانات المدرسة معتمدة مسبقاً وطُبّقت على هذا الجهاز" : "تم التفعيل — راجع البيانات ثم اضغط «اعتماد بيانات المدرسة»");
+        A.toast(r.id ? "تم التفعيل — بيانات المدرسة معتمدة مسبقاً وطُبّقت على هذا الجهاز" : "تم التفعيل — أكمل بيانات المدرسة واعتمدها");
         A.route();
       });
     } else if (tab === "links") {
@@ -2905,7 +2953,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         var m = $("#lc-msg"); m.className = "mut"; m.textContent = "جارٍ التفعيل…";
         var r = await C.activate($("#lc-code").value, $("#lc-role").value);
         m.className = "alert sm " + (r.ok ? "ok" : "err");
-        m.textContent = r.ok ? "تم التفعيل حتى " + SL.greg(r.end) + (r.slot ? " — هذا الجهاز رقم " + r.slot + " من " + C.SLOTS : "") + (r.v === 2 ? (r.id ? " — طُبّقت بيانات المدرسة المعتمدة" : " — راجع بيانات المدرسة ثم اعتمدها") : "") : r.why;
+        m.textContent = r.ok ? "تم التفعيل حتى " + SL.greg(r.end) + (r.slot ? " — هذا الجهاز رقم " + r.slot + " من " + C.SLOTS : "") + (r.v === 2 ? (r.id ? " — طُبّقت بيانات المدرسة المعتمدة" : "") : "") : r.why;
         if (r.ok) { C.lic = await C.license(); await A.applyIdentity(); A.drawTop(); A.ping(); setTimeout(function () { A.route(); }, 1200); }
       };
       C.DB.get("devRole").then(function (v) { if (v) $("#lc-role").value = v; });
