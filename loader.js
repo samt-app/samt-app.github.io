@@ -261,10 +261,9 @@
     SESS.me = id; return id;
   }
   async function seatName() {
-    var role = (await DB.get("devRole")) || "", r = DEV_ROLES.find(function (x) { return x[0] === role; });
     var ua = navigator.userAgent || "", os = /Windows/.test(ua) ? "Windows" : /Mac OS X/.test(ua) && !/Mobile/.test(ua) ? "Mac" : /iPad/.test(ua) ? "iPad" : /iPhone/.test(ua) ? "iPhone" : /Android/.test(ua) ? "Android" : /Linux/.test(ua) ? "Linux" : "";
     var br = /Edg\//.test(ua) ? "Edge" : /Chrome\//.test(ua) ? "Chrome" : /Safari\//.test(ua) ? "Safari" : /Firefox\//.test(ua) ? "Firefox" : "";
-    return [r ? r[1] : "", [os, br].filter(Boolean).join(" · ")].filter(Boolean).join(" — ");
+    return [os, br].filter(Boolean).join(" · ") || "جهاز";
   }
   /* وقت البيانات المُعلن للأجهزة الأخرى: مع المجلد = آخر ما وصل المجلد فعلاً (وإلا انتظر الجهاز الآخر بيانات لن تصل) */
   function sessData() { return FS.ok ? (SESS.fdata || 0) : (SESS.data || 0); }
@@ -484,13 +483,12 @@
       '<p class="lock-hint">الاشتراك للمدرسة لا للجهاز: أرسل <b>الرقم الوزاري للمدرسة</b> إلى ' + esc(VENDOR.name) + " تصلك كود يعمل على أي جهاز في المدرسة، على جهاز واحد في كل مرة. المدرسة ذات المرحلتين برقمين وزاريين تحتاج كودين.</p>" +
       (wa ? '<a class="btn wa" href="' + wa + '" rel="noopener">طلب الاشتراك عبر واتساب</a>' : "") +
       '<label class="lock-l">كود اشتراك المدرسة<textarea id="lk-code" rows="3" dir="ltr" placeholder="SL2.123456789.YYYYMMDD.…"></textarea></label>' +
-      '<label class="lock-l">هذا الجهاز هو<select id="lk-role">' + DEV_ROLES.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + "</option>"; }).join("") + "</select></label>" +
       '<button class="btn pri" id="lk-act" type="button">تفعيل</button><p id="lk-msg" class="lock-msg"></p>' +
       "</div></div>";
     (document.getElementById("lk-copy")||{}).onclick = function () { try { navigator.clipboard.writeText(L.dev); this.textContent = "تم"; } catch (e) {} };
     document.getElementById("lk-act").onclick = async function () {
       var m = document.getElementById("lk-msg"); m.className = "lock-msg"; m.textContent = "جارٍ التحقق…";
-      var r = await activate(document.getElementById("lk-code").value, document.getElementById("lk-role").value);
+      var r = await activate(document.getElementById("lk-code").value, "");
       if (r.ok) { m.className = "lock-msg ok"; m.textContent = "تم التفعيل حتى " + fmt(r.end) + " — جارٍ الفتح…"; setTimeout(function () { location.reload(); }, 900); }
       else { m.className = "lock-msg err"; m.textContent = r.why; }
     };

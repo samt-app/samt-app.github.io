@@ -2805,7 +2805,6 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         (schools.length ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الرقم الوزاري</th><th>المدرسة المعتمدة</th><th>الحالة</th></tr></thead><tbody>' + schools.map(function (x) {
           return "<tr><td dir=\"ltr\">" + e(x.moe) + "</td><td>" + e(x.id ? x.id.name : "— بانتظار الاعتماد —") + "</td><td>" + (x.ok ? '<span class="chip ok">حتى ' + e(SL.greg(x.end)) + "</span>" : '<span class="chip red">' + e(x.why) + "</span>") + "</td></tr>";
         }).join("") + "</tbody></table></div>" : "") +
-        '<label>هذا الجهاز هو<select id="lc-role">' + C.DEV_ROLES.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + "</option>"; }).join("") + "</select></label>" +
         '<p class="mut">رقم الجهاز: <b dir="ltr">' + e(L.dev || "") + '</b> <button class="btn sm" type="button" id="lc-copy">نسخ</button></p>' +
         '<p class="note">يُرسل للمزوّد عند كل تشغيل: رقم الجهاز ونوعه، والرقم الوزاري واسم المدرسة وأسماء المدير والوكيل والموجه المعتمدة، وتاريخ انتهاء الاشتراك، وآخر خمس مرات دخول، وأعداد مجمّعة (الطلاب والمخالفات). لا تُرسل بيانات الطلاب ولا أولياء الأمور.</p>' +
         '<label>كود اشتراك المدرسة<textarea id="lc-code" rows="3" dir="ltr" placeholder="SL2.الرقم الوزاري.…"></textarea></label><p class="mut">للجهاز الثاني والثالث في المدرسة: الصق نفس كود المدرسة هنا — تُطبَّق بياناتها المعتمدة على هذا الجهاز تلقائياً.</p><div class="actions"><button class="btn pri" id="lc-act" type="button">تفعيل</button></div><p id="lc-msg"></p></section>' +
@@ -2859,7 +2858,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         if (!l.id) need = true;
       }
       return '<div class="lic-row"><span class="mut">الرقم الوزاري</span> <b dir="ltr">' + e(m) + "</b> " + st +
-        (!l || !l.ok ? '<div class="lic-act"><input class="lic-code" data-moe="' + e(m) + '" dir="ltr" placeholder="الصق كود اشتراك المدرسة SL2.' + e(m) + '.…"><select class="lic-role" data-moe="' + e(m) + '">' + C.DEV_ROLES.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + "</option>"; }).join("") + '</select><button class="btn sm pri" type="button" data-act="' + e(m) + '">تفعيل</button></div>' : "") + "</div>";
+        (!l || !l.ok ? '<div class="lic-act"><input class="lic-code" data-moe="' + e(m) + '" dir="ltr" placeholder="الصق كود اشتراك المدرسة SL2.' + e(m) + '.…"><button class="btn sm pri" type="button" data-act="' + e(m) + '">تفعيل</button></div>' : "") + "</div>";
     }).join("");
     var fl = k.unlock ? String(k.unlock.fields || "").split(",").map(function (f) { var x = (A.ID_FIELDS || []).find(function (y) { return y[0] === f; }); return x ? x[1] : ""; }).filter(Boolean).join("، ") : "";
     return '<div class="licbox"><h4>الاشتراك والاعتماد</h4>' + rows +
@@ -2902,7 +2901,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         if (!pc || pc.v !== 2) return A.toast("الصق كود اشتراك المدرسة (يبدأ بـ SL2)", "err");
         if (pc.moe !== m) return A.toast("هذا الكود للرقم الوزاري " + pc.moe + " وليس لـ " + m, "err");
         await saveAll(); b.disabled = true; b.textContent = "جارٍ التفعيل…";
-        var rs = $('.lic-role[data-moe="' + m + '"]'), r = await C.activate(code, rs ? rs.value : ((await C.DB.get("devRole")) || ""));
+        var r = await C.activate(code, "");
         if (!r.ok) { A.toast(r.why, "err"); b.disabled = false; b.textContent = "تفعيل"; return; }
         C.lic = await C.license(); await A.applyIdentity(); A.drawTop(); A.ping();
         A.toast(r.id ? "تم التفعيل — بيانات المدرسة معتمدة مسبقاً وطُبّقت على هذا الجهاز" : "تم التفعيل — أكمل بيانات المدرسة واعتمدها");
@@ -2957,13 +2956,11 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       $("#lc-copy").onclick = function () { try { navigator.clipboard.writeText(C.lic.dev); A.toast("نُسخ رقم الجهاز"); } catch (err) {} };
       $("#lc-act").onclick = async function () {
         var m = $("#lc-msg"); m.className = "mut"; m.textContent = "جارٍ التفعيل…";
-        var r = await C.activate($("#lc-code").value, $("#lc-role").value);
+        var r = await C.activate($("#lc-code").value, "");
         m.className = "alert sm " + (r.ok ? "ok" : "err");
         m.textContent = r.ok ? "تم التفعيل حتى " + SL.greg(r.end) + (r.v === 2 ? (r.id ? " — طُبّقت بيانات المدرسة المعتمدة" : "") : "") : r.why;
         if (r.ok) { C.lic = await C.license(); await A.applyIdentity(); A.drawTop(); A.ping(); setTimeout(function () { r.v === 2 ? location.reload() : A.route(); }, 1200); }   /* ترخيص مدرسة: إعادة التشغيل لحجز الجلسة */
       };
-      C.DB.get("devRole").then(function (v) { if (v) $("#lc-role").value = v; });
-      $("#lc-role").onchange = async function () { await C.setRole(this.value); A.toast("تم الحفظ"); A.ping(); };
       $("#up-f").onchange = async function () {
         var f = this.files[0]; if (!f) return; var m = $("#up-msg");
         var r = await C.installUpdate(f); m.className = "alert sm " + (r.ok ? "ok" : "err");
