@@ -51,6 +51,9 @@
   .doc-tb th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
 
+/* التوقيعات بلون القلم الأزرق — تُحفظ عند الطباعة */
+.sigsvg { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
 /* سَمْت — واجهة التطبيق — الهوية: رسمي فاخر (كحلي وذهبي) */
 /* ————— الإطار ————— */
 #boot { display: grid; grid-template-columns: 1fr; min-height: 100vh; }

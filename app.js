@@ -1,5 +1,5 @@
-/* سَمْت 1.0.0-r43 — حزمة الواجهة */
-window.SAMT_BUILD = "1.0.0-r43";
+/* سَمْت 1.0.0-r44 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r44";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -83,7 +83,7 @@ window.SAMT_BUILD = "1.0.0-r43";
     function pt(e) { var r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height]; }
     function redraw() {
       var r = canvas.getBoundingClientRect(); ctx.clearRect(0, 0, r.width, r.height);
-      ctx.lineWidth = 2.4; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#0b2a4a";
+      ctx.lineWidth = 2.4; ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.strokeStyle = "#1a3fb0";
       strokes.forEach(function (s) { ctx.beginPath(); s.forEach(function (p, i) { var x = p[0] * r.width, y = p[1] * r.height; if (i) ctx.lineTo(x, y); else ctx.moveTo(x, y); }); if (s.length === 1) ctx.lineTo(s[0][0] * r.width + .5, s[0][1] * r.height); ctx.stroke(); });
     }
     canvas.style.touchAction = "none";
@@ -117,7 +117,7 @@ window.SAMT_BUILD = "1.0.0-r43";
       d += (first ? "M" : "L") + x + " " + y + " "; first = false;
     }
     if (d) paths.push(d);
-    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w + " " + h + '" width="' + w + '" height="' + h + '" class="sigsvg"><g fill="none" stroke="#0b2a4a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + w + " " + h + '" width="' + w + '" height="' + h + '" class="sigsvg"><g fill="none" stroke="#1a3fb0" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">' +
       paths.map(function (p) { return '<path d="' + p + '"/>'; }).join("") + "</g></svg>";
   };
 

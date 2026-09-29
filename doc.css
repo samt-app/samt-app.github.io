@@ -50,3 +50,6 @@
   .doc-h { font-size: 13px !important; } .doc-hc img { height: 64px !important; }
   .doc-tb th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* التوقيعات بلون القلم الأزرق — تُحفظ عند الطباعة */
+.sigsvg { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
