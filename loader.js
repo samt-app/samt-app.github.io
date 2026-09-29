@@ -221,6 +221,23 @@
       return w.status === 401 || w.status === 403 ? want : undefined;   /* قواعد الخادم لم تُحدَّث بعد: نعمل محلياً مؤقتاً بدل إيقاف التجربة */
     } catch (e) { return undefined; }
   }
+  /* خيار «لديّ بيانات في مجلد sammt» في شاشات البدء: متصفح جديد لا يعرف المجلد (كل متصفح له بياناته المستقلة) */
+  function folderBlock() {
+    return FS.supported
+      ? '<div class="lock-fold"><button class="btn" id="fx-pick" type="button">📁 لديّ بيانات في مجلد sammt (Google Drive / OneDrive) — ربط المجلد</button><p class="lock-hint">اختر مجلد <b>sammt</b> نفسه، فيُستعاد اشتراك المدرسة وبياناتها على هذا المتصفح.</p><p id="fx-m" class="lock-msg err"></p></div>'
+      : '<p class="lock-hint lock-warn">⚠️ هذا المتصفح لا يدعم ربط مجلد البيانات <b>sammt</b>، فلن تظهر فيه بيانات مدرستك المحفوظة في Google Drive. افتح المنصة في <b>Google Chrome</b> أو <b>Microsoft Edge</b> على الكمبيوتر.</p>';
+  }
+  function folderBind() {
+    var b = document.getElementById("fx-pick"); if (!b) return;
+    b.onclick = async function () {
+      var m = document.getElementById("fx-m");
+      try {
+        await fsPick(); var r = await fsRestore();
+        if (!r.core && !r.data) { m.textContent = "لم أجد بيانات «سَمْت» في هذا المجلد. تأكد أنك اخترت مجلد sammt الصحيح."; return; }
+        m.className = "lock-msg ok"; m.textContent = "تمت الاستعادة — جارٍ الفتح…"; setTimeout(function () { location.reload(); }, 600);
+      } catch (e) { if (e && e.name !== "AbortError") m.textContent = "تعذّر ربط المجلد: " + e.message; }
+    };
+  }
   /* شاشة بدء الفترة التجريبية: الرقم الوزاري للمدرسة */
   function trialScreen() {
     var root = document.getElementById("boot");
@@ -228,8 +245,9 @@
       '<p class="lock-why">مرحباً بك. للبدء أدخل <b>الرقم الوزاري للمدرسة</b> لتشغيل الفترة التجريبية (ثلاثة أيام).</p>' +
       '<p class="lock-hint">الفترة التجريبية لكل مدرسة مرة واحدة، وتُحسب من أول تشغيل على أي جهاز.</p>' +
       '<label class="lock-l">الرقم الوزاري للمدرسة<input id="tr-moe" dir="ltr" inputmode="numeric" placeholder="مثال: 123456"></label>' +
-      '<button class="btn pri" id="tr-go" type="button">بدء الفترة التجريبية</button><p id="tr-m" class="lock-msg err"></p>' +
+      '<button class="btn pri" id="tr-go" type="button">بدء الفترة التجريبية</button><p id="tr-m" class="lock-msg err"></p>' + folderBlock() +
       '<details><summary>لديّ كود اشتراك</summary><label class="lock-l">كود اشتراك المدرسة<textarea id="lk-code" rows="3" dir="ltr" placeholder="SL2.123456789.YYYYMMDD.…"></textarea></label><button class="btn" id="lk-act" type="button">تفعيل</button><p id="lk-msg" class="lock-msg"></p></details>') + "</div>";
+    folderBind();
     document.getElementById("tr-go").onclick = async function () {
       var m = String(document.getElementById("tr-moe").value).replace(/[٠-٩]/g, function (d) { return "٠١٢٣٤٥٦٧٨٩".indexOf(d); }).replace(/\D/g, "");
       if (!/^\d{3,12}$/.test(m)) { document.getElementById("tr-m").textContent = "أدخل الرقم الوزاري الصحيح للمدرسة."; return; }
@@ -556,8 +574,9 @@
       '<p class="lock-hint">الاشتراك للمدرسة لا للجهاز: أرسل <b>الرقم الوزاري للمدرسة</b> إلى ' + esc(VENDOR.name) + " تصلك كود يعمل على أي جهاز في المدرسة، على جهاز واحد في كل مرة. المدرسة ذات المرحلتين برقمين وزاريين تحتاج كودين.</p>" +
       (wa ? '<a class="btn wa" href="' + wa + '" rel="noopener">طلب الاشتراك عبر واتساب</a>' : "") +
       '<label class="lock-l">كود اشتراك المدرسة<textarea id="lk-code" rows="3" dir="ltr" placeholder="SL2.123456789.YYYYMMDD.…"></textarea></label>' +
-      '<button class="btn pri" id="lk-act" type="button">تفعيل</button><p id="lk-msg" class="lock-msg"></p>' +
+      '<button class="btn pri" id="lk-act" type="button">تفعيل</button><p id="lk-msg" class="lock-msg"></p>' + folderBlock() +
       "</div></div>";
+    folderBind();
     (document.getElementById("lk-copy")||{}).onclick = function () { try { navigator.clipboard.writeText(L.dev); this.textContent = "تم"; } catch (e) {} };
     document.getElementById("lk-act").onclick = async function () {
       var m = document.getElementById("lk-msg"); m.className = "lock-msg"; m.textContent = "جارٍ التحقق…";
@@ -712,7 +731,17 @@
     }
   })();
 
-  if ("serviceWorker" in navigator && /^https?:/.test(location.protocol)) navigator.serviceWorker.register("sw.js").catch(function () {});
+  /* تحديث تلقائي: عند وصول إصدار جديد يُعاد التحميل إن كنا في شاشة البدء، وإلا يظهر زر «تحديث» حتى لا يضيع عمل جارٍ */
+  if ("serviceWorker" in navigator && /^https?:/.test(location.protocol)) {
+    var hadSW = !!navigator.serviceWorker.controller, swDone = false;
+    navigator.serviceWorker.register("sw.js").then(function (r) { try { r.update(); } catch (e) {} }).catch(function () {});
+    navigator.serviceWorker.addEventListener("controllerchange", function () {
+      if (!hadSW || swDone) return; swDone = true;
+      if (!window.SLCore || !window.SLCore.version) { location.reload(); return; }
+      var b = document.createElement("button"); b.type = "button"; b.className = "upd-bar"; b.textContent = "⟳ يتوفر تحديث جديد للمنصة — اضغط للتحديث";
+      b.onclick = function () { location.reload(); }; document.body.appendChild(b);
+    });
+  }
   /* زر التثبيت داخل التطبيق */
   window.addEventListener("beforeinstallprompt", function (ev) { ev.preventDefault(); window.__bip = ev; document.documentElement.classList.add("can-install"); });
   window.addEventListener("appinstalled", function () { window.__bip = null; document.documentElement.classList.remove("can-install"); });
