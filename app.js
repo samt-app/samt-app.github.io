@@ -1,5 +1,5 @@
-/* سَمْت 1.0.0-r47 — حزمة الواجهة */
-window.SAMT_BUILD = "1.0.0-r47";
+/* سَمْت 1.0.0-r48 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r48";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -3020,7 +3020,12 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       $("#tp-reset").onclick = async function () { if (!(await A.confirm("استعادة نصوص الرسائل الافتراضية؟"))) return; cfg.tpl = A.defaults().tpl; await A.saveSettings(); A.route(); };
     } else if (tab === "backup") {
       var fp = $("#fs-pick"); if (fp) fp.onclick = async function () {
-        try { await C.fsPick(); var r = await C.fsRestore(); await C.fsWriteCore(); if (r.data) { A.toast("استُعيدت " + r.data + " سجلاً من المجلد"); setTimeout(function () { location.reload(); }, 800); return; } await C.fsSaveData(); A.toast("تم ربط المجلد وحفظ البيانات فيه"); A.route(); }
+        try {
+          var r = await C.fsLink(function (m) { return A.confirm(m); }); await C.fsWriteCore();
+          if (!r.linked) { A.toast("لم يُربط المجلد، ولم يتغير فيه شيء."); A.route(); return; }
+          if (r.adopted || r.restored) { A.toast("حُمّلت بيانات المدرسة من المجلد"); setTimeout(function () { location.reload(); }, 800); return; }
+          A.toast("تم ربط المجلد وحفظ البيانات فيه"); A.route();
+        }
         catch (err) { if (err && err.name !== "AbortError") A.toast("تعذّر: " + err.message, "err"); }
       };
       var fn = $("#fs-now"); if (fn) fn.onclick = async function () { try { await C.fsSaveData(); A.toast("تم الحفظ في مجلد sammt"); A.route(); } catch (err) { A.toast("تعذّر الحفظ: " + err.message, "err"); } };
@@ -3718,6 +3723,15 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     await pinGate();
     window.addEventListener("hashchange", function () { Array.prototype.forEach.call(document.querySelectorAll(".sheet-wrap"), function (w) { w.remove(); }); A.route(); A.drawTop(); });
     document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") A.poll(); });
+    /* تعارض المجلد: جهاز/متصفح آخر حفظ بيانات أحدث — لا نكتب فوقها بلا قرار */
+    window.addEventListener("samt-folder-conflict", function () {
+      if (document.getElementById("fc-bar")) return;
+      var d = document.createElement("div"); d.id = "fc-bar"; d.className = "fc-bar";
+      d.innerHTML = '<b>مجلد sammt فيه بيانات أحدث حفظها متصفح أو جهاز آخر،</b> ولم تُحفظ تعديلاتك فيه حتى لا تُمسح. <button class="btn sm pri" type="button" id="fc-a">تحميل بيانات المجلد (موصى به)</button><button class="btn sm" type="button" id="fc-o">استبدال بيانات المجلد ببيانات هذا المتصفح</button>';
+      document.body.appendChild(d);
+      d.querySelector("#fc-a").onclick = async function () { if (await C.fsAdopt()) location.reload(); };
+      d.querySelector("#fc-o").onclick = async function () { if (!(await A.confirm("ستُستبدل بيانات المجلد ببيانات هذا المتصفح، وتضيع التعديلات التي حُفظت فيه من الجهاز الآخر. متابعة؟"))) return; await C.fsForce(); d.remove(); A.toast("حُفظت بيانات هذا المتصفح في المجلد"); };
+    });
     A.route();
     A.startPolling();
     A.ping();

@@ -601,3 +601,6 @@ html.net-off body::after { content: "لا يوجد اتصال بالإنترنت
 /* نوع السلوك: تعويضي | تميز */
 .chip.kc { background: #e8f1fb; border-color: #bcd4f0; color: #184c86; }
 .chip.ke { background: #fbf3df; border-color: #ecd49a; color: #7a5a12; }
+
+/* تعارض مجلد sammt */
+.fc-bar { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 9500; width: min(760px, calc(100% - 32px)); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: #fff6e5; border: 1.5px solid var(--gold); border-radius: 16px; padding: 12px 14px; color: #5b4410; box-shadow: 0 12px 30px rgba(0,0,0,.2); }

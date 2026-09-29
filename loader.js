@@ -200,6 +200,8 @@
     if (!(await DB.get("trialMoe")) && typeof self.SAMT_TRIAL_MOE === "string") await DB.set("trialMoe", self.SAMT_TRIAL_MOE);   /* للاختبارات */
     var tmoe = await DB.get("trialMoe");
     if (!tmoe) return { ok: false, trial: true, needMoe: true, dev: dev, why: "" };
+    var tsrv = await licFetch(tmoe);
+    if (tsrv && (tsrv.id || tsrv.ids)) return { ok: false, trial: true, licensedMoe: tmoe, dev: dev, why: "هذه المدرسة (" + tmoe + ") مشتركة في المنصة، فلا تعمل فيها الفترة التجريبية. اربط مجلد sammt الخاص بالمدرسة من الأسفل، أو أدخل كود اشتراك المدرسة." };
     var local = (await DB.get("trialStart")) || 0, srv = await trialStart(tmoe, local || now);
     if (srv === undefined) return { ok: false, trial: true, offline: true, dev: dev, why: "يلزم الاتصال بالإنترنت لتشغيل الفترة التجريبية. تحقق من الاتصال ثم أعد المحاولة." };
     var start = Math.min(srv || now, local || Infinity);
@@ -232,8 +234,9 @@
     b.onclick = async function () {
       var m = document.getElementById("fx-m");
       try {
-        await fsPick(); var r = await fsRestore();
-        if (!r.core && !r.data) { m.textContent = "لم أجد بيانات «سَمْت» في هذا المجلد. تأكد أنك اخترت مجلد sammt الصحيح."; return; }
+        var r = await fsLink();
+        if (!r.linked) { m.textContent = "لم يُربط المجلد، ولم يتغير فيه شيء."; return; }
+        if (!r.adopted && !r.core && !r.restored) { m.textContent = "لم أجد بيانات «سَمْت» في هذا المجلد. تأكد أنك اخترت مجلد sammt الصحيح."; return; }
         m.className = "lock-msg ok"; m.textContent = "تمت الاستعادة — جارٍ الفتح…"; setTimeout(function () { location.reload(); }, 600);
       } catch (e) { if (e && e.name !== "AbortError") m.textContent = "تعذّر ربط المجلد: " + e.message; }
     };
@@ -419,7 +422,7 @@
     await tx("rec", "readwrite", function (s) { s.clear(); });
     await DB.putMany(f.recs || []);
     for (var k in (f.kv || {})) if (KEEP_KV.indexOf(k) < 0) await DB.set(k, f.kv[k]);
-    await DB.set("dataAt", fileAt(f));
+    await DB.set("dataAt", fileAt(f)); await DB.set("folderBase", fileAt(f));
   }
   async function freshnessGate() {
     var me = await seat(), P = SESS.prev, D = P ? +P.data || 0 : 0, TOL = 3000;
@@ -643,13 +646,41 @@
       if (data && data.format === "sulook-backup" && data.recs) {
         await DB.putMany(data.recs);
         for (var k in (data.kv || {})) await DB.set(k, data.kv[k]);
-        restored.data = data.recs.length;
+        restored.data = data.recs.length; await DB.set("folderBase", fileAt(data)); await DB.set("dataAt", fileAt(data));
       }
     }
     return restored;
   }
+  /* ربط مجلد بأمان: إن كان فيه بيانات مدرسة من متصفح/جهاز آخر وهذا المتصفح فيه بيانات، يُسأل المستخدم ولا يُكتب فوق المجلد */
+  async function fsLink(ask) {
+    await fsPick();
+    var f = await fsRead("samt-data.json"), me = await seat(), have = (await DB.all()).length;
+    if (f && f.format === "sulook-backup" && (f.recs || []).length && have && f.seat !== me) {
+      var nm = ((f.kv && f.kv.settings && f.kv.settings.schools) || []).map(function (z) { return z.name; }).filter(Boolean).join(" · ") || "مدرسة";
+      var stu = (f.recs || []).filter(function (r) { return r.t === "stu"; }).length, when = new Date(fileAt(f)).toLocaleString("ar-SA-u-nu-latn");
+      var yes = await (ask || function (m) { return Promise.resolve(window.confirm(m)); })("المجلد المختار فيه بيانات «" + nm + "» (" + stu + " طالباً، آخر حفظ " + when + ").\n\nموافق = تحميل بيانات المجلد إلى هذا المتصفح بدل بياناته الحالية (موصى به).\nإلغاء = عدم ربط المجلد، ولا يتغير فيه شيء.");
+      if (!yes) { FS.ok = false; FS.handle = null; await DB.set("dirHandle", null); return { linked: false }; }
+      await replaceData(f);
+      var core = await fsRead("samt-core.json");
+      if (core && core.lics) { var cur = await getLics(); Object.keys(core.lics).forEach(function (m) { if (!cur[m]) cur[m] = core.lics[m]; }); await DB.set("lics", cur); }
+      if (core && core.trialMoe) await DB.set("trialMoe", core.trialMoe);
+      return { linked: true, adopted: true };
+    }
+    var r = await fsRestore();
+    if (!r.data && !(f && (f.recs || []).length)) { await fsSaveData(true); }   /* مجلد فارغ: نحفظ فيه بيانات هذا المتصفح */
+    return { linked: true, restored: r.data, core: r.core };
+  }
+  async function fsAdopt() { var f = await fsRead("samt-data.json"); if (!f || f.format !== "sulook-backup") return false; await replaceData(f); FS.conflict = null; return true; }
+  async function fsForce() { if (FS.conflict) await DB.set("folderBase", FS.conflict.at); FS.conflict = null; return fsSaveData(true); }
   async function fsSaveData(force) {
     if (!FS.ok || (SESS.dead && !force)) return false;
+    /* حماية: لا يُكتب فوق بيانات أحدث حفظها متصفح/جهاز آخر في المجلد نفسه (نعرضها ونطلب القرار بدل الكتابة فوقها) */
+    try {
+      var ex = await fsRead("samt-data.json"), me0 = await seat(), base = (await DB.get("folderBase")) || 0;
+      if (ex && ex.format === "sulook-backup" && (ex.recs || []).length && ex.seat && ex.seat !== me0 && fileAt(ex) > base) {
+        FS.conflict = { at: fileAt(ex), n: (ex.recs || []).length }; window.dispatchEvent(new Event("samt-folder-conflict")); return false;
+      }
+    } catch (e) {}
     var obj = await backupObject(); obj.dataAt = (await DB.get("dataAt")) || Date.now(); obj.seat = await seat();
     var txt = JSON.stringify(obj);
     await fsWrite("samt-data.json", txt);
@@ -662,7 +693,7 @@
         names.sort(); while (names.length > 30) await bd.removeEntry(names.shift());
       } catch (e) {}
     }
-    FS.savedAt = Date.now(); SESS.fdata = obj.dataAt; await DB.set("folderSavedAt", FS.savedAt);
+    FS.savedAt = Date.now(); SESS.fdata = obj.dataAt; FS.conflict = null; await DB.set("folderSavedAt", FS.savedAt); await DB.set("folderBase", obj.dataAt);
     return true;
   }
   var fsTimer = null;
@@ -679,7 +710,7 @@
         : '<p>اسمح لسَمْت بالوصول إلى مجلد البيانات <b>sammt</b> للمتابعة.</p><button class="btn pri" id="fg-ok" type="button">السماح والمتابعة</button><button class="btn" id="fg-new" type="button">اختيار مجلد آخر</button><button class="btn" id="fg-skip" type="button">المتابعة بدون المجلد</button>') +
         '<p id="fg-m" class="lock-msg err"></p></div></div>';
       function m(t) { document.getElementById("fg-m").textContent = t; }
-      async function pick() { try { await fsPick(); var r = await fsRestore(); res(r); } catch (e) { if (e && e.name !== "AbortError") m("تعذّر اختيار المجلد: " + e.message); } }
+      async function pick() { try { var r = await fsLink(); if (r.linked) res(r); else m("لم يُربط المجلد، ولم يتغير فيه شيء."); } catch (e) { if (e && e.name !== "AbortError") m("تعذّر اختيار المجلد: " + e.message); } }
       var b;
       if ((b = document.getElementById("fg-pick"))) b.onclick = pick;
       if ((b = document.getElementById("fg-new"))) b.onclick = pick;
@@ -706,7 +737,7 @@
     REG: REG, parseCode: parseCode, approve: approve, approveKey: approveKey, idUsed: idUsed, maintFetch: maintFetch, maintActive: maintActive, whenAr: whenAr, getLics: getLics, dropLic: dropLic, setRole: setRole, DEV_ROLES: DEV_ROLES, SLOTS: SLOTS, SESS: SESS, seat: seat, sessGet: sessGet, IDLE_MS: IDLE_MS, unlockOn: unlockOn,
     installUpdate: installUpdate, readUpdate: readUpdate, currentVersion: currentVersion, rollback: rollback,
     backupObject: backupObject, download: download, vcmp: vcmp,
-    FS: FS, fsPick: fsPick, fsRestore: fsRestore, fsSaveData: fsSaveData, fsSchedule: fsSchedule, fsWriteCore: fsWriteCore, fsPerm: fsPerm
+    FS: FS, fsPick: fsPick, fsLink: fsLink, fsAdopt: fsAdopt, fsForce: fsForce, fsRestore: fsRestore, fsSaveData: fsSaveData, fsSchedule: fsSchedule, fsWriteCore: fsWriteCore, fsPerm: fsPerm
   };
 
   (async function boot() {
