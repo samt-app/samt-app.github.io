@@ -1824,6 +1824,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       return (!sc || s.school === sc) && (!sg || A.stageText(s) === sg) && (!cl || A.classKey(s) === cl);
     };
   }
+  A.scopeHTML = scopeHTML; A.scopeBind = scopeBind;   /* تُستخدم في التقارير */
   function byClassName(a, b) { return A.classKey(a).localeCompare(A.classKey(b), "ar") || a.name.localeCompare(b.name, "ar"); }
   /* ضبط المرشحات على مدرسة الطالب ومرحلته وفصله */
   function scopeSet(id, s) {
@@ -1832,6 +1833,8 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       el.value = kv[1] || ""; el.dispatchEvent(new Event("input"));
     });
   }
+  A.scopeSet = scopeSet;
+
 
   /* ————— الطلاب ————— */
   V.students = function (p, q) {
@@ -1921,7 +1924,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         '<p class="mut">السلوك الإيجابي ' + sc.positive + "/80 · المتميز " + sc.excellent + "/20 · المحسوم " + sc.deducted + " · المكتسب " + sc.merits + "</p>") +
       '<div class="parent"><span>ولي الأمر: <b>' + e(s.parentName || "—") + "</b> " + (SL.validPhone(s.parentPhone) ? '<a dir="ltr" href="tel:+' + e(s.parentPhone) + '">' + e(SL.showPhone(s.parentPhone)) + "</a>" : '<span class="chip warnc">لا يوجد جوال صحيح</span>') + "</span>" +
       (SL.validPhone(s.parentPhone) ? '<button class="btn wa sm" id="sp-wa" type="button">واتساب</button>' : "") + "</div>" +
-      '<div class="actions wrap"><a class="btn pri" href="#new?s=' + s.id + '">＋ رصد مخالفة</a><a class="btn" href="#merit?s=' + s.id + '">★ سلوك متميز</a><button class="btn" id="sp-edit" type="button">تعديل البيانات</button></div></section>';
+      '<div class="actions wrap"><a class="btn pri" href="#new?s=' + s.id + '">＋ رصد مخالفة</a><a class="btn" href="#merit?s=' + s.id + '">★ سلوك متميز</a><a class="btn" href="#reports?s=' + s.id + '">تقرير المخالفات</a><button class="btn" id="sp-edit" type="button">تعديل البيانات</button></div></section>';
     html += '<section class="card"><h3>النماذج</h3><ul class="list forms">' +
       formRow("stu", s.id, "F1", f1 ? '<span class="chip ok">وقّع ولي الأمر ' + e(SL.hijri(f1.at)) + "</span>" : '<span class="chip">لم يوقّع بعد</span>') +
       formRow("stu", s.id, "F5", "سجل المشكلات السلوكية") + formRow("stu", s.id, "F2", "") + formRow("stu", s.id, "F6", "") + "</ul></section>";
@@ -2340,7 +2343,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   V.more = function () {
     setTitle("المزيد");
     main().innerHTML = '<div class="tiles">' +
-      [["#staff", "المعلمون والإدارة", "teacher"], ["#import", "استيراد من Excel", "upload"], ["#merit", "السلوك المتميز", "star"], ["#absence", "الغياب — ربط وهج", "calendar"], ["#sigs", "التوقيعات عن بُعد", "pen"], ["#commit", "الالتزام المدرسي", "doc"], ["#settings", "الإعدادات والاشتراك", "gear"], ["#log", "سجل العمليات", "clock"]]
+      [["#staff", "المعلمون والإدارة", "teacher"], ["#import", "استيراد من Excel", "upload"], ["#merit", "السلوك المتميز", "star"], ["#reports", "التقارير", "list"], ["#absence", "الغياب — ربط وهج", "calendar"], ["#sigs", "التوقيعات عن بُعد", "pen"], ["#commit", "الالتزام المدرسي", "doc"], ["#settings", "الإعدادات والاشتراك", "gear"], ["#log", "سجل العمليات", "clock"]]
         .map(function (x) { return '<a class="tile" href="' + x[0] + '"><span class="tile-i">' + SLI(x[2]) + "</span><b>" + e(x[1]) + "</b></a>"; }).join("") +
       (A.installed() ? "" : '<button class="tile" type="button" id="mo-inst"><span class="tile-i">' + SLI("download") + "</span><b>تثبيت التطبيق على هذا الجهاز</b></button>") + "</div>" +
       '<p class="mut center">سَمْت — الإصدار ' + e(C.version || C.BUILTIN) + " · " + e(C.licLabel(C.lic)) + "</p>";
@@ -2991,6 +2994,88 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     try { return new TextDecoder().decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: SL.unb64u(p[1]) }, await pwKey(pw, SL.unb64u(p[0])), SL.unb64u(p[2]))); }
     catch (err) { throw new Error("كلمة المرور غير صحيحة"); }
   }
+  /* ————— التقارير ————— */
+  function repData(s) {
+    var incs = A.S.incidents.filter(function (x) { return x.stu === s.id && (x.status === "open" || x.status === "closed"); })
+      .sort(function (a, b) { return new Date(a.date) - new Date(b.date); });
+    var mers = A.S.merits.filter(function (m) { return m.stu === s.id; }).sort(function (a, b) { return new Date(a.date) - new Date(b.date); });
+    return { incs: incs, mers: mers, score: A.score(s), qual: A.qualitative(s) };
+  }
+  function repStep(x) {
+    var art = R.articleById(x.art) || { steps: [] }, st = art.steps[x.stepIdx] || art.steps[0] || { title: "", actions: [] }, dn = x.done || {};
+    var acts = (st.actions || []).map(function (a, i) { return { t: a, at: dn[i] || 0, hdr: /^(تحويل الطالب|إحالة الطالب من قبل)/.test(a) && /ما يلي:$/.test(a) }; }).filter(function (a) { return !a.hdr; });
+    return { art: art, st: st, acts: acts, n: art.steps.length };
+  }
+  function meritText(m) { var p = R.MERITS.find(function (x) { return x.id === m.practice; }); return (p ? p.t : "") + (m.note ? " — " + m.note : "") + (m.topic ? " (" + m.topic + ")" : ""); }
+  function dedLabel(x, qual) { return qual ? "تقدير كيفي" : x.deduct ? String(x.deduct) : "بلا حسم"; }
+
+  V.reports = function (p, q) {
+    setTitle("التقارير");
+    main().innerHTML = '<section class="card rep-card"><div class="c-h"><div><h3>' + SLI("list") + ' تقرير عن مخالفات طالب</h3><small class="mut">اختر المرحلة ثم الصف ثم اسم الطالب</small></div></div>' +
+      '<div class="toolbar rep-f">' + A.scopeHTML("rp") + '<select id="rp-stu"></select></div></section><div id="rp-out"></div>';
+    var match = A.scopeBind("rp", fillStu);
+    function fillStu() {
+      var sel = $("#rp-stu"), cur = sel.value;
+      var list = A.S.students.filter(match).sort(function (a, b) { return a.name.localeCompare(b.name, "ar"); });
+      sel.innerHTML = '<option value="">— اختر الطالب (' + list.length + ") —</option>" + list.map(function (s) { return '<option value="' + e(s.id) + '">' + e(s.name) + "</option>"; }).join("");
+      sel.value = list.some(function (s) { return s.id === cur; }) ? cur : "";
+      show();
+    }
+    $("#rp-stu").addEventListener("input", show);
+    if (q.s && A.byId[q.s]) { A.scopeSet("rp", A.byId[q.s]); fillStu(); $("#rp-stu").value = q.s; show(); } else fillStu();
+
+    function show() {
+      var s = A.byId[$("#rp-stu").value], out = $("#rp-out");
+      if (!s) { out.innerHTML = '<section class="card"><p class="mut">اختر طالباً لعرض تقرير مخالفاته.</p></section>'; return; }
+      var d = repData(s), sc = d.score;
+      var html = '<section class="card"><div class="stu-top"><div><h2>' + e(s.name) + '</h2><p class="mut">' + e(A.classKey(s)) + " · المرحلة " + e(A.stageLabel(s)) + "</p></div>" + A.scoreChip(s) + "</div>" +
+        '<div class="rep-sum"><span class="chip">المخالفات: <b>' + d.incs.length + "</b></span>" +
+        (d.qual ? '<span class="chip">تقدير كيفي</span>' : '<span class="chip red">المحسوم: <b>' + sc.deducted + '</b></span><span class="chip ok">التعويض: <b>' + sc.merits + '</b></span><span class="chip">درجة السلوك: <b>' + sc.total + "</b> من 100</span>") + "</div>" +
+        '<div class="actions"><a class="btn pri" href="#repdoc/' + s.id + '">' + SLI("download") + ' طباعة التقرير</a><a class="btn" href="#student/' + s.id + '">ملف الطالب</a></div></section>';
+      html += '<section class="card"><h3>المخالفات (' + d.incs.length + ")</h3>" + (d.incs.length ? '<div class="rep-l">' + d.incs.map(function (x) {
+        var r = repStep(x);
+        return '<details class="rep-i"><summary><span class="rep-d">' + e(SL.hijri(x.date)) + ' <small class="mut">' + e(SL.time(x.date)) + "</small></span>" + A.degChip(x.degree) + ' <span class="rep-t">' + e(x.itemText) + '</span><span class="chip ' + (x.deduct && !d.qual ? "red" : "") + '">' + (d.qual ? "كيفي" : x.deduct ? "حسم " + x.deduct : "بلا حسم") + "</span></summary>" +
+          '<div class="rep-b"><p><b>الإجراء المتخذ:</b> ' + e(r.st.title) + (r.n > 1 ? ' <small class="mut">(' + (x.stepIdx + 1) + " من " + r.n + ")</small>" : "") + " — " + (x.status === "closed" ? '<span class="chip ok">مغلقة</span>' : '<span class="chip">قيد المتابعة</span>') + "</p>" +
+          (r.acts.length ? '<ul class="rep-acts">' + r.acts.map(function (a) { return '<li class="' + (a.at ? "ok" : "") + '">' + (a.at ? "✓" : "○") + " " + e(a.t) + (a.at ? ' <small class="mut">(' + e(SL.hijri(a.at)) + ")</small>" : ' <small class="mut">(لم يُنفَّذ بعد)</small>') + "</li>"; }).join("") + "</ul>" : "") +
+          (x.stepNote ? '<p class="mut">ملاحظة: ' + e(x.stepNote) + "</p>" : "") +
+          (x.committee && x.committee.decisions ? '<p><b>قرارات لجنة التوجيه:</b> ' + e(x.committee.decisions) + "</p>" : "") +
+          '<p class="mut sm">الراصد: ' + e(x.byName || "—") + (x.period ? " · الحصة: " + e(x.period) : "") + ' · <a href="#inc/' + x.id + '">فتح المخالفة</a></p></div></details>';
+      }).join("") + "</div>" : '<p class="mut">لا توجد مخالفات مسجلة.</p>') + "</section>";
+      html += '<section class="card"><h3>درجات التعويض (' + d.mers.length + ")</h3>" + (d.mers.length ? '<ul class="list">' + d.mers.map(function (m) {
+        return '<li><div class="row1"><span class="chip ok">+' + (m.pts || 0) + "</span> " + e(meritText(m)) + '</div><div class="row3">' + e(SL.hijri(m.date)) + "</div></li>";
+      }).join("") + "</ul>" : '<p class="mut">لا توجد درجات تعويض مسجلة.</p>') + "</section>";
+      out.innerHTML = html;
+    }
+  };
+
+  /* التقرير المطبوع بالترويسة الرسمية */
+  A.reportDoc = function (s) {
+    var d = repData(s), sc = d.score, sum = 0, gain = 0;
+    var rows = d.incs.map(function (x, i) { sum += d.qual ? 0 : x.deduct || 0; return [String(i + 1), x.itemText, R.DEGREE_NAME[x.degree] || "", SL.hijri(x.date), SL.time(x.date), dedLabel(x, d.qual), repStep(x).st.title]; });
+    if (!rows.length) rows.push(["—", "لا توجد مخالفات مسجلة", "", "", "", "", ""]);
+    else rows.push(["", "المجموع", "", "", "", d.qual ? "—" : String(sum), ""]);
+    var mrows = d.mers.map(function (m, i) { gain += m.pts || 0; return [String(i + 1), meritText(m), SL.hijri(m.date), String(m.pts || 0)]; });
+    if (!mrows.length) mrows.push(["—", "لا توجد درجات تعويض مسجلة", "", ""]);
+    else mrows.push(["", "المجموع", "", String(gain)]);
+    var blocks = [{ k: "h", t: "أولاً: المخالفات السلوكية" },
+      { k: "table", head: ["م", "المخالفة", "درجتها", "التاريخ", "الوقت", "درجة الحسم", "الإجراء المتخذ"], rows: rows },
+      { k: "h", t: "ثانياً: درجات التعويض" },
+      { k: "table", head: ["م", "فرصة التعويض (السلوك المتميز)", "التاريخ", "الدرجات المكتسبة"], rows: mrows }];
+    if (d.qual) blocks.push({ k: "note", t: "الطالب في مرحلة التقدير الكيفي؛ لا تُحسم درجات." });
+    else blocks.push({ k: "fields", rows: [["مجموع الدرجات المحسومة", String(sc.deducted)], ["مجموع درجات التعويض", String(sc.merits)], ["درجة السلوك الحالية", sc.total + " من 100"]] });
+    return { id: "RPT", title: "تقرير عن مخالفات الطالب",
+      fields: [["اسم الطالب", s.name, 1], ["الصف", s.grade || ""], ["الفصل", s.section || ""], ["المرحلة", A.stageLabel(s)], ["تاريخ التقرير", SL.hijri(Date.now())]],
+      blocks: blocks,
+      signers: [{ role: "deputy", label: "وكيل شؤون الطلبة", name: A.staffName("deputy", s.school) }, { role: "principal", label: "مدير المدرسة", name: A.staffName("principal", s.school) }], stamp: true };
+  };
+  V.repdoc = function (p) {
+    var s = A.byId[p[0]]; if (!s || s.t !== "stu") return A.go("reports");
+    var doc = A.reportDoc(s), hdr = A.schoolCtx(s);
+    setTitle(doc.title);
+    main().innerHTML = '<div class="toolbar noprint"><a class="btn" href="#reports?s=' + s.id + '">رجوع</a><button class="btn pri" type="button" id="rp-print">طباعة / حفظ PDF</button></div>' +
+      '<div class="paper">' + SL.renderDoc(doc, { header: { region: hdr.region, school: hdr.name, admin: hdr.admin }, logo: A.S.settings.useLogo ? "moe-logo.png" : "" }) + "</div>";
+    $("#rp-print").onclick = function () { window.print(); };
+  };
 })();
 
 /* سَمْت — مؤشرات إضافية للصفحة الرئيسية (تُحسب محلياً من بيانات الجهاز) */
@@ -3353,7 +3438,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   var R = window.RULES, SL = window.SL, C = window.SLCore, A = window.APP, e = SL.esc, $ = A.$;
 
   function shell() {
-    var items = [["home", "home", "الرئيسية"], ["students", "users", "الطلاب"], ["incidents", "alert", "المخالفات", "nav-badge"], ["merit", "star", "السلوك المتميز"], ["absence", "calendar", "الغياب"],
+    var items = [["home", "home", "الرئيسية"], ["students", "users", "الطلاب"], ["incidents", "alert", "المخالفات", "nav-badge"], ["merit", "star", "السلوك المتميز"], ["reports", "list", "التقارير"], ["absence", "calendar", "الغياب"],
       ["sigs", "pen", "التوقيعات عن بُعد", "sig-badge"], ["staff", "teacher", "المعلمون والإدارة"], ["commit", "doc", "الالتزام المدرسي"], ["import", "upload", "الاستيراد"], ["settings", "gear", "الإعدادات"]];
     document.getElementById("boot").innerHTML =
       '<aside class="side"><a class="logo" href="#home"><span class="lg">' + SL.LOGO + '</span><span class="logo-t"><b>سَمْت</b><small>ضبط السلوك والمواظبة</small></span></a>' +
