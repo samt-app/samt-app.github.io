@@ -1,5 +1,5 @@
-/* سَمْت 1.0.0-r46 — حزمة الواجهة */
-window.SAMT_BUILD = "1.0.0-r46";
+/* سَمْت 1.0.0-r47 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r47";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -2523,7 +2523,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       function row(x) {
         var ok = can(x);
         return '<li class="frow selrow' + (ok && sel[x.id] ? " on" : "") + '"><label class="sel"><input type="checkbox" data-pick="' + e(x.id) + '"' + (ok && sel[x.id] ? " checked" : "") + (ok ? "" : " disabled") + ">" +
-          '<span class="row1"><b>' + e(x.name) + '</b> <span class="chip">' + e(ROLE[x.role] || x.role) + "</span>" + (A.lockedStaff(x) ? ' <span class="chip lockc" title="معتمد — لا يُعدَّل إلا بإذن المزوّد">🔒 معتمد</span>' : "") +
+          '<span class="row1"><b>' + e(x.name) + '</b> <span class="chip">' + e(ROLE[x.role] || x.role) + "</span>" + (A.lockedStaff(x) ? ' <span class="chip lockc" title="معتمد — لا يُعدَّل إلا بكود اشتراك جديد أو بإذن المزوّد">🔒 معتمد</span>' : "") +
           (x.subject ? ' <small class="mut">' + e(x.subject) + "</small>" : "") +
           (x.classes ? ' <small class="mut">' + e(x.classes) + "</small>" : "") +
           (SL.validPhone(x.phone) ? ' <small class="mut" dir="ltr">' + e(SL.showPhone(x.phone)) + "</small>" : ' <span class="chip warnc">بلا جوال</span>') + "</span></label>" +
@@ -2555,8 +2555,8 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   function editStaff(x) {
     var s = x || { role: "teacher", school: (A.S.settings.schools[0] || {}).id }, lk = x ? A.lockedStaff(x) : null;
     var sh = A.sheet(x ? "تعديل" : "إضافة منسوب", '<form class="form" id="fsf">' +
-      (lk ? '<p class="alert sm lockn">🔒 ' + e(ROLE[s.role]) + " معتمد لمدرسة «" + e(lk.name) + "»: الاسم والوظيفة لا يُعدَّلان إلا بإذن من المزوّد. يمكنك تعديل الجوال والمادة والفصول.</p>" :
-        '<p class="note">أسماء <b>مدير المدرسة ووكيل شؤون الطلبة والموجه الطلابي</b> تُعتمد عند تفعيل الاشتراك، ولا تُعدَّل بعدها إلا بإذن من المزوّد — اكتبها كما في نظام نور.</p>') +
+      (lk ? '<p class="alert sm lockn">🔒 ' + e(ROLE[s.role]) + " معتمد لمدرسة «" + e(lk.name) + "»: الاسم والوظيفة لا يُعدَّلان إلا بكود اشتراك جديد أو بإذن من المزوّد. يمكنك تعديل الجوال والمادة والفصول.</p>" :
+        '<p class="note">أسماء <b>مدير المدرسة ووكيل شؤون الطلبة والموجه الطلابي</b> تُعتمد عند تفعيل الاشتراك، ولا تُعدَّل بعدها إلا بكود اشتراك جديد أو بإذن من المزوّد — اكتبها كما في نظام نور.</p>') +
       '<label>الاسم<input name="name" value="' + e(s.name || "") + '" required' + (lk ? " readonly" : "") + "></label>" + A.fld("sid", "رقم السجل المدني", s.sid) +
       '<label>الوظيفة<select name="role"' + (lk ? " disabled" : "") + ">" + Object.keys(ROLE).map(function (r) { return '<option value="' + r + '"' + (r === s.role ? " selected" : "") + ">" + ROLE[r] + "</option>"; }).join("") + "</select></label>" +
       (A.S.settings.schools.length > 1 ? '<label>المدرسة<select name="school"' + (lk ? " disabled" : "") + '><option value="">كل المدارس</option>' + A.S.settings.schools.map(function (z) { return '<option value="' + e(z.id) + '"' + (z.id === s.school ? " selected" : "") + ">" + e(z.name) + "</option>"; }).join("") + "</select></label>" : "") +
@@ -2568,7 +2568,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       var rec = Object.assign({}, s, { t: "stf", id: s.id || "T" + SL.rid(10), name: String(f.get("name")).trim(), sid: String(f.get("sid") || "").trim(), role: f.get("role") || s.role, phone: SL.normPhone(f.get("phone")), subject: f.get("subject"), classes: f.get("classes") });
       if (f.has("school")) rec.school = f.get("school");
       if (lk) { rec.name = s.name; rec.role = s.role; rec.school = s.school; }
-      else if (A.roleTaken(rec.role, rec.school, rec.id)) return A.toast(ROLE[rec.role] + " معتمد لهذه المدرسة ولا يُغيَّر إلا بإذن من المزوّد", "err");
+      else if (A.roleTaken(rec.role, rec.school, rec.id)) return A.toast(ROLE[rec.role] + " معتمد لهذه المدرسة ولا يُغيَّر إلا بكود اشتراك جديد أو بإذن من المزوّد", "err");
       await A.save(rec); sh.close(); A.route();
     };
     var d = $("#fsf-del", sh.body); if (d) d.onclick = async function () { if (await A.confirm("حذف " + s.name + "؟")) { await A.remove(s); sh.close(); A.route(); } };
@@ -2851,7 +2851,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     if (tab === "school") {
       var need = A.needApproval();
       if (need.length) html += '<div class="alert warn"><b>' + (need.some(function (x) { return !x.re; }) ? "اعتماد بيانات المدرسة مطلوب قبل استخدام المنصة." : "سمح المزوّد بتعديل بيانات معتمدة.") + "</b> راجع البيانات أدناه ثم اضغط «" + (need.some(function (x) { return !x.re; }) ? "اعتماد بيانات المدرسة" : "إعادة اعتماد البيانات") + "».</div>";
-      html += '<section class="card id-note"><h3>' + SLI("shield") + ' بيانات تُعتمد ولا تُعدَّل</h3><p>عند تفعيل الاشتراك تُعتمد بيانات المدرسة التالية: <b>اسم المدرسة، الرقم الوزاري، مدير المدرسة، وكيل شؤون الطلبة، الموجه الطلابي</b>. تُطبع في كل النماذج الرسمية وتظهر على أجهزة المدرسة الثلاثة، و<b>لا يمكن تعديلها بعد الاعتماد إلا بإذن من المزوّد (تقناس)</b>. اكتبها كما هي في نظام نور وراجعها قبل الاعتماد.</p><p class="mut">أسماء المدير والوكيل والموجه تُدخل من صفحة <a href="#staff">المعلمون والإدارة</a> أو باستيراد ملف نور.</p></section>';
+      html += '<section class="card id-note"><h3>' + SLI("shield") + ' بيانات تُعتمد ولا تُعدَّل</h3><p>عند تفعيل الاشتراك تُعتمد بيانات المدرسة التالية: <b>اسم المدرسة، الرقم الوزاري، المرحلة، نوع المدرسة، المنطقة، إدارة التعليم، مدير المدرسة، وكيل شؤون الطلبة، الموجه الطلابي</b>. تُطبع في كل النماذج الرسمية وتظهر على أي جهاز تُفتح عليه المنصة، و<b>لا يمكن تعديلها بعد الاعتماد إلا بكود اشتراك جديد أو بإذن من المزوّد (تقناس)</b>. اكتبها كما هي في نظام نور وراجعها قبل الاعتماد.</p><p class="mut">أسماء المدير والوكيل والموجه تُدخل من صفحة <a href="#staff">المعلمون والإدارة</a> أو باستيراد ملف نور.</p></section>';
       html += '<section class="card"><h3>المدارس</h3><div id="sc-l">' +
         cfg.schools.map(function (z, i) { return schoolForm(z, i); }).join("") + '</div>' + (C.lic && C.lic.v === 2 ? '<p class="mut sm">لكل مدرسة كود اشتراك خاص برقمها الوزاري. لإضافة مدرسة أخرى فعّل كودها من تبويب «الاشتراك والتحديث».</p>' : '<button class="btn" id="sc-add" type="button">＋ إضافة مدرسة</button>') + '</section>' +
         '<section class="card"><label class="row-check"><input type="checkbox" id="sc-logo"' + (cfg.useLogo ? " checked" : "") + "> إظهار شعار وزارة التعليم في ترويسة النماذج</label></section>" +

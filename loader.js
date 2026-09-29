@@ -312,7 +312,7 @@
     var c = parseCode(rec.code), obj = Object.assign({ v: 1, moe: moe }, ident, { at: Date.now() });
     try {
       var r = await fetch(REG + "/lic/" + moe + "/id.json", { method: "PUT", body: JSON.stringify(await sealId(moe, c.s, obj)) });
-      if (!r.ok) return { ok: false, why: r.status === 401 || r.status === 403 ? "بيانات هذه المدرسة معتمدة مسبقاً ولا تُغيَّر إلا بإذن من المزوّد." : "تعذّر الاعتماد (" + r.status + ")." };
+      if (!r.ok) return { ok: false, why: r.status === 401 || r.status === 403 ? "بيانات هذه المدرسة معتمدة مسبقاً ولا تُغيَّر إلا بكود اشتراك جديد أو بإذن من المزوّد." : "تعذّر الاعتماد (" + r.status + ")." };
     } catch (e) { return { ok: false, why: "الاعتماد يحتاج اتصالاً بالإنترنت." }; }
     rec.id = obj; await saveLic(moe, rec); await fsWriteCore();
     return { ok: true, id: obj };
