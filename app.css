@@ -111,6 +111,7 @@ main.enter > *:nth-child(2) { animation-delay: .04s; } main.enter > *:nth-child(
 .lg { width: 48px; height: 48px; border-radius: 15px; display: grid; place-items: center; font-size: 26px; font-weight: 700; background: linear-gradient(145deg, #12384a, #0d6b61); box-shadow: inset 0 0 0 2px var(--gold), 0 8px 20px rgba(0,0,0,.3); flex: none; }
 .logo-t b { display: block; font-size: 1.35rem; line-height: 1.15; }
 .logo-t small { font-size: .74rem; color: rgba(255,255,255,.55); }
+.logo-t small.ver { display: block; margin-top: 2px; font-size: .68rem; color: #d6b465; letter-spacing: .02em; direction: rtl; }
 .new { display: flex; align-items: center; gap: 10px; padding: 13px 16px; border-radius: 15px; font-weight: 700; margin-bottom: 14px; color: #1d1606; background: linear-gradient(135deg, #dcb75f, #b8913c); box-shadow: 0 10px 24px rgba(201,162,76,.28); transition: transform .2s, box-shadow .2s; }
 .new:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(201,162,76,.4); }
 .new kbd { margin-inline-start: auto; font: inherit; font-size: .7rem; padding: 0 7px; border-radius: 6px; background: rgba(0,0,0,.12); }

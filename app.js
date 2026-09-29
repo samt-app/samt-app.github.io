@@ -1,4 +1,5 @@
-/* سَمْت 1.0.0 — حزمة الواجهة */
+/* سَمْت 1.0.0-r41 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r41";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -2346,7 +2347,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       [["#staff", "المعلمون والإدارة", "teacher"], ["#import", "استيراد من Excel", "upload"], ["#merit", "السلوك المتميز", "star"], ["#reports", "التقارير", "list"], ["#absence", "الغياب — ربط وهج", "calendar"], ["#sigs", "التوقيعات عن بُعد", "pen"], ["#commit", "الالتزام المدرسي", "doc"], ["#settings", "الإعدادات والاشتراك", "gear"], ["#log", "سجل العمليات", "clock"]]
         .map(function (x) { return '<a class="tile" href="' + x[0] + '"><span class="tile-i">' + SLI(x[2]) + "</span><b>" + e(x[1]) + "</b></a>"; }).join("") +
       (A.installed() ? "" : '<button class="tile" type="button" id="mo-inst"><span class="tile-i">' + SLI("download") + "</span><b>تثبيت التطبيق على هذا الجهاز</b></button>") + "</div>" +
-      '<p class="mut center">سَمْت — الإصدار ' + e(C.version || C.BUILTIN) + " · " + e(C.licLabel(C.lic)) + "</p>";
+      '<p class="mut center">سَمْت — الإصدار <bdi dir="ltr">' + e(window.SAMT_BUILD || C.version || C.BUILTIN) + "</bdi> · " + e(C.licLabel(C.lic)) + "</p>";
     var ib = $("#mo-inst"); if (ib) ib.onclick = A.install;
   };
   A.installed = function () { return window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true; };
@@ -3441,7 +3442,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var items = [["home", "home", "الرئيسية"], ["students", "users", "الطلاب"], ["incidents", "alert", "المخالفات", "nav-badge"], ["merit", "star", "السلوك المتميز"], ["reports", "list", "التقارير"], ["absence", "calendar", "الغياب"],
       ["sigs", "pen", "التوقيعات عن بُعد", "sig-badge"], ["staff", "teacher", "المعلمون والإدارة"], ["commit", "doc", "الالتزام المدرسي"], ["import", "upload", "الاستيراد"], ["settings", "gear", "الإعدادات"]];
     document.getElementById("boot").innerHTML =
-      '<aside class="side"><a class="logo" href="#home"><span class="lg">' + SL.LOGO + '</span><span class="logo-t"><b>سَمْت</b><small>ضبط السلوك والمواظبة</small></span></a>' +
+      '<aside class="side"><a class="logo" href="#home"><span class="lg">' + SL.LOGO + '</span><span class="logo-t"><b>سَمْت</b><small>ضبط السلوك والمواظبة</small><small class="ver">الإصدار <bdi dir="ltr">' + SL.esc(window.SAMT_BUILD || C.version || C.BUILTIN) + '</bdi></small></span></a>' +
       '<nav class="snav">' +
       items.map(function (x) { return '<a href="#' + x[0] + '">' + SLI(x[1]) + "<span>" + x[2] + "</span>" + (x[3] ? '<em id="' + x[3] + '" hidden></em>' : "") + "</a>"; }).join("") +
       '</nav><a class="subc" href="#settings?tab=lic" id="side-plan"></a><div class="side-foot">وفق قواعد السلوك والمواظبة — الإصدار الخامس 1447هـ</div></aside>' +
