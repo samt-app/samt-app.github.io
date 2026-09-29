@@ -115,7 +115,10 @@ main.enter > *:nth-child(2) { animation-delay: .04s; } main.enter > *:nth-child(
 .new { display: flex; align-items: center; gap: 10px; padding: 13px 16px; border-radius: 15px; font-weight: 700; margin-bottom: 14px; color: #1d1606; background: linear-gradient(135deg, #dcb75f, #b8913c); box-shadow: 0 10px 24px rgba(201,162,76,.28); transition: transform .2s, box-shadow .2s; }
 .new:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(201,162,76,.4); }
 .new kbd { margin-inline-start: auto; font: inherit; font-size: .7rem; padding: 0 7px; border-radius: 6px; background: rgba(0,0,0,.12); }
-.snav { display: flex; flex-direction: column; gap: 2px; }
+.snav { display: flex; flex-direction: column; gap: 8px; }
+.sgrp { display: flex; flex-direction: column; gap: 2px; padding: 4px; border-radius: 14px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08); }
+.sgrp:empty, .no-wj .sgrp:has(> a:only-child[href="#absence"]) { display: none; }
+.sgrp a.on::before { inset-inline-start: -5px; }
 .snav a { position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; font-weight: 500; font-size: .95rem; color: rgba(255,255,255,.66); transition: background .15s, color .15s; }
 .snav a:hover { background: rgba(255,255,255,.06); color: #fff; }
 .snav a.on { background: rgba(201,162,76,.14); color: #fff; font-weight: 600; }

@@ -1,5 +1,5 @@
-/* سَمْت 1.0.0-r41 — حزمة الواجهة */
-window.SAMT_BUILD = "1.0.0-r41";
+/* سَمْت 1.0.0-r42 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r42";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -3439,12 +3439,17 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   var R = window.RULES, SL = window.SL, C = window.SLCore, A = window.APP, e = SL.esc, $ = A.$;
 
   function shell() {
-    var items = [["home", "home", "الرئيسية"], ["students", "users", "الطلاب"], ["incidents", "alert", "المخالفات", "nav-badge"], ["merit", "star", "السلوك المتميز"], ["reports", "list", "التقارير"], ["absence", "calendar", "الغياب"],
-      ["sigs", "pen", "التوقيعات عن بُعد", "sig-badge"], ["staff", "teacher", "المعلمون والإدارة"], ["commit", "doc", "الالتزام المدرسي"], ["import", "upload", "الاستيراد"], ["settings", "gear", "الإعدادات"]];
+    /* القائمة الجانبية في صناديق: الرئيسية | الطالب والسلوك | التقارير | التوقيعات | المعلمون | النظام */
+    var groups = [[["home", "home", "الرئيسية"]],
+      [["students", "users", "الطلاب"], ["commit", "doc", "الالتزام المدرسي"], ["incidents", "alert", "المخالفات", "nav-badge"], ["merit", "star", "السلوك المتميز"], ["absence", "calendar", "الغياب"]],
+      [["reports", "list", "التقارير"]],
+      [["sigs", "pen", "التوقيعات عن بُعد", "sig-badge"]],
+      [["staff", "teacher", "المعلمون والإدارة"]],
+      [["import", "upload", "الاستيراد"], ["settings", "gear", "الإعدادات"]]];
     document.getElementById("boot").innerHTML =
       '<aside class="side"><a class="logo" href="#home"><span class="lg">' + SL.LOGO + '</span><span class="logo-t"><b>سَمْت</b><small>ضبط السلوك والمواظبة</small><small class="ver">الإصدار <bdi dir="ltr">' + SL.esc(window.SAMT_BUILD || C.version || C.BUILTIN) + '</bdi></small></span></a>' +
       '<nav class="snav">' +
-      items.map(function (x) { return '<a href="#' + x[0] + '">' + SLI(x[1]) + "<span>" + x[2] + "</span>" + (x[3] ? '<em id="' + x[3] + '" hidden></em>' : "") + "</a>"; }).join("") +
+      groups.map(function (g) { return '<div class="sgrp">' + g.map(function (x) { return '<a href="#' + x[0] + '">' + SLI(x[1]) + "<span>" + x[2] + "</span>" + (x[3] ? '<em id="' + x[3] + '" hidden></em>' : "") + "</a>"; }).join("") + "</div>"; }).join("") +
       '</nav><a class="subc" href="#settings?tab=lic" id="side-plan"></a><div class="side-foot">وفق قواعد السلوك والمواظبة — الإصدار الخامس 1447هـ</div></aside>' +
       '<div class="shell"><header class="top"><a class="m-logo" href="#home">' + SL.LOGO + '</a><div class="crumb"><small id="top-school"></small><h1 id="top-title"></h1></div>' +
       '<div class="search" id="q-box">' + SLI("search") + '<input id="q-all" type="search" autocomplete="off" placeholder="ابحث عن طالب بالاسم أو السجل المدني…"><kbd>/</kbd><div class="q-res" id="q-res" hidden></div></div>' +
