@@ -566,3 +566,6 @@ main input::placeholder, main textarea::placeholder, .sheet input::placeholder {
 
 /* r35: ميزات وهج (الغياب) مخفية ما لم يفعّلها المزوّد */
 .no-wj .wj, .no-wj a[href="#absence"], .no-wj a[href^="#absence?"] { display: none !important; }
+
+/* الجلسة الواحدة: تنبيه انقطاع الإنترنت أثناء العمل */
+html.net-off body::after { content: "لا يوجد اتصال بالإنترنت — تابِع العمل، وسيُعاد الاتصال تلقائياً"; position: fixed; bottom: 14px; inset-inline-start: 14px; z-index: 9000; background: #b42318; color: #fff; padding: 8px 14px; border-radius: 12px; font-size: .85rem; font-weight: 600; box-shadow: 0 8px 22px rgba(0,0,0,.25); }

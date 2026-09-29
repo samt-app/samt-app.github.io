@@ -1182,7 +1182,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
 })();
 
 /* سَمْت — ترخيص المدارس بالرقم الوزاري واعتماد بياناتها
-   • كل رقم وزاري = ترخيص مستقل يعمل على 3 أجهزة.
+   • كل رقم وزاري = ترخيص مستقل يعمل على أي جهاز، وعلى جهاز واحد في كل مرة.
    • عند التفعيل تُعتمد: اسم المدرسة، الرقم الوزاري، مدير المدرسة، وكيل شؤون الطلبة، الموجه الطلابي.
    • بعد الاعتماد لا تُعدَّل إلا بإذن من المزوّد (لوحة التراخيص)، والبيانات المعتمدة على الخادم هي المرجع. */
 (function () {
@@ -1316,7 +1316,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     if (!moes.length) return A.toast("أدخل الرقم الوزاري أولاً", "err");
     var id = A.identFor(z, moes[0]), miss = A.identMissing(id);
     if (miss.length) return A.toast("أكمل قبل الاعتماد: " + miss.join("، "), "err");
-    var html = '<p>بعد الاعتماد <b>لا يمكن تعديل</b> البيانات التالية إلا بإذن من المزوّد (تقناس). تُطبع في كل النماذج الرسمية وتظهر على أجهزة المدرسة الثلاثة:</p><table class="tbl"><tbody>' +
+    var html = '<p>بعد الاعتماد <b>لا يمكن تعديل</b> البيانات التالية إلا بإذن من المزوّد (تقناس). تُطبع في كل النماذج الرسمية وتظهر على أي جهاز تُفتح عليه المنصة:</p><table class="tbl"><tbody>' +
       FIELDS.map(function (f) { return "<tr><th>" + f[1] + "</th><td>" + SL.esc(f[0] === "moe" ? moes.join(" + ") : id[f[0]]) + "</td></tr>"; }).join("") +
       "</tbody></table><p class=\"mut\">تأكد من كتابة الأسماء كما في نظام نور.</p>";
     if (!silent && !(await A.ask("اعتماد بيانات المدرسة", html, "اعتماد نهائي"))) return;
@@ -2768,7 +2768,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       if (need.length) html += '<div class="alert warn"><b>' + (need.some(function (x) { return !x.re; }) ? "اعتماد بيانات المدرسة مطلوب قبل استخدام المنصة." : "سمح المزوّد بتعديل بيانات معتمدة.") + "</b> راجع البيانات أدناه ثم اضغط «" + (need.some(function (x) { return !x.re; }) ? "اعتماد بيانات المدرسة" : "إعادة اعتماد البيانات") + "».</div>";
       html += '<section class="card id-note"><h3>' + SLI("shield") + ' بيانات تُعتمد ولا تُعدَّل</h3><p>عند تفعيل الاشتراك تُعتمد بيانات المدرسة التالية: <b>اسم المدرسة، الرقم الوزاري، مدير المدرسة، وكيل شؤون الطلبة، الموجه الطلابي</b>. تُطبع في كل النماذج الرسمية وتظهر على أجهزة المدرسة الثلاثة، و<b>لا يمكن تعديلها بعد الاعتماد إلا بإذن من المزوّد (تقناس)</b>. اكتبها كما هي في نظام نور وراجعها قبل الاعتماد.</p><p class="mut">أسماء المدير والوكيل والموجه تُدخل من صفحة <a href="#staff">المعلمون والإدارة</a> أو باستيراد ملف نور.</p></section>';
       html += '<section class="card"><h3>المدارس</h3><div id="sc-l">' +
-        cfg.schools.map(function (z, i) { return schoolForm(z, i); }).join("") + '</div><button class="btn" id="sc-add" type="button">＋ إضافة مدرسة</button></section>' +
+        cfg.schools.map(function (z, i) { return schoolForm(z, i); }).join("") + '</div>' + (C.lic && C.lic.v === 2 ? '<p class="mut sm">لكل مدرسة كود اشتراك خاص برقمها الوزاري. لإضافة مدرسة أخرى فعّل كودها من تبويب «الاشتراك والتحديث».</p>' : '<button class="btn" id="sc-add" type="button">＋ إضافة مدرسة</button>') + '</section>' +
         '<section class="card"><label class="row-check"><input type="checkbox" id="sc-logo"' + (cfg.useLogo ? " checked" : "") + "> إظهار شعار وزارة التعليم في ترويسة النماذج</label></section>" +
         '<div class="actions"><button class="btn pri big" id="sc-save" type="button">حفظ</button></div>';
     } else if (tab === "links") {
@@ -2796,14 +2796,14 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         '<p class="mut">آخر نسخة: ' + (cfg.lastBackup ? e(SL.hijri(cfg.lastBackup)) + " " + e(SL.time(cfg.lastBackup)) : "لا يوجد") + "</p>" +
         '<label>كلمة مرور لتشفير النسخة (اختياري لكن يُنصح به)<input id="bk-pw" type="password" autocomplete="new-password"></label>' +
         '<div class="actions wrap"><button class="btn pri" id="bk-dl" type="button">تنزيل نسخة احتياطية</button><label class="btn">استعادة من نسخة<input id="bk-up" type="file" accept=".json,.samt" hidden></label></div></section>' +
-        '<section class="card"><h3>نقل البيانات لجهاز آخر</h3><p class="mut">نزّل نسخة من هذا الجهاز ثم استعدها في الجهاز الجديد. اشتراك المدرسة يعمل على ثلاثة أجهزة: أدخل نفس كود المدرسة في الجهاز الجديد.</p></section>' +
+        '<section class="card"><h3>العمل من أكثر من جهاز</h3><p class="mut">المنصة تعمل على جهاز واحد في كل مرة. للتنقل بين الأجهزة ضع مجلد <b>sammt</b> داخل مجلد Google Drive أو OneDrive على الكمبيوتر (برنامج Drive for Desktop أو OneDrive)، واربطه من «مجلد البيانات» في كل جهاز؛ فيفتح كل جهاز آخر ما حُفظ. أو انقل البيانات يدوياً: نزّل نسخة من هذا الجهاز ثم استعدها في الجهاز الآخر.</p></section>' +
         '<section class="card danger-zone"><h3>حذف جميع البيانات</h3><button class="btn danger" id="bk-wipe" type="button">حذف كل بيانات الطلاب والمخالفات</button></section>';
     } else if (tab === "lic") {
       var L = C.lic || {}, schools = L.schools || [];
       html += '<section class="card"><h3>اشتراك المدرسة</h3><p>الحالة: <b>' + e(C.licLabel(L)) + "</b></p>" +
-        '<p class="mut">الاشتراك للمدرسة بالرقم الوزاري، ويعمل على <b>' + C.SLOTS + " أجهزة</b> فيها. المدرسة ذات المرحلتين برقمين وزاريين لها ترخيصان. التفعيل والاعتماد من <a href=\"#settings?tab=school\">بيانات المدرسة</a>.</p>" +
-        (schools.length ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الرقم الوزاري</th><th>المدرسة المعتمدة</th><th>الحالة</th><th>هذا الجهاز</th></tr></thead><tbody>' + schools.map(function (x) {
-          return "<tr><td dir=\"ltr\">" + e(x.moe) + "</td><td>" + e(x.id ? x.id.name : "— بانتظار الاعتماد —") + "</td><td>" + (x.ok ? '<span class="chip ok">حتى ' + e(SL.greg(x.end)) + "</span>" : '<span class="chip red">' + e(x.why) + "</span>") + "</td><td>" + (x.slot ? "رقم " + x.slot + " من " + C.SLOTS : "—") + "</td></tr>";
+        "<p class=\"mut\">الاشتراك للمدرسة بالرقم الوزاري، ويعمل على <b>أي جهاز، وعلى جهاز واحد فقط في كل مرة</b>: إن فُتحت المنصة على جهاز آخر وهي تعمل هنا فلن تعمل هناك حتى تُغلق هنا. وتُغلق تلقائياً بعد 20 دقيقة دون استخدام. المدرسة ذات المرحلتين برقمين وزاريين لها ترخيصان. التفعيل والاعتماد من <a href=\"#settings?tab=school\">بيانات المدرسة</a>.</p>" +
+        (schools.length ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الرقم الوزاري</th><th>المدرسة المعتمدة</th><th>الحالة</th></tr></thead><tbody>' + schools.map(function (x) {
+          return "<tr><td dir=\"ltr\">" + e(x.moe) + "</td><td>" + e(x.id ? x.id.name : "— بانتظار الاعتماد —") + "</td><td>" + (x.ok ? '<span class="chip ok">حتى ' + e(SL.greg(x.end)) + "</span>" : '<span class="chip red">' + e(x.why) + "</span>") + "</td></tr>";
         }).join("") + "</tbody></table></div>" : "") +
         '<label>هذا الجهاز هو<select id="lc-role">' + C.DEV_ROLES.map(function (r) { return '<option value="' + r[0] + '">' + r[1] + "</option>"; }).join("") + "</select></label>" +
         '<p class="mut">رقم الجهاز: <b dir="ltr">' + e(L.dev || "") + '</b> <button class="btn sm" type="button" id="lc-copy">نسخ</button></p>' +
@@ -2855,7 +2855,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       if (!l) st = '<span class="chip">' + (L.trial ? "الفترة التجريبية — غير مفعّل" : "غير مفعّل") + "</span>";
       else if (!l.ok) st = '<span class="chip red">' + e(l.why) + "</span>";
       else {
-        st = '<span class="chip ok">مشترك حتى ' + e(SL.greg(l.end)) + '</span> <span class="chip">هذا الجهاز: ' + l.slot + " من " + C.SLOTS + "</span> " + (l.id ? '<span class="chip lockc">🔒 معتمدة</span>' : '<span class="chip warnc">بانتظار الاعتماد</span>');
+        st = '<span class="chip ok">مشترك حتى ' + e(SL.greg(l.end)) + '</span> ' + (l.id ? '<span class="chip lockc">🔒 معتمدة</span>' : '<span class="chip warnc">بانتظار الاعتماد</span>');
         if (!l.id) need = true;
       }
       return '<div class="lic-row"><span class="mut">الرقم الوزاري</span> <b dir="ltr">' + e(m) + "</b> " + st +
@@ -2870,12 +2870,18 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var cfg = A.S.settings;
     if (tab === "school") {
       if (!cfg.schools.length) cfg.schools.push({ id: "C" + SL.rid(6), name: "", stage: "متوسط", region: "", admin: "" }), $("#sc-l").innerHTML = schoolForm(cfg.schools[0], 0);
-      $("#sc-add").onclick = function () { collect(); cfg.schools.push({ id: "C" + SL.rid(6), name: "", stage: "ابتدائي", region: "", admin: "" }); $("#sc-l").innerHTML = cfg.schools.map(schoolForm).join(""); rm(); };
+      var snap = {}; cfg.schools.forEach(function (z) { snap[z.id] = { moeCode: z.moeCode, moeCode2: z.moeCode2, moeMode: z.moeMode, moes: A.schoolMoes(z) }; });
+      if ($("#sc-add")) $("#sc-add").onclick = function () { collect(); cfg.schools.push({ id: "C" + SL.rid(6), name: "", stage: "ابتدائي", region: "", admin: "" }); $("#sc-l").innerHTML = cfg.schools.map(schoolForm).join(""); rm(); };
       function collect() { $$(".school").forEach(function (d) { var z = cfg.schools[+d.dataset.i]; $$("[data-k]", d).forEach(function (el) { z[el.dataset.k] = el.value.trim(); }); }); }
       $("#sc-l").addEventListener("change", function (ev) { var k = ev.target.dataset && ev.target.dataset.k; if (k === "stage" || k === "moeMode") { collect(); $("#sc-l").innerHTML = cfg.schools.map(schoolForm).join(""); rm(); } });
       function rm() { $$("[data-rm]").forEach(function (b) { b.onclick = async function () { var i = +b.dataset.rm; if (A.S.students.some(function (s) { return s.school === cfg.schools[i].id; })) return A.toast("المدرسة مرتبطة بطلاب", "err"); collect(); cfg.schools.splice(i, 1); $("#sc-l").innerHTML = cfg.schools.map(schoolForm).join(""); rm(); }; }); }
       rm();
       function guard() { /* البيانات المعتمدة لا تتغير من هنا مهما حدث في الحقول */
+        cfg.schools.forEach(function (z) {   /* الرقم الوزاري المرخّص لا يُستبدل برقم مدرسة أخرى */
+          var o = snap[z.id]; if (!o) return;
+          var lost = o.moes.filter(function (m) { return A.licOf(m) && A.schoolMoes(z).indexOf(m) < 0; });
+          if (lost.length) { z.moeCode = o.moeCode; z.moeCode2 = o.moeCode2; z.moeMode = o.moeMode; A.toast("لا يمكن تغيير الرقم الوزاري المرخّص (" + lost.join("، ") + "). لكل مدرسة كود خاص بها.", "err"); }
+        });
         cfg.schools.forEach(function (z) {
           var k = A.lockFor(z); if (!k.locked || !k.id) return;
           if (!k.open.name) z.name = k.id.name;
@@ -2900,7 +2906,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         if (!r.ok) { A.toast(r.why, "err"); b.disabled = false; b.textContent = "تفعيل"; return; }
         C.lic = await C.license(); await A.applyIdentity(); A.drawTop(); A.ping();
         A.toast(r.id ? "تم التفعيل — بيانات المدرسة معتمدة مسبقاً وطُبّقت على هذا الجهاز" : "تم التفعيل — أكمل بيانات المدرسة واعتمدها");
-        A.route();
+        setTimeout(function () { location.reload(); }, 900);   /* إعادة التشغيل لحجز جلسة المدرسة */
       });
     } else if (tab === "links") {
       $("#ln-save").onclick = async function () {
@@ -2953,8 +2959,8 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         var m = $("#lc-msg"); m.className = "mut"; m.textContent = "جارٍ التفعيل…";
         var r = await C.activate($("#lc-code").value, $("#lc-role").value);
         m.className = "alert sm " + (r.ok ? "ok" : "err");
-        m.textContent = r.ok ? "تم التفعيل حتى " + SL.greg(r.end) + (r.slot ? " — هذا الجهاز رقم " + r.slot + " من " + C.SLOTS : "") + (r.v === 2 ? (r.id ? " — طُبّقت بيانات المدرسة المعتمدة" : "") : "") : r.why;
-        if (r.ok) { C.lic = await C.license(); await A.applyIdentity(); A.drawTop(); A.ping(); setTimeout(function () { A.route(); }, 1200); }
+        m.textContent = r.ok ? "تم التفعيل حتى " + SL.greg(r.end) + (r.v === 2 ? (r.id ? " — طُبّقت بيانات المدرسة المعتمدة" : "") : "") : r.why;
+        if (r.ok) { C.lic = await C.license(); await A.applyIdentity(); A.drawTop(); A.ping(); setTimeout(function () { r.v === 2 ? location.reload() : A.route(); }, 1200); }   /* ترخيص مدرسة: إعادة التشغيل لحجز الجلسة */
       };
       C.DB.get("devRole").then(function (v) { if (v) $("#lc-role").value = v; });
       $("#lc-role").onchange = async function () { await C.setRole(this.value); A.toast("تم الحفظ"); A.ping(); };
