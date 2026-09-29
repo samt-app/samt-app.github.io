@@ -1,5 +1,5 @@
-/* سَمْت 1.0.0-r42 — حزمة الواجهة */
-window.SAMT_BUILD = "1.0.0-r42";
+/* سَمْت 1.0.0-r43 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r43";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -1052,13 +1052,31 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     return { art: art, step: st, stepIdx: idx, prior: prior, total: n, deduct: qual ? 0 : (st.deduct || 0), qualitative: qual, warnings: warn, forms: st.forms.slice() };
   };
 
-  /* ————— درجة السلوك (المادة 5): 80 إيجابي + 20 متميز، ولا تتجاوز 100 ————— */
-  A.score = function (stu) {
-    var ded = 0, mer = 0;
+  /* ————— درجة السلوك (المادة 5): 80 إيجابي + 20 متميز، ولا تتجاوز 100 —————
+     • السلوك التعويضي (kind: "comp") يعوّض المحسوم من الـ80 ولا يتجاوزها.
+     • السلوك المتميز (kind: "exc") يُجمع في الـ20.
+     • السجلات القديمة بلا نوع: تُعدّ تعويضية حتى يُستوفى المحسوم (بترتيب التاريخ)، والباقي متميز — كما كانت تُحتسب سابقاً. */
+  A.meritKinds = function (stu) {
+    var ded = 0, out = {};
     A.S.incidents.forEach(function (x) { if (x.stu === stu.id && (x.status === "open" || x.status === "closed")) ded += x.deduct || 0; });
-    A.S.merits.forEach(function (m) { if (m.stu === stu.id) mer += m.pts || 0; });
-    var raw = 80 - ded + mer, total = Math.max(0, Math.min(100, raw));
-    return { deducted: ded, merits: mer, total: total, positive: Math.max(0, Math.min(80, 80 - ded + mer)), excellent: Math.max(0, total - 80), qualitative: A.qualitative(stu) };
+    var ms = A.S.merits.filter(function (m) { return m.stu === stu.id; }).sort(function (a, b) { return new Date(a.date) - new Date(b.date) || (a.at || 0) - (b.at || 0); });
+    var comp = ms.reduce(function (n, m) { return n + (m.kind === "comp" ? m.pts || 0 : 0); }, 0);
+    ms.forEach(function (m) {
+      if (m.kind === "comp" || m.kind === "exc") { out[m.id] = m.kind; return; }
+      if (comp < ded) { out[m.id] = "comp"; comp += m.pts || 0; } else out[m.id] = "exc";
+    });
+    return out;
+  };
+  A.MERIT_KIND = { comp: "تعويضي", exc: "تميز" };
+  A.kindChip = function (k) { return '<span class="chip ' + (k === "comp" ? "kc" : "ke") + '">' + (k === "comp" ? "تعويضي" : "تميز") + "</span>"; };
+  A.score = function (stu) {
+    var ded = 0, comp = 0, exc = 0, kinds = A.meritKinds(stu);
+    A.S.incidents.forEach(function (x) { if (x.stu === stu.id && (x.status === "open" || x.status === "closed")) ded += x.deduct || 0; });
+    var legacy = 0;
+    A.S.merits.forEach(function (m) { if (m.stu !== stu.id) return; if (kinds[m.id] === "comp") { comp += m.pts || 0; if (!m.kind) legacy += m.pts || 0; } else exc += m.pts || 0; });
+    var over = Math.min(legacy, Math.max(0, comp - ded)); comp -= over; exc += over;   /* السجلات القديمة: الزائد عن المحسوم يذهب للمتميز كما كان */
+    var positive = Math.max(0, Math.min(80, 80 - ded + comp)), excellent = Math.max(0, Math.min(20, exc));
+    return { deducted: ded, comp: comp, exc: exc, compLeft: Math.max(0, ded - comp), merits: comp + exc, total: positive + excellent, positive: positive, excellent: excellent, qualitative: A.qualitative(stu) };
   };
 
   /* ————— سياق النماذج ————— */
@@ -1096,10 +1114,14 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     } else if (kind === "stu") {
       stu = A.byId[ref];
       ctx = { history: A.historyRows(stu) };
-      ctx.merits = A.S.merits.filter(function (m) { return m.stu === stu.id; }).map(function (m) { var p = R.MERITS.find(function (x) { return x.id === m.practice; }); return { topic: m.topic, practice: (p ? p.t : "") + (m.note ? " — " + m.note : ""), date: m.date, evidence: m.evidence, pts: m.pts, by: m.byName }; });
-      var mtxt = ctx.merits.map(function (m) { return m.practice; }).join("، ");
+      var kinds = A.meritKinds(stu);
+      ctx.merits = A.S.merits.filter(function (m) { return m.stu === stu.id && kinds[m.id] !== "comp"; }).map(function (m) { var p = R.MERITS.find(function (x) { return x.id === m.practice; }); return { topic: m.topic, practice: (p ? p.t : "") + (m.note ? " — " + m.note : ""), date: m.date, evidence: m.evidence, pts: m.pts, by: m.byName }; });
+      var cms = A.S.merits.filter(function (m) { return m.stu === stu.id && kinds[m.id] === "comp"; }).sort(function (a, b) { return new Date(a.date) - new Date(b.date); });
+      var mtxt = cms.map(function (m) { var p = R.MERITS.find(function (x) { return x.id === m.practice; }); return p ? p.t : ""; }).filter(Boolean).join("، ");
+      var pool = cms.reduce(function (n, m) { return n + (m.pts || 0); }, 0);
       ctx.compRows = A.S.incidents.filter(function (x) { return x.stu === stu.id && x.deduct && (x.status === "open" || x.status === "closed"); })
-        .map(function (x) { return { itemText: x.itemText, degree: x.degree, deduct: x.deduct, chance: mtxt, gained: "" }; });
+        .sort(function (a, b) { return new Date(a.date) - new Date(b.date); })
+        .map(function (x) { var g = Math.min(pool, x.deduct); pool -= g; return { itemText: x.itemText, degree: x.degree, deduct: x.deduct, chance: g ? mtxt : "", gained: g ? String(g) : "" }; });
     } else if (kind === "abs") {
       var ab = A.byId[ref]; stu = A.byId[ab.stu];
       var done = {};
@@ -1922,17 +1944,18 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var html = '<section class="card stu-head"><div class="stu-top"><div><h2>' + e(s.name) + '</h2><p class="mut">' + e(A.classKey(s)) + " · المرحلة " + e(A.stageLabel(s)) + " · " + e(A.school(s.school).name || "") + (s.sid ? " · السجل المدني: " + e(s.sid) : "") + "</p></div>" + A.scoreChip(s) + "</div>" +
       (sc.qualitative ? '<p class="mut">' + e(R.GENERAL.qualitative) + "</p>" :
         '<div class="meter"><div class="m-pos" style="width:' + sc.positive + '%"></div><div class="m-exc" style="width:' + sc.excellent + '%"></div></div>' +
-        '<p class="mut">السلوك الإيجابي ' + sc.positive + "/80 · المتميز " + sc.excellent + "/20 · المحسوم " + sc.deducted + " · المكتسب " + sc.merits + "</p>") +
+        '<p class="mut">السلوك الإيجابي ' + sc.positive + "/80 · المتميز " + sc.excellent + "/20 · المحسوم " + sc.deducted + " · المعوَّض " + Math.min(sc.comp, sc.deducted) + (sc.compLeft ? " · <b>متبقٍ للتعويض " + sc.compLeft + "</b>" : "") + "</p>") +
       '<div class="parent"><span>ولي الأمر: <b>' + e(s.parentName || "—") + "</b> " + (SL.validPhone(s.parentPhone) ? '<a dir="ltr" href="tel:+' + e(s.parentPhone) + '">' + e(SL.showPhone(s.parentPhone)) + "</a>" : '<span class="chip warnc">لا يوجد جوال صحيح</span>') + "</span>" +
       (SL.validPhone(s.parentPhone) ? '<button class="btn wa sm" id="sp-wa" type="button">واتساب</button>' : "") + "</div>" +
-      '<div class="actions wrap"><a class="btn pri" href="#new?s=' + s.id + '">＋ رصد مخالفة</a><a class="btn" href="#merit?s=' + s.id + '">★ سلوك متميز</a><a class="btn" href="#reports?s=' + s.id + '">تقرير المخالفات</a><button class="btn" id="sp-edit" type="button">تعديل البيانات</button></div></section>';
+      '<div class="actions wrap"><a class="btn pri" href="#new?s=' + s.id + '">＋ رصد مخالفة</a>' + (sc.compLeft ? '<a class="btn" href="#comp?s=' + s.id + '">↺ سلوك تعويضي</a>' : "") + '<a class="btn" href="#merit?s=' + s.id + '">★ سلوك متميز</a><a class="btn" href="#reports?s=' + s.id + '">تقرير المخالفات</a><button class="btn" id="sp-edit" type="button">تعديل البيانات</button></div></section>';
     html += '<section class="card"><h3>النماذج</h3><ul class="list forms">' +
       formRow("stu", s.id, "F1", f1 ? '<span class="chip ok">وقّع ولي الأمر ' + e(SL.hijri(f1.at)) + "</span>" : '<span class="chip">لم يوقّع بعد</span>') +
       formRow("stu", s.id, "F5", "سجل المشكلات السلوكية") + formRow("stu", s.id, "F2", "") + formRow("stu", s.id, "F6", "") + "</ul></section>";
     html += '<section class="card"><h3>المخالفات (' + incs.length + ")</h3>" + (incs.length ? incList(incs) : '<p class="mut">لا توجد مخالفات.</p>') + "</section>";
-    html += '<section class="card"><h3>السلوك المتميز (' + mers.length + ')</h3>' + (mers.length ? '<ul class="list">' + mers.map(function (m) {
+    var mk = A.meritKinds(s);
+    html += '<section class="card"><h3>السلوك التعويضي والمتميز (' + mers.length + ')</h3>' + (mers.length ? '<ul class="list">' + mers.map(function (m) {
       var pr = R.MERITS.find(function (x) { return x.id === m.practice; }) || { t: "" };
-      return '<li><div class="row1"><span class="chip ok">+' + m.pts + "</span> " + e(pr.t) + '</div><div class="row3">' + fmtDate(m.date) + (m.topic ? " · " + e(m.topic) : "") + ' <button class="link" data-del-mer="' + m.id + '" type="button">حذف</button></div></li>';
+      return '<li><div class="row1"><span class="chip ok">+' + m.pts + "</span> " + A.kindChip(mk[m.id]) + " " + e(pr.t) + '</div><div class="row3">' + fmtDate(m.date) + (m.topic ? " · " + e(m.topic) : "") + ' <button class="link" data-del-mer="' + m.id + '" type="button">حذف</button></div></li>';
     }).join("") + "</ul>" : '<p class="mut">لا يوجد.</p>') + "</section>";
     if (ab) html += '<section class="card wj"><h3>الغياب (من وهج)</h3><p>بدون عذر: <b class="red">' + ab.un + "</b> · بعذر: <b>" + ab.ex + "</b>" + (ab.late ? " · تأخير: " + ab.late : "") + ' <a href="#absence?s=' + s.id + '">الإجراءات</a></p></section>';
     main().innerHTML = html;
@@ -2310,33 +2333,56 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   };
 
   /* ————— السلوك المتميز ————— */
+  /* السلوك المتميز والتعويضي: القائمة نفسها، ويُحدَّد نوع كل تسجيل (تعويضي يعوّض المحسوم | تميز ضمن 20 درجة) */
+  V.comp = function (p, q) { V.merit(p, Object.assign({}, q, { k: "comp" })); };
   V.merit = function (p, q) {
-    setTitle("السلوك المتميز");
+    var kind = q.k === "comp" ? "comp" : "exc";
+    setTitle(kind === "comp" ? "السلوك التعويضي" : "السلوك المتميز");
     var stu = q.s ? A.byId[q.s] : null;
     var now = SL.isoDay();
-    main().innerHTML = '<form class="form card" id="fm"><div class="picked" id="fm-stu"></div>' +
-      '<label>الممارسة<select name="practice">' + R.MERITS.map(function (m) { return '<option value="' + m.id + '">' + e(m.t) + " — " + m.pts + " درجات</option>"; }).join("") + "</select></label>" +
+    main().innerHTML = '<form class="form card" id="fm"><div class="picked" id="fm-stu"></div><div id="fm-st"></div>' +
+      '<label>نوع السلوك<select name="kind"><option value="comp">تعويضي — لتعويض الدرجات المحسومة بسبب المخالفات</option><option value="exc">تميز — يُجمع ضمن 20 درجة للسلوك المتميز</option></select></label>' +
+      '<label>الممارسة<select name="practice"></select></label>' +
       '<div class="grid2"><label>الدرجة<input name="pts" type="number" min="1" max="6" value="6"></label><label>تاريخ التنفيذ<input name="date" type="date" value="' + now + '"></label></div>' +
       '<label>الموضوع<select name="topic"><option value="">—</option>' + R.MERIT_TOPICS.map(function (t) { return "<option>" + e(t) + "</option>"; }).join("") + "</select></label>" +
       '<label>الشواهد<input name="evidence" placeholder="ما يثبت المشاركة"></label><label>ملاحظة<input name="note"></label>' +
       '<label>راصد السلوك<select name="by"><option value="">—</option>' + A.S.staff.map(function (x) { return '<option value="' + e(x.id) + '">' + e(x.name) + "</option>"; }).join("") + "</select></label>" +
-      '<p class="note">المرجع: المادة (5) — يُخصص للسلوك المتميز 20% من درجة السلوك، ولا تتجاوز درجة السلوك 100. ممارسة «الانضباط وعدم الغياب بدون عذر» تُحتسب مرة واحدة في الفصل.</p>' +
+      '<p class="note" id="fm-note"></p>' +
       '<div class="actions"><button class="btn pri" type="submit">حفظ</button></div></form>';
+    var ksel = $("[name=kind]"), sel = $("[name=practice]"), pts = $("[name=pts]");
+    ksel.value = kind;
     function drawStu() {
       $("#fm-stu").innerHTML = stu ? '<div class="stu-mini">' + A.scoreChip(stu) + " <b>" + e(stu.name) + '</b> <button class="link" type="button" id="fm-chg">تغيير</button></div>' : '<button class="btn pri big" type="button" id="fm-pick">اختر الطالب</button>';
       ($("#fm-pick") || $("#fm-chg")).onclick = function () { pickStudent(function (s) { stu = s; drawStu(); }); };
+      drawState();
     }
+    function drawState() {
+      var k = ksel.value, box = $("#fm-st");
+      setTitle(k === "comp" ? "السلوك التعويضي" : "السلوك المتميز");
+      var cur = sel.value;
+      sel.innerHTML = R.MERITS.map(function (m) { return '<option value="' + m.id + '">' + e(m.t) + " — " + m.pts + " درجات (" + (k === "comp" ? "تعويضي" : "تميز") + ")</option>"; }).join("");
+      if (cur) sel.value = cur;
+      $("#fm-note").textContent = k === "comp"
+        ? "المرجع: المادة (5) — يُتاح للطالب تعويض الدرجات المحسومة من السلوك الإيجابي (80 درجة) خلال الفصل الدراسي بتنفيذ ممارسات السلوك المقترحة، ولا يعفيه التعويض من بقية إجراءات المخالفة."
+        : "المرجع: المادة (5) — يُخصص للسلوك المتميز 20% من درجة السلوك، ولا تتجاوز درجة السلوك 100. ممارسة «الانضباط وعدم الغياب بدون عذر» تُحتسب مرة واحدة في الفصل.";
+      if (!stu) { box.innerHTML = ""; return; }
+      var sc = A.score(stu);
+      box.innerHTML = sc.qualitative ? '<p class="alert sm">الطالب في مرحلة التقدير الكيفي.</p>' : k === "comp"
+        ? '<p class="alert ' + (sc.compLeft ? "warn" : "ok") + ' sm">المحسوم: <b>' + sc.deducted + "</b> · المعوَّض: <b>" + Math.min(sc.comp, sc.deducted) + "</b> · المتبقي للتعويض: <b>" + sc.compLeft + "</b>" + (sc.compLeft ? "" : " — لا توجد درجات محسومة تحتاج تعويضاً") + "</p>"
+        : '<p class="alert ok sm">السلوك المتميز: <b>' + sc.excellent + "</b> من 20</p>";
+    }
+    ksel.onchange = drawState;
     drawStu();
-    var sel = $("[name=practice]"), pts = $("[name=pts]");
     sel.onchange = function () { var m = R.MERITS.find(function (x) { return x.id === sel.value; }); pts.value = m.pts; pts.readOnly = !m.custom; };
     sel.onchange();
     $("#fm").onsubmit = async function (ev) {
       ev.preventDefault(); if (!stu) return A.toast("اختر الطالب", "err");
-      var f = new FormData(this), m = R.MERITS.find(function (x) { return x.id === f.get("practice"); });
+      var f = new FormData(this), m = R.MERITS.find(function (x) { return x.id === f.get("practice"); }), k = f.get("kind");
+      if (k === "comp" && !A.score(stu).compLeft && !(await A.confirm("لا توجد درجات محسومة متبقية للتعويض لهذا الطالب. تسجيلها تعويضية على أي حال؟"))) return;
       if (m.once && A.S.merits.some(function (x) { return x.stu === stu.id && x.practice === m.id; }) && !(await A.confirm("سبق احتساب هذه الممارسة للطالب. احتسابها مرة أخرى؟"))) return;
       var by = A.byId[f.get("by")];
-      await A.save({ id: "M" + SL.rid(10), t: "mer", at: Date.now(), stu: stu.id, practice: m.id, pts: Math.min(6, Math.max(1, +f.get("pts") || m.pts)), date: f.get("date"), topic: f.get("topic"), evidence: f.get("evidence"), note: f.get("note"), by: by ? by.id : "", byName: by ? by.name : "" });
-      A.toast("تمت إضافة " + f.get("pts") + " درجات"); A.go("student/" + stu.id);
+      await A.save({ id: "M" + SL.rid(10), t: "mer", kind: k, at: Date.now(), stu: stu.id, practice: m.id, pts: Math.min(6, Math.max(1, +f.get("pts") || m.pts)), date: f.get("date"), topic: f.get("topic"), evidence: f.get("evidence"), note: f.get("note"), by: by ? by.id : "", byName: by ? by.name : "" });
+      A.toast("تمت إضافة " + f.get("pts") + " درجات (" + A.MERIT_KIND[k] + ")"); A.go("student/" + stu.id);
     };
   };
 
@@ -2344,7 +2390,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   V.more = function () {
     setTitle("المزيد");
     main().innerHTML = '<div class="tiles">' +
-      [["#staff", "المعلمون والإدارة", "teacher"], ["#import", "استيراد من Excel", "upload"], ["#merit", "السلوك المتميز", "star"], ["#reports", "التقارير", "list"], ["#absence", "الغياب — ربط وهج", "calendar"], ["#sigs", "التوقيعات عن بُعد", "pen"], ["#commit", "الالتزام المدرسي", "doc"], ["#settings", "الإعدادات والاشتراك", "gear"], ["#log", "سجل العمليات", "clock"]]
+      [["#staff", "المعلمون والإدارة", "teacher"], ["#import", "استيراد من Excel", "upload"], ["#comp", "السلوك التعويضي", "check"], ["#merit", "السلوك المتميز", "star"], ["#reports", "التقارير", "list"], ["#absence", "الغياب — ربط وهج", "calendar"], ["#sigs", "التوقيعات عن بُعد", "pen"], ["#commit", "الالتزام المدرسي", "doc"], ["#settings", "الإعدادات والاشتراك", "gear"], ["#log", "سجل العمليات", "clock"]]
         .map(function (x) { return '<a class="tile" href="' + x[0] + '"><span class="tile-i">' + SLI(x[2]) + "</span><b>" + e(x[1]) + "</b></a>"; }).join("") +
       (A.installed() ? "" : '<button class="tile" type="button" id="mo-inst"><span class="tile-i">' + SLI("download") + "</span><b>تثبيت التطبيق على هذا الجهاز</b></button>") + "</div>" +
       '<p class="mut center">سَمْت — الإصدار <bdi dir="ltr">' + e(window.SAMT_BUILD || C.version || C.BUILTIN) + "</bdi> · " + e(C.licLabel(C.lic)) + "</p>";
@@ -3000,7 +3046,8 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var incs = A.S.incidents.filter(function (x) { return x.stu === s.id && (x.status === "open" || x.status === "closed"); })
       .sort(function (a, b) { return new Date(a.date) - new Date(b.date); });
     var mers = A.S.merits.filter(function (m) { return m.stu === s.id; }).sort(function (a, b) { return new Date(a.date) - new Date(b.date); });
-    return { incs: incs, mers: mers, score: A.score(s), qual: A.qualitative(s) };
+    var kinds = A.meritKinds(s);
+    return { incs: incs, mers: mers, kinds: kinds, comp: mers.filter(function (m) { return kinds[m.id] === "comp"; }), exc: mers.filter(function (m) { return kinds[m.id] !== "comp"; }), score: A.score(s), qual: A.qualitative(s) };
   }
   function repStep(x) {
     var art = R.articleById(x.art) || { steps: [] }, st = art.steps[x.stepIdx] || art.steps[0] || { title: "", actions: [] }, dn = x.done || {};
@@ -3031,7 +3078,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       var d = repData(s), sc = d.score;
       var html = '<section class="card"><div class="stu-top"><div><h2>' + e(s.name) + '</h2><p class="mut">' + e(A.classKey(s)) + " · المرحلة " + e(A.stageLabel(s)) + "</p></div>" + A.scoreChip(s) + "</div>" +
         '<div class="rep-sum"><span class="chip">المخالفات: <b>' + d.incs.length + "</b></span>" +
-        (d.qual ? '<span class="chip">تقدير كيفي</span>' : '<span class="chip red">المحسوم: <b>' + sc.deducted + '</b></span><span class="chip ok">التعويض: <b>' + sc.merits + '</b></span><span class="chip">درجة السلوك: <b>' + sc.total + "</b> من 100</span>") + "</div>" +
+        (d.qual ? '<span class="chip">تقدير كيفي</span>' : '<span class="chip red">المحسوم: <b>' + sc.deducted + '</b></span><span class="chip kc">التعويض: <b>' + Math.min(sc.comp, sc.deducted) + '</b></span><span class="chip ke">التميز: <b>' + sc.excellent + '</b> من 20</span><span class="chip">درجة السلوك: <b>' + sc.total + "</b> من 100</span>") + "</div>" +
         '<div class="actions"><a class="btn pri" href="#repdoc/' + s.id + '">' + SLI("download") + ' طباعة التقرير</a><a class="btn" href="#student/' + s.id + '">ملف الطالب</a></div></section>';
       html += '<section class="card"><h3>المخالفات (' + d.incs.length + ")</h3>" + (d.incs.length ? '<div class="rep-l">' + d.incs.map(function (x) {
         var r = repStep(x);
@@ -3042,28 +3089,34 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
           (x.committee && x.committee.decisions ? '<p><b>قرارات لجنة التوجيه:</b> ' + e(x.committee.decisions) + "</p>" : "") +
           '<p class="mut sm">الراصد: ' + e(x.byName || "—") + (x.period ? " · الحصة: " + e(x.period) : "") + ' · <a href="#inc/' + x.id + '">فتح المخالفة</a></p></div></details>';
       }).join("") + "</div>" : '<p class="mut">لا توجد مخالفات مسجلة.</p>') + "</section>";
-      html += '<section class="card"><h3>درجات التعويض (' + d.mers.length + ")</h3>" + (d.mers.length ? '<ul class="list">' + d.mers.map(function (m) {
-        return '<li><div class="row1"><span class="chip ok">+' + (m.pts || 0) + "</span> " + e(meritText(m)) + '</div><div class="row3">' + e(SL.hijri(m.date)) + "</div></li>";
-      }).join("") + "</ul>" : '<p class="mut">لا توجد درجات تعويض مسجلة.</p>') + "</section>";
+            [["comp", "درجات التعويض", d.comp, "لا توجد درجات تعويض مسجلة."], ["exc", "السلوك المتميز", d.exc, "لا يوجد سلوك متميز مسجل."]].forEach(function (g) {
+        html += '<section class="card"><h3>' + g[1] + " (" + g[2].length + ")</h3>" + (g[2].length ? '<ul class="list">' + g[2].map(function (m) {
+          return '<li><div class="row1"><span class="chip ok">+' + (m.pts || 0) + "</span> " + A.kindChip(g[0]) + " " + e(meritText(m)) + '</div><div class="row3">' + e(SL.hijri(m.date)) + "</div></li>";
+        }).join("") + "</ul>" : '<p class="mut">' + g[3] + "</p>") + "</section>";
+      });
       out.innerHTML = html;
     }
   };
 
   /* التقرير المطبوع بالترويسة الرسمية */
   A.reportDoc = function (s) {
-    var d = repData(s), sc = d.score, sum = 0, gain = 0;
+    var d = repData(s), sc = d.score, sum = 0;
     var rows = d.incs.map(function (x, i) { sum += d.qual ? 0 : x.deduct || 0; return [String(i + 1), x.itemText, R.DEGREE_NAME[x.degree] || "", SL.hijri(x.date), SL.time(x.date), dedLabel(x, d.qual), repStep(x).st.title]; });
     if (!rows.length) rows.push(["—", "لا توجد مخالفات مسجلة", "", "", "", "", ""]);
     else rows.push(["", "المجموع", "", "", "", d.qual ? "—" : String(sum), ""]);
-    var mrows = d.mers.map(function (m, i) { gain += m.pts || 0; return [String(i + 1), meritText(m), SL.hijri(m.date), String(m.pts || 0)]; });
-    if (!mrows.length) mrows.push(["—", "لا توجد درجات تعويض مسجلة", "", ""]);
-    else mrows.push(["", "المجموع", "", String(gain)]);
+    function mtable(list, empty) {
+      var tot = 0, r = list.map(function (m, i) { tot += m.pts || 0; return [String(i + 1), meritText(m), SL.hijri(m.date), String(m.pts || 0)]; });
+      if (!r.length) r.push(["—", empty, "", ""]); else r.push(["", "المجموع", "", String(tot)]);
+      return r;
+    }
     var blocks = [{ k: "h", t: "أولاً: المخالفات السلوكية" },
       { k: "table", head: ["م", "المخالفة", "درجتها", "التاريخ", "الوقت", "درجة الحسم", "الإجراء المتخذ"], rows: rows },
-      { k: "h", t: "ثانياً: درجات التعويض" },
-      { k: "table", head: ["م", "فرصة التعويض (السلوك المتميز)", "التاريخ", "الدرجات المكتسبة"], rows: mrows }];
+      { k: "h", t: "ثانياً: درجات التعويض (السلوك التعويضي)" },
+      { k: "table", head: ["م", "فرصة التعويض", "التاريخ", "الدرجات المكتسبة"], rows: mtable(d.comp, "لا توجد درجات تعويض مسجلة") },
+      { k: "h", t: "ثالثاً: السلوك المتميز" },
+      { k: "table", head: ["م", "ممارسة السلوك المتميز", "التاريخ", "الدرجات المكتسبة"], rows: mtable(d.exc, "لا يوجد سلوك متميز مسجل") }];
     if (d.qual) blocks.push({ k: "note", t: "الطالب في مرحلة التقدير الكيفي؛ لا تُحسم درجات." });
-    else blocks.push({ k: "fields", rows: [["مجموع الدرجات المحسومة", String(sc.deducted)], ["مجموع درجات التعويض", String(sc.merits)], ["درجة السلوك الحالية", sc.total + " من 100"]] });
+    else blocks.push({ k: "fields", rows: [["مجموع الدرجات المحسومة", String(sc.deducted)], ["الدرجات المعوَّضة", String(Math.min(sc.comp, sc.deducted))], ["درجات السلوك المتميز", sc.excellent + " من 20"], ["درجة السلوك الحالية", sc.total + " من 100"]] });
     return { id: "RPT", title: "تقرير عن مخالفات الطالب",
       fields: [["اسم الطالب", s.name, 1], ["الصف", s.grade || ""], ["الفصل", s.section || ""], ["المرحلة", A.stageLabel(s)], ["تاريخ التقرير", SL.hijri(Date.now())]],
       blocks: blocks,
@@ -3117,7 +3170,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       if (x.status === "reported") ev.push({ t: x.createdAt, ic: "inbox", c: "warn", x: "بلاغ من " + (x.byName || "معلم") + " عن " + st.name + " — " + (x.itemText || ""), h: "#inc/" + x.id });
       else ev.push({ t: x.createdAt, ic: "alert", c: "", x: "رُصدت مخالفة على " + st.name + " — " + (x.itemText || ""), h: "#inc/" + x.id });
     });
-    S.merits.forEach(function (m) { var t = m.at || m.createdAt; if (!t) return; var st = A.byId[m.stu] || {}; ev.push({ t: t, ic: "star", c: "gold", x: "سلوك متميز لـ " + (st.name || "طالب") + " (+" + (m.pts || 0) + ")", h: "#student/" + m.stu }); });
+    S.merits.forEach(function (m) { var t = m.at || m.createdAt; if (!t) return; var st = A.byId[m.stu] || {}; ev.push({ t: t, ic: "star", c: "gold", x: (m.kind === "comp" ? "سلوك تعويضي لـ " : "سلوك متميز لـ ") + (st.name || "طالب") + " (+" + (m.pts || 0) + ")", h: "#student/" + m.stu }); });
     if (!ev.length) return '<div class="live" id="live-s"><span class="lv-dot off"></span><b>الآن</b><span class="lv-t">لا نشاط بعد — تظهر هنا آخر البلاغات والتوقيعات فور وصولها.</span></div>';
     ev.sort(function (a, b) { return b.t - a.t; });
     var L = ev[0], fresh = now - L.t < 15 * 6e4, today = ev.filter(function (x) { return x.t >= t0; }).length;
@@ -3439,9 +3492,10 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   var R = window.RULES, SL = window.SL, C = window.SLCore, A = window.APP, e = SL.esc, $ = A.$;
 
   function shell() {
-    /* القائمة الجانبية في صناديق: الرئيسية | الطالب والسلوك | التقارير | التوقيعات | المعلمون | النظام */
+    /* القائمة الجانبية في صناديق: الرئيسية | الطالب والمخالفات والتعويض | السلوك المتميز | التقارير | التوقيعات | المعلمون | النظام */
     var groups = [[["home", "home", "الرئيسية"]],
-      [["students", "users", "الطلاب"], ["commit", "doc", "الالتزام المدرسي"], ["incidents", "alert", "المخالفات", "nav-badge"], ["merit", "star", "السلوك المتميز"], ["absence", "calendar", "الغياب"]],
+      [["students", "users", "الطلاب"], ["commit", "doc", "الالتزام المدرسي"], ["incidents", "alert", "المخالفات", "nav-badge"], ["comp", "check", "السلوك التعويضي"], ["absence", "calendar", "الغياب"]],
+      [["merit", "star", "السلوك المتميز"]],
       [["reports", "list", "التقارير"]],
       [["sigs", "pen", "التوقيعات عن بُعد", "sig-badge"]],
       [["staff", "teacher", "المعلمون والإدارة"]],

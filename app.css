@@ -115,13 +115,13 @@ main.enter > *:nth-child(2) { animation-delay: .04s; } main.enter > *:nth-child(
 .new { display: flex; align-items: center; gap: 10px; padding: 13px 16px; border-radius: 15px; font-weight: 700; margin-bottom: 14px; color: #1d1606; background: linear-gradient(135deg, #dcb75f, #b8913c); box-shadow: 0 10px 24px rgba(201,162,76,.28); transition: transform .2s, box-shadow .2s; }
 .new:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(201,162,76,.4); }
 .new kbd { margin-inline-start: auto; font: inherit; font-size: .7rem; padding: 0 7px; border-radius: 6px; background: rgba(0,0,0,.12); }
-.snav { display: flex; flex-direction: column; gap: 8px; }
-.sgrp { display: flex; flex-direction: column; gap: 2px; padding: 4px; border-radius: 14px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08); }
+.snav { display: flex; flex-direction: column; gap: 12px; padding: 2px 2px 8px; }
+.sgrp { display: flex; flex-direction: column; gap: 2px; padding: 5px; border-radius: 14px; background: linear-gradient(160deg, rgba(255,255,255,.075), rgba(255,255,255,.025)); border: 1.5px solid var(--gold); box-shadow: 0 8px 20px rgba(0,0,0,.38), 0 2px 5px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.08); }
 .sgrp:empty, .no-wj .sgrp:has(> a:only-child[href="#absence"]) { display: none; }
 .sgrp a.on::before { inset-inline-start: -5px; }
-.snav a { position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; font-weight: 500; font-size: .95rem; color: rgba(255,255,255,.66); transition: background .15s, color .15s; }
+.snav a { position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; font-family: "Plex", sans-serif; font-weight: 700; font-size: 1.02rem; letter-spacing: 0; color: rgba(255,255,255,.86); transition: background .15s, color .15s; }
 .snav a:hover { background: rgba(255,255,255,.06); color: #fff; }
-.snav a.on { background: rgba(201,162,76,.14); color: #fff; font-weight: 600; }
+.snav a.on { background: rgba(201,162,76,.16); color: #fff; font-weight: 700; }
 .snav a.on svg.ic { color: var(--gold); }
 .snav a.on::before { content: ""; position: absolute; inset-inline-start: -16px; top: 9px; bottom: 9px; width: 4px; border-radius: 4px; background: var(--gold); }
 .snav em { margin-inline-start: auto; font-style: normal; font-size: .72rem; font-weight: 700; min-width: 22px; height: 22px; border-radius: 11px; display: grid; place-items: center; padding: 0 6px; background: #e0525a; color: #fff; }
@@ -594,3 +594,7 @@ html.net-off body::after { content: "لا يوجد اتصال بالإنترنت
 .rep-acts li { padding: 4px 0; color: #5b6570; }
 .rep-acts li.ok { color: var(--ink); }
 .rep-acts li.ok::first-letter { color: var(--ok); font-weight: 800; }
+
+/* نوع السلوك: تعويضي | تميز */
+.chip.kc { background: #e8f1fb; border-color: #bcd4f0; color: #184c86; }
+.chip.ke { background: #fbf3df; border-color: #ecd49a; color: #7a5a12; }
