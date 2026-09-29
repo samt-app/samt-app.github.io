@@ -149,7 +149,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
 
   <div class="seg views" id="views">
     <button data-v="sch" class="on" type="button">المدارس والتراخيص</button>
-    <button data-v="dev" type="button">كل الأجهزة</button>
+    <button data-v="dev" type="button">تقارير الاستخدام</button>
     <button data-v="mnt" type="button">صيانة المنصة</button>
   </div>
 
@@ -157,7 +157,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
     <div class="kpis" id="skpis"></div>
     <div class="bar"><input id="sq" type="search" placeholder="بحث باسم المدرسة أو الرقم الوزاري أو اسم المدير أو الوكيل…"></div>
     <div class="cards" id="scards"></div>
-    <p class="foot">لكل رقم وزاري ترخيص يعمل على أي جهاز، وعلى جهاز واحد في كل مرة. الأوامر (تمديد، إيقاف، فصل جهاز، السماح بالتعديل) تصل للمدرسة عند أول تشغيل متصل بالإنترنت.</p>
+    <p class="foot">لكل رقم وزاري ترخيص يعمل على أي جهاز، وعلى جهاز واحد في كل مرة. الترخيص مرتبط بالرقم الوزاري واسم المدرسة فقط، لا بالجهاز. الأوامر (تمديد، إيقاف، إنهاء الجلسة، السماح بالتعديل) تصل للمدرسة عند أول تشغيل متصل بالإنترنت.</p>
   </section>
 
   <section id="v-mnt" class="hide">
@@ -179,7 +179,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
   <div class="kpis" id="kpis"></div>
 
   <div class="bar">
-    <input id="q" type="search" placeholder="بحث باسم المدرسة أو رقم الجهاز أو الإدارة…">
+    <input id="q" type="search" placeholder="بحث باسم المدرسة أو الرقم الوزاري أو الإدارة…">
     <div class="seg" id="seg">
       <button data-f="all" class="on" type="button">الكل</button>
       <button data-f="ok" type="button">فعّال</button>
@@ -195,7 +195,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
     <table>
       <thead><tr>
         <th data-s="school">المدرسة <span>⇅</span></th>
-        <th data-s="dev">رقم الجهاز <span>⇅</span></th>
+        <th data-s="dev">الرقم الوزاري <span>⇅</span></th>
         <th data-s="end">الاشتراك <span>⇅</span></th>
         <th data-s="last">آخر دخول <span>⇅</span></th>
         <th data-s="stu">الطلاب <span>⇅</span></th>
@@ -272,20 +272,21 @@ td.dcol .del svg { width: 19px; height: 19px; }
           Object.keys(raw).forEach(function (k) { try { cmds[k] = typeof raw[k] === "string" ? JSON.parse(raw[k]) : raw[k]; } catch (err) {} });
         }
       } catch (err) {}
+      var LIC0 = {}; try { var rl0 = await fetch(DB + "/lic.json?auth=" + encodeURIComponent(window.__tok), { cache: "no-store" }); LIC0 = rl0.ok ? ((await rl0.json()) || {}) : {}; } catch (err) {}
       RAW = {}; DELS = Object.keys(cmds).filter(function (k) { return cmds[k] && cmds[k].del; }).map(function (k) { return { dev: k, at: cmds[k].at || 0 }; });
-      ROWS = Object.keys(box).filter(function (k) { var c = cmds[k]; if (!c) { try { var oo = typeof box[k] === "string" ? JSON.parse(box[k]) : box[k]; c = cmds[(oo || {}).dev]; } catch (err) {} } return !(c && c.del); }).map(function (k) {
+      ROWS = Object.keys(box).map(function (k) {
         var o = {}; try { o = typeof box[k] === "string" ? JSON.parse(box[k]) : box[k] || {}; } catch (err) {}
         RAW[o.dev || k] = o;
         var logins = o.logins || [], last = logins[logins.length - 1] || o.at || 0;
         var endT = o.end ? new Date(o.end + "T23:59:59").getTime() : 0;
         var days = o.trial ? Math.ceil((o.hours || 0) / 24) : endT ? Math.ceil((endT - Date.now()) / 864e5) : 0;
-        var cm = cmds[o.dev || k] || {};
+        var cm = pj((LIC0[o.moe || o.dev || k] || {}).cmd) || {};   /* أوامر المدرسة بالرقم الوزاري */
         if (cm.end) { var ce = new Date(cm.end + "T23:59:59").getTime(); if (ce > endT) { endT = ce; days = Math.ceil((ce - Date.now()) / 864e5); o.trial = false; } }
         return { cmd: cm, wahaj: !!cm.wahaj, stopped: !!cm.stop, cmdEnd: cm.end || "", dev: o.dev || k, school: o.school || "—", region: o.region || "", admin: o.admin || "", ver: o.ver || "—",
           trial: !!o.trial, end: o.end || "", endT: endT, days: days, last: last, logins: logins, first: o.first || 0,
           stu: (o.n || {}).stu || 0, inc: (o.n || {}).inc || 0, sig: (o.n || {}).sig || 0, stf: (o.n || {}).stf || 0, mer: (o.n || {}).mer || 0, ua: o.ua || "" };
       });
-      try { var rl = await fetch(DB + "/lic.json?auth=" + encodeURIComponent(window.__tok), { cache: "no-store" }); LIC = rl.ok ? ((await rl.json()) || {}) : {}; } catch (err) { LIC = {}; }
+      LIC = LIC0;
       try { var rm = await fetch(DB + "/sys/maint.json", { cache: "no-store" }); MAINT = rm.ok ? await rm.json() : null; } catch (err) {}
       $("#upd").textContent = "آخر تحديث " + SL.time(Date.now());
       draw(); drawSchools(); drawMaint();
@@ -324,7 +325,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
     var end = ROWS.filter(function (r) { return state(r) === "end"; }).length, idle = ROWS.filter(function (r) { return state(r) === "idle"; }).length;
     var stu = ROWS.reduce(function (s, r) { return s + r.stu; }, 0), inc = ROWS.reduce(function (s, r) { return s + r.inc; }, 0);
     $("#kpis").innerHTML =
-      kpi(n, "جهاز مسجّل", "") + kpi(ok + soon + idle, "اشتراك فعّال", "ok") + kpi(soon, "ينتهي خلال 14 يوماً", "warn") +
+      kpi(n, "مدرسة لها تقارير", "") + kpi(ok + soon + idle, "اشتراك فعّال", "ok") + kpi(soon, "ينتهي خلال 14 يوماً", "warn") +
       kpi(tri, "قيد التجربة", "") + kpi(end, "منتهٍ", "red") + kpi(idle, "لم يدخل منذ أسبوعين", "") + kpi(ROWS.filter(function (r) { return state(r) === "stop"; }).length, "موقوف", "red") +
       kpi(stu.toLocaleString("ar-SA"), "طالب في كل المدارس", "") + kpi(inc.toLocaleString("ar-SA"), "مخالفة مسجّلة", "");
     $("#rows").innerHTML = list.length ? list.map(function (r, i) {
@@ -334,29 +335,23 @@ td.dcol .del svg { width: 19px; height: 19px; }
         '<td><span class="pill ' + lb[1] + '">' + e(txt) + "</span>" + (r.end ? '<div class="mini">حتى ' + e(r.end) + "</div>" : "") + "</td>" +
         "<td>" + e(ago(r.last)) + '<div class="mini">' + e(r.last ? SL.hijri(r.last) + " " + SL.time(r.last) : "") + "</div></td>" +
         "<td>" + r.stu + "</td><td>" + r.inc + "</td><td>" + r.sig + "</td><td>" + e(r.ver) + "</td>" +
-        '<td class="dcol"><button class="del" type="button" data-ddel="' + e(r.dev) + '" title="حذف الجهاز نهائياً" aria-label="حذف الجهاز نهائياً">' + TRASH + "</button></td></tr>" +
+        '<td class="dcol"><button class="del" type="button" data-ddel="' + e(r.dev) + '" title="حذف سجل التقارير" aria-label="حذف سجل التقارير">' + TRASH + "</button></td></tr>" +
         '<tr class="det hide" data-d="' + i + '"><td colspan="9">' +
           '<div style="display:flex;gap:26px;flex-wrap:wrap">' +
           '<div><b>آخر ' + (r.logins.length || 0) + ' مرات دخول</b><ul class="logins">' + (r.logins.slice().reverse().map(function (t) { return "<li>" + e(SL.hijri(t)) + " — " + e(SL.greg(t)) + " " + e(SL.time(t)) + "</li>"; }).join("") || "<li>—</li>") + "</ul></div>" +
           "<div><b>أرقام</b><ul class=\"logins\"><li>الطلاب: " + r.stu + "</li><li>المنسوبون: " + r.stf + "</li><li>المخالفات: " + r.inc + "</li><li>السلوك المتميز: " + r.mer + "</li><li>روابط التوقيع: " + r.sig + "</li></ul></div>" +
           '<div><b>معلومات</b><ul class="logins"><li>أول تشغيل: ' + e(r.first ? SL.hijri(r.first) : "—") + "</li><li>إدارة التعليم: " + e(r.admin || "—") + "</li><li>الجهاز: " + e(r.ua || "—") + "</li></ul></div>" +
-          '</div><div class="tools"><button class="btn sm" data-copy="' + e(r.dev) + '" type="button">نسخ رقم الجهاز</button>' +
+          '</div><div class="tools"><button class="btn sm" data-copy="' + e(r.dev) + '" type="button">نسخ الرقم الوزاري</button>' +
           '<button class="btn sm" data-wa="' + e(r.dev) + '" type="button">رسالة تجديد جاهزة</button>' +
-          '<button class="btn sm pri" data-ext="' + e(r.dev) + '" data-m="3" type="button">تمديد 3 أشهر</button>' +
-          '<button class="btn sm pri" data-ext="' + e(r.dev) + '" data-m="12" type="button">تمديد سنة</button>' +
-          '<button class="btn sm" data-extd="' + e(r.dev) + '" type="button">تمديد حتى تاريخ…</button>' +
-          (r.stopped ? '<button class="btn sm" data-run="' + e(r.dev) + '" type="button">إلغاء الإيقاف</button>'
-                     : '<button class="btn sm danger" data-stop="' + e(r.dev) + '" type="button">إيقاف الاشتراك</button>') +
-          (r.wahaj ? '<button class="btn sm" data-wj="' + e(r.dev) + '" type="button">إيقاف ميزات وهج</button>' : '<button class="btn sm pri" data-wj="' + e(r.dev) + '" type="button">السماح بميزات وهج (الغياب)</button>') +
-          (r.cmdEnd ? '<span class="pill p-ok">أمر ساري: حتى ' + e(r.cmdEnd) + "</span>" : "") + "</div>" +
+          '<span class="mini">التمديد والإيقاف ووهج من بطاقة المدرسة في «المدارس والتراخيص».</span></div>' +
         "</td></tr>";
-    }).join("") : '<tr><td colspan="9"><div class="empty"><p>لا توجد أجهزة مطابقة.</p></div></td></tr>';
+    }).join("") : '<tr><td colspan="9"><div class="empty"><p>لا توجد نتائج مطابقة.</p></div></td></tr>';
     document.querySelectorAll(".row").forEach(function (tr) {
       tr.onclick = function () { var d = document.querySelector('[data-d="' + tr.dataset.i + '"]'); if (d) d.classList.toggle("hide"); };
     });
-    $("#dels").innerHTML = DELS.length ? '<section class="dels"><h4>أجهزة محذوفة ومقفلة (' + DELS.length + ')</h4><p class="mini">هذه الأجهزة مقفلة ولا تظهر في الجدول. «استعادة» يرفع الإقفال فيعود الجهاز للعمل ويظهر هنا عند أول تشغيل متصل.</p>' +
-      DELS.map(function (d) { return '<div class="drow"><span class="dev">' + e(d.dev) + '</span><span class="mini">حُذف ' + e(d.at ? ago(d.at) : "") + '</span><button class="btn sm" type="button" data-undel="' + e(d.dev) + '">استعادة</button></div>'; }).join("") + "</section>" : "";
-    document.querySelectorAll("[data-undel]").forEach(function (b) { b.onclick = function () { act(b, function () { return put("/cmd/" + encodeURIComponent(b.dataset.undel), null); }, "استُعيد"); }; });
+    $("#dels").innerHTML = DELS.length ? '<section class="dels"><h4>إقفالات أجهزة قديمة (' + DELS.length + ')</h4><p class="mini">لم يعد لها أي أثر: المنصة لا ترتبط بالجهاز. يمكنك مسحها.</p>' +
+      DELS.map(function (d) { return '<div class="drow"><span class="dev">' + e(d.dev) + '</span><span class="mini">حُذف ' + e(d.at ? ago(d.at) : "") + '</span><button class="btn sm" type="button" data-undel="' + e(d.dev) + '">مسح</button></div>'; }).join("") + "</section>" : "";
+    document.querySelectorAll("[data-undel]").forEach(function (b) { b.onclick = function () { act(b, function () { return put("/cmd/" + encodeURIComponent(b.dataset.undel), null); }, "مُسح"); }; });
     document.querySelectorAll("[data-ddel]").forEach(function (b) { b.onclick = function (ev) { ev.stopPropagation(); delDevice(ROWS.find(function (x) { return x.dev === b.dataset.ddel; }) || { dev: b.dataset.ddel }); }; });
     document.querySelectorAll("[data-copy]").forEach(function (b) { b.onclick = function (ev) { ev.stopPropagation(); navigator.clipboard.writeText(b.dataset.copy); b.textContent = "تم النسخ"; }; });
     function iso(d) { return new Date(d).toISOString().slice(0, 10); }
@@ -444,6 +439,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
       Object.keys(RAW).forEach(function (d) {
         var o = RAW[d]; (o.lics || []).forEach(function (x) { if (x.moe === moe && (o.at || 0) > infoAt) { info = x; infoAt = o.at || 0; } });
       });
+      var rm = RAW[moe]; if (rm) { if (!info) info = { name: rm.school || "", end: rm.end || "" }; infoAt = Math.max(infoAt, rm.at || 0); devs.push({ n: 0, dev: "", o: rm, last: (rm.logins || []).slice(-1)[0] || rm.at || 0 }); }
       for (var n = 1; n <= 3; n++) {
         var dev = slots[n] || "", o = dev ? RAW[dev] || null : null, lg = o ? (o.logins || []) : [];
         devs.push({ n: n, dev: dev, o: o, last: lg[lg.length - 1] || (o && o.at) || 0 });
@@ -512,9 +508,9 @@ td.dcol .del svg { width: 19px; height: 19px; }
     var i = x.info || {}, devs = x.devs.filter(function (d) { return d.dev; });
     var w = document.createElement("div"); w.className = "modal-w";
     w.innerHTML = '<div class="modal" role="dialog" aria-modal="true"><h3>' + WARN + " حذف المدرسة نهائياً</h3>" +
-      '<div class="who2"><b>' + e(i.name || "مدرسة لم تُعتمد بياناتها") + '</b><div class="mini">الرقم الوزاري: <span class="dev">' + e(x.moe) + "</span> · الأجهزة المسجّلة: " + devs.length + " من 3</div></div>" +
+      '<div class="who2"><b>' + e(i.name || "مدرسة لم تُعتمد بياناتها") + '</b><div class="mini">الرقم الوزاري: <span class="dev">' + e(x.moe) + "</span></div></div>" +
       "<p><b>سيُحذف من الخادم نهائياً ولا يمكن التراجع:</b></p><ul>" +
-      "<li>ترخيص المدرسة وجلستها</li><li>بيانات الاعتماد (الاسم، المدير، الوكيل، الموجه)</li><li>أوامر التمديد والإيقاف والسماح بالتعديل</li><li>سجلات أجهزتها في هذه اللوحة</li></ul>" +
+      "<li>ترخيص المدرسة وجلستها</li><li>بيانات الاعتماد (الاسم، المدير، الوكيل، الموجه)</li><li>أوامر التمديد والإيقاف والسماح بالتعديل</li><li>سجل تقاريرها في هذه اللوحة</li></ul>" +
       '<p class="mini">بيانات الطلاب والمخالفات محفوظة على أجهزة المدرسة نفسها ولا تُحذف، لكن المنصة تُقفل عندهم عند أول تشغيل متصل، ويلزم تفعيل الكود واعتماد البيانات من جديد لإعادتها.</p>' +
       '<label>للتأكيد اكتب الرقم الوزاري <b class="dev">' + e(x.moe) + '</b><input id="dl-in" dir="ltr" inputmode="numeric" autocomplete="off"></label>' +
       '<div class="actions"><button class="btn danger" id="dl-go" type="button" disabled>' + TRASH.replace("<svg", '<svg style="width:18px;height:18px;vertical-align:-3px"') + ' حذف نهائي</button><button class="btn" id="dl-no" type="button">إلغاء</button></div><p id="dl-msg" class="mini"></p></div>';
@@ -533,6 +529,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
         var ids = {}; devs.forEach(function (d) { ids[d.dev] = 1; });
         Object.keys(RAW).forEach(function (d) { if ((RAW[d].lics || []).some(function (l) { return l.moe === x.moe; })) ids[d] = 1; });
         await put("/lic/" + x.moe, null);
+        ids[x.moe] = 1;
         for (var d in ids) { await put("/reg/" + encodeURIComponent(d), null); await put("/cmd/" + encodeURIComponent(d), null); }
         close(); await load();
       } catch (err) { w.querySelector("#dl-msg").textContent = "تعذّر الحذف — أعد المحاولة (" + err.message + ")"; go.disabled = false; go.textContent = "حذف نهائي"; }
@@ -541,11 +538,9 @@ td.dcol .del svg { width: 19px; height: 19px; }
   /* حذف جهاز نهائياً من لوحة «كل الأجهزة»: تحذير + كتابة «حذف» للتأكيد */
   function delDevice(r) {
     var w = document.createElement("div"); w.className = "modal-w";
-    w.innerHTML = '<div class="modal" role="dialog" aria-modal="true"><h3>' + WARN + " حذف الجهاز نهائياً</h3>" +
-      '<div class="who2"><b>' + e(r.school && r.school !== "—" ? r.school : "جهاز بلا اسم مدرسة") + '</b><div class="mini">رقم الجهاز: <span class="dev">' + e(r.dev) + "</span>" + (r.stu ? " · الطلاب: " + r.stu : "") + (r.inc ? " · المخالفات: " + r.inc : "") + "</div></div>" +
-      "<p><b>سيُحذف من الخادم نهائياً ولا يمكن التراجع:</b></p><ul><li>سجل الجهاز في هذه اللوحة (الدخول، الأرقام، الإصدار)</li><li>أوامر التمديد والإيقاف الخاصة به</li></ul>" +
-      '<label class="chk"><input type="checkbox" id="dl-blk" checked> إقفال المنصة على هذا الجهاز أيضاً (لا يعود للظهور ولا يعمل حتى لو شُغّل من جديد)</label>' +
-      '<p class="mini">بيانات الطلاب والمخالفات محفوظة على الجهاز نفسه ولا تُحذف. إن ألغيت الإقفال فسيعود الجهاز للظهور هنا عند أول تشغيل متصل.</p>' +
+    w.innerHTML = '<div class="modal" role="dialog" aria-modal="true"><h3>' + WARN + " حذف سجل التقارير</h3>" +
+      '<div class="who2"><b>' + e(r.school && r.school !== "—" ? r.school : "بلا اسم مدرسة") + '</b><div class="mini">المعرّف: <span class="dev">' + e(r.dev) + "</span>" + (r.stu ? " · الطلاب: " + r.stu : "") + (r.inc ? " · المخالفات: " + r.inc : "") + "</div></div>" +
+      "<p>يُحذف سجل التقارير فقط (الدخول، الأرقام، الإصدار). لا يؤثر على ترخيص المدرسة ولا على عملها، ويعود السجل عند أول تشغيل متصل. لإيقاف مدرسة استخدم «إيقاف الاشتراك» في بطاقتها.</p>" +
       '<label>للتأكيد اكتب كلمة <b>حذف</b><input id="dl-in" autocomplete="off"></label>' +
       '<div class="actions"><button class="btn danger" id="dl-go" type="button" disabled>' + TRASH.replace("<svg", '<svg style="width:18px;height:18px;vertical-align:-3px"') + ' حذف نهائي</button><button class="btn" id="dl-no" type="button">إلغاء</button></div><p id="dl-msg" class="mini"></p></div>';
     document.body.appendChild(w);
@@ -559,10 +554,10 @@ td.dcol .del svg { width: 19px; height: 19px; }
     setTimeout(function () { inp.focus(); }, 50);
     go.onclick = async function () {
       go.disabled = true; go.textContent = "جارٍ الحذف…";
-      var id = encodeURIComponent(r.dev), blk = w.querySelector("#dl-blk").checked;
+      var id = encodeURIComponent(r.dev);
       try {
         await put("/reg/" + id, null);
-        await put("/cmd/" + id, blk ? JSON.stringify({ stop: true, del: true, why: "أُلغي تسجيل هذا الجهاز من المزوّد. تواصل مع متجر تقناس.", by: "admin", at: Date.now() }) : null);
+        await put("/cmd/" + id, null);
         close(); await load();
       } catch (err) { w.querySelector("#dl-msg").textContent = "تعذّر الحذف — أعد المحاولة (" + err.message + ")"; go.disabled = false; go.textContent = "حذف نهائي"; }
     };

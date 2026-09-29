@@ -81,34 +81,9 @@
     return id;
   }
 
-  /* ————— الترخيص: SL1.<رقم الجهاز>.<YYYYMMDD>.<توقيع> ————— */
-  async function verifyCode(code, dev) {
-    var p = String(code || "").trim().replace(/\s+/g, "").split(".");
-    if (p.length !== 4 || p[0] !== "SL1") return { ok: false, why: "صيغة كود الاشتراك غير صحيحة." };
-    var d = p[1].toUpperCase(), exp = p[2];
-    if (!/^\d{8}$/.test(exp)) return { ok: false, why: "صيغة كود الاشتراك غير صحيحة." };
-    if (!(await verifySig("SL1|" + d + "|" + exp, p[3]))) return { ok: false, why: "كود الاشتراك غير صالح." };
-    if (d !== String(dev).toUpperCase()) return { ok: false, why: "هذا الكود مخصص لجهاز آخر (" + d + ")." };
-    var end = new Date(+exp.slice(0, 4), +exp.slice(4, 6) - 1, +exp.slice(6, 8), 23, 59, 59);
-    if (Date.now() > end) return { ok: false, expired: true, end: end, why: "انتهى الاشتراك بتاريخ " + fmt(end) + "." };
-    return { ok: true, end: end, days: Math.ceil((end - Date.now()) / 864e5) };
-  }
-  /* ————— أوامر المزوّد: تمديد أو إيقاف الاشتراك عن بُعد (يكتبها المزوّد وحده) ————— */
   var REG = typeof self.SAMT_REG === "string" ? self.SAMT_REG : "https://samt-app-4132d-default-rtdb.europe-west1.firebasedatabase.app";
-  async function remoteFetch(dev) {
-    if (!REG) return await DB.get("remote");
-    try {
-      var c = new AbortController(), t = setTimeout(function () { c.abort(); }, 3000);
-      var r = await fetch(REG + "/cmd/" + encodeURIComponent(dev) + ".json", { cache: "no-store", signal: c.signal });
-      clearTimeout(t);
-      if (!r.ok) return await DB.get("remote");
-      var v = await r.json();
-      if (!v) { await DB.set("remote", null); return null; }
-      var o = typeof v === "string" ? JSON.parse(v) : v;
-      o.at = Date.now(); await DB.set("remote", o); return o;
-    } catch (e) { return await DB.get("remote"); }
-  }
-  /* ————— الترخيص بالرقم الوزاري: SL2.<الرقم الوزاري>.<YYYYMMDD>.<سر المدرسة>.<توقيع> —————
+  /* ————— الترخيص بالرقم الوزاري واسم المدرسة: SL3.<الرقم الوزاري>.<YYYYMMDD>.<سر المدرسة>.<اسم المدرسة b64url>.<توقيع> (وSL2 القديم بلا اسم) —————
+     • لا ارتباط بالجهاز إطلاقاً: لا رقم جهاز في الكود ولا أوامر للأجهزة.
      • الكود للمدرسة لا للجهاز: يعمل على أي جهاز، لكن على جهاز واحد فقط في كل لحظة (جلسة نشطة lic/<moe>/sess).
      • «سر المدرسة» ثابت عبر التجديدات؛ منه يُشتق مفتاح تشفير بيانات اعتماد المدرسة على الخادم.
      • يُتحقق من الخادم عند كل تشغيل، ويلزم الاتصال بالإنترنت لفتح المنصة. */
@@ -119,14 +94,20 @@
   function parseCode(code) {
     var p = String(code || "").trim().replace(/\s+/g, "").split(".");
     if (p[0] === "SL2" && p.length === 5 && /^\d{3,12}$/.test(p[1]) && /^\d{8}$/.test(p[2]) && /^[A-Za-z0-9_-]{16}$/.test(p[3])) return { v: 2, moe: p[1], exp: p[2], s: p[3], sig: p[4], code: p.join(".") };
+    if (p[0] === "SL3" && p.length === 6 && /^\d{3,12}$/.test(p[1]) && /^\d{8}$/.test(p[2]) && /^[A-Za-z0-9_-]{16}$/.test(p[3]) && /^[A-Za-z0-9_-]{2,400}$/.test(p[4])) {
+      var nm = ""; try { nm = new TextDecoder().decode(unb64u(p[4])).trim(); } catch (e) {}
+      if (nm) return { v: 2, t: 3, moe: p[1], exp: p[2], s: p[3], nm: p[4], name: nm, sig: p[5], code: p.join(".") };
+    }
     if (p[0] === "SL1" && p.length === 4) return { v: 1 };
     return null;
   }
+  /* نص التوقيع: SL3 يربط الكود بالرقم الوزاري واسم المدرسة معاً */
+  function sigMsg(c) { return c.t === 3 ? "SL3|" + c.moe + "|" + c.exp + "|" + c.s + "|" + c.nm : "SL2|" + c.moe + "|" + c.exp + "|" + c.s; }
   function expDate(x) { return new Date(+x.slice(0, 4), +x.slice(4, 6) - 1, +x.slice(6, 8), 23, 59, 59); }
   async function verifySchool(code) {
     var c = parseCode(code);
     if (!c || c.v !== 2) return { ok: false, why: "صيغة كود الاشتراك غير صحيحة." };
-    if (!(await verifySig("SL2|" + c.moe + "|" + c.exp + "|" + c.s, c.sig))) return { ok: false, why: "كود الاشتراك غير صالح." };
+    if (!(await verifySig(sigMsg(c), c.sig))) return { ok: false, why: "كود الاشتراك غير صالح." };
     var end = expDate(c.exp), exp = Date.now() > end;
     return { ok: !exp, c: c, moe: c.moe, end: end, expired: exp, why: exp ? "انتهى اشتراك المدرسة (" + c.moe + ") بتاريخ " + fmt(end) + "." : "" };
   }
@@ -159,9 +140,10 @@
     rec.id = srv.id ? ((await openId(moe, v.c.s, srv.id)) || rec.id || null) : null;
     var kid = await latestKeyId(moe, v.c.s, srv.ids);   /* اعتماد لاحق بكود جديد يتقدّم على الأقدم */
     if (kid && (!rec.id || (+kid.at || 0) > (+rec.id.at || 0))) rec.id = kid;
+    if (v.c.name && rec.id && rec.id.name !== v.c.name) rec.id = Object.assign({}, rec.id, { name: v.c.name });   /* اسم المدرسة من الكود نفسه */
     await saveLic(moe, rec);
     var cmd = rec.cmd || {};
-    Object.assign(out, { slot: 0, sess: parseJ(srv.sess), id: rec.id || null, unlock: unlockOn(rec.unlock) ? rec.unlock : null, okAt: rec.okAt });
+    Object.assign(out, { codeName: v.c.name || "", slot: 0, sess: parseJ(srv.sess), id: rec.id || null, unlock: unlockOn(rec.unlock) ? rec.unlock : null, okAt: rec.okAt });
     if (cmd.stop) return Object.assign(out, { ok: false, stopped: true, why: cmd.why || "أُوقف اشتراك المدرسة (" + moe + ") من المزوّد. تواصل مع متجر تقناس لتفعيله." });
     if (cmd.end) { var ce = new Date(cmd.end + "T23:59:59").getTime(); if (ce > end) end = ce; }
     if (now > end) return Object.assign(out, { ok: false, expired: true, end: new Date(end), why: "انتهى اشتراك المدرسة (" + moe + ") بتاريخ " + fmt(new Date(end)) + "." });
@@ -179,35 +161,26 @@
       if (good.length) return { ok: true, v: 2, dev: dev, schools: schools, end: good[0].end, days: good[0].days, wahaj: good.some(function (x) { return x.wahaj; }) };
       return { ok: false, v: 2, dev: dev, schools: schools, stopped: schools.some(function (x) { return x.stopped; }), why: schools.map(function (x) { return x.why; }).join(" ") };
     }
-    /* النظام السابق: كود مرتبط بالجهاز (SL1) + أوامر المزوّد للجهاز */
-    var rem = await remoteFetch(dev);
-    if (rem && rem.stop) return { ok: false, dev: dev, stopped: true, why: rem.why || "أُوقف الاشتراك من المزوّد. تواصل مع متجر تقناس لتفعيله." };
-    var remEnd = rem && rem.end ? new Date(rem.end + "T23:59:59").getTime() : 0;
-    var wj = !!(rem && rem.wahaj), r0 = await legacyLic(rem, remEnd, dev, now);
-    if (r0) r0.wahaj = wj;
-    return r0;
+    /* لا ارتباط بالجهاز: بلا كود مدرسة ← الفترة التجريبية بالرقم الوزاري */
+    return await trialLic(dev, now);
   }
-  async function legacyLic(rem, remEnd, dev, now) {
-    var code = await DB.get("license");
-    if (code) {
-      var r = await verifyCode(code, dev); r.dev = dev; r.code = code;
-      if (remEnd > now && (!r.ok || remEnd > +new Date(r.end || 0))) return { ok: true, dev: dev, end: new Date(remEnd), days: Math.ceil((remEnd - now) / 864e5), remote: true };
-      return r;
-    }
-    if (remEnd > now) return { ok: true, dev: dev, end: new Date(remEnd), days: Math.ceil((remEnd - now) / 864e5), remote: true };
+  async function trialLic(dev, now) {
     /* الفترة التجريبية مربوطة بالخادم وبالرقم الوزاري: lic/<moe>/trial = وقت البداية (يُكتب مرة واحدة ولا يُعدَّل)
        فمسح المتصفح أو تغيير الجهاز لا يعيدها. يلزم الإنترنت. */
     if (!(await DB.get("trialMoe")) && typeof self.SAMT_TRIAL_MOE === "string") await DB.set("trialMoe", self.SAMT_TRIAL_MOE);   /* للاختبارات */
     var tmoe = await DB.get("trialMoe");
     if (!tmoe) return { ok: false, trial: true, needMoe: true, dev: dev, why: "" };
     var tsrv = await licFetch(tmoe);
+    var tcmd = tsrv ? parseJ(tsrv.cmd) || {} : {};
+    if (tcmd.stop) return { ok: false, trial: true, stopped: true, dev: dev, why: tcmd.why || "أُوقفت المنصة لهذه المدرسة (" + tmoe + ") من المزوّد. تواصل مع متجر تقناس." };
+    if (tcmd.end) { var te = new Date(tcmd.end + "T23:59:59").getTime(); if (te > now) return { ok: true, ext: true, dev: dev, end: new Date(te), days: Math.ceil((te - now) / 864e5), wahaj: !!tcmd.wahaj }; }
     if (tsrv && (tsrv.id || tsrv.ids)) return { ok: false, trial: true, licensedMoe: tmoe, dev: dev, why: "هذه المدرسة (" + tmoe + ") مشتركة في المنصة، فلا تعمل فيها الفترة التجريبية. اربط مجلد sammt الخاص بالمدرسة من الأسفل، أو أدخل كود اشتراك المدرسة." };
     var local = (await DB.get("trialStart")) || 0, srv = await trialStart(tmoe, local || now);
     if (srv === undefined) return { ok: false, trial: true, offline: true, dev: dev, why: "يلزم الاتصال بالإنترنت لتشغيل الفترة التجريبية. تحقق من الاتصال ثم أعد المحاولة." };
     var start = Math.min(srv || now, local || Infinity);
     if (start !== local) await DB.set("trialStart", start);
     var end = new Date(start + TRIAL_HOURS * 3600e3), left = end - now;
-    if (left > 0) return { ok: true, trial: true, dev: dev, end: end, hours: Math.ceil(left / 3600e3) };
+    if (left > 0) return { ok: true, trial: true, dev: dev, end: end, hours: Math.ceil(left / 3600e3), wahaj: !!tcmd.wahaj };
     return { ok: false, trial: true, dev: dev, end: end, why: "انتهت الفترة التجريبية (ثلاثة أيام). أدخل كود اشتراك المدرسة للمتابعة." };
   }
   /* بداية التجربة على الخادم: تُقرأ، وإن لم توجد تُكتب مرة واحدة. undefined = لا اتصال */
@@ -249,7 +222,7 @@
       '<p class="lock-hint">الفترة التجريبية لكل مدرسة مرة واحدة، وتُحسب من أول تشغيل على أي جهاز.</p>' +
       '<label class="lock-l">الرقم الوزاري للمدرسة<input id="tr-moe" dir="ltr" inputmode="numeric" placeholder="مثال: 123456"></label>' +
       '<button class="btn pri" id="tr-go" type="button">بدء الفترة التجريبية</button><p id="tr-m" class="lock-msg err"></p>' + folderBlock() +
-      '<details><summary>لديّ كود اشتراك</summary><label class="lock-l">كود اشتراك المدرسة<textarea id="lk-code" rows="3" dir="ltr" placeholder="SL2.123456789.YYYYMMDD.…"></textarea></label><button class="btn" id="lk-act" type="button">تفعيل</button><p id="lk-msg" class="lock-msg"></p></details>') + "</div>";
+      '<details><summary>لديّ كود اشتراك</summary><label class="lock-l">كود اشتراك المدرسة<textarea id="lk-code" rows="3" dir="ltr" placeholder="الصق كود اشتراك المدرسة هنا"></textarea></label><button class="btn" id="lk-act" type="button">تفعيل</button><p id="lk-msg" class="lock-msg"></p></details>') + "</div>";
     folderBind();
     document.getElementById("tr-go").onclick = async function () {
       var m = String(document.getElementById("tr-moe").value).replace(/[٠-٩]/g, function (d) { return "٠١٢٣٤٥٦٧٨٩".indexOf(d); }).replace(/\D/g, "");
@@ -288,7 +261,7 @@
         var o = await openId(moe, s, ids[h]); if (!o || !o.code) continue;
         var c = parseCode(o.code); if (!c || c.v !== 2 || c.moe !== moe) continue;
         if ((await idHash(c.code)) !== h) continue;
-        if (!(await verifySig("SL2|" + c.moe + "|" + c.exp + "|" + c.s, c.sig))) continue;
+        if (!(await verifySig(sigMsg(c), c.sig))) continue;
         if (!best || (+o.at || 0) > (+best.at || 0)) best = o;
       } catch (e) {}
     }
@@ -328,9 +301,8 @@
   async function activate(code, role) {
     var c = parseCode(code);
     if (c && c.v === 2) return activateSchool(c.code, role);
-    var dev = await deviceId(), r = await verifyCode(code, dev);
-    if (r.ok) { await DB.set("license", String(code).trim().replace(/\s+/g, "")); await fsWriteCore(); }
-    return r;
+    if (c && c.v === 1) return { ok: false, why: "هذا كود قديم مرتبط بجهاز، ولم يعد مستخدماً. اطلب من المزوّد كود المدرسة الجديد (بالرقم الوزاري واسم المدرسة)." };
+    return { ok: false, why: "صيغة كود الاشتراك غير صحيحة." };
   }
   function licLabel(L) {
     if (!L) return "";
@@ -574,9 +546,9 @@
       '<div class="lock"><div class="lock-card">' +
       '<div class="lock-logo">' + MARK + '</div><h1>سَمْت</h1>' +
       '<p class="lock-why">' + esc(L.why || "") + "</p>" +
-      '<p class="lock-hint">الاشتراك للمدرسة لا للجهاز: أرسل <b>الرقم الوزاري للمدرسة</b> إلى ' + esc(VENDOR.name) + " تصلك كود يعمل على أي جهاز في المدرسة، على جهاز واحد في كل مرة. المدرسة ذات المرحلتين برقمين وزاريين تحتاج كودين.</p>" +
+      '<p class="lock-hint">الاشتراك مربوط بالمدرسة لا بالجهاز: أرسل <b>الرقم الوزاري واسم المدرسة</b> إلى ' + esc(VENDOR.name) + " يصلك كود يعمل على أي جهاز في المدرسة، على جهاز واحد في كل مرة. المدرسة ذات المرحلتين برقمين وزاريين تحتاج كودين.</p>" +
       (wa ? '<a class="btn wa" href="' + wa + '" rel="noopener">طلب الاشتراك عبر واتساب</a>' : "") +
-      '<label class="lock-l">كود اشتراك المدرسة<textarea id="lk-code" rows="3" dir="ltr" placeholder="SL2.123456789.YYYYMMDD.…"></textarea></label>' +
+      '<label class="lock-l">كود اشتراك المدرسة<textarea id="lk-code" rows="3" dir="ltr" placeholder="الصق كود اشتراك المدرسة هنا"></textarea></label>' +
       '<button class="btn pri" id="lk-act" type="button">تفعيل</button><p id="lk-msg" class="lock-msg"></p>' + folderBlock() +
       "</div></div>";
     folderBind();

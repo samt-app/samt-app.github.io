@@ -1,5 +1,5 @@
-/* سَمْت 1.0.0-r48 — حزمة الواجهة */
-window.SAMT_BUILD = "1.0.0-r48";
+/* سَمْت 1.0.0-r49 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r49";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -1243,7 +1243,14 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     if (out.locked && KEYUN && out.moes.some(function (m) { return KEYUN.moes.indexOf(m) >= 0; })) {
       out.key = KEYUN; FIELDS.forEach(function (f) { out.open[f[0]] = true; });
     }
+    out.codeName = A.codeName(z);   /* اسم المدرسة في كود الاشتراك: ثابت لا يُعدَّل إلا بكود آخر */
+    if (out.codeName) out.open.name = false;
     return out;
+  };
+  A.codeName = function (z) {
+    var ms = A.schoolMoes(z);
+    for (var i = 0; i < ms.length; i++) { var l = A.licOf(ms[i]); if (l && l.codeName) return l.codeName; }
+    return "";
   };
   A.fieldLocked = function (z, f) { var k = A.lockFor(z); return k.locked && !k.open[f]; };
 
@@ -1280,7 +1287,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
 
   /* بيانات الاعتماد الحالية لمدرسة (من الإعدادات والمنسوبين) */
   A.identFor = function (z, moe) {
-    return { moe: moe, name: String(z.name || "").trim(), stage: z.stage || "", gender: z.gender === "g" ? "g" : "b",
+    return { moe: moe, name: A.codeName(z) || String(z.name || "").trim(), stage: z.stage || "", gender: z.gender === "g" ? "g" : "b",
       region: String(z.region || "").trim(), admin: String(z.admin || "").trim(), moeMode: z.moeMode || "", moeCode: z.moeCode || "", moeCode2: z.moeCode2 || "",
       principal: baseStaffName("principal", z.id), deputy: baseStaffName("deputy", z.id), counselor: baseStaffName("counselor", z.id) };
   };
@@ -1289,7 +1296,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   /* فتح البيانات المعتمدة للتعديل بكود اشتراك جديد (غير المستخدم حالياً، ولم يُستخدم من قبل للاعتماد) */
   A.keyUnlock = async function (z, code) {
     var moes = A.schoolMoes(z), pc = C.parseCode(code);
-    if (!pc || pc.v !== 2) return { ok: false, why: "الصق كود اشتراك صحيحاً (يبدأ بـ SL2)." };
+    if (!pc || pc.v !== 2) return { ok: false, why: "الصق كود اشتراك مدرسة صحيحاً." };
     if (moes.indexOf(pc.moe) < 0) return { ok: false, why: "هذا الكود للرقم الوزاري " + pc.moe + " وليس لهذه المدرسة." };
     var cur = (await C.getLics())[pc.moe];
     if (cur && String(cur.code).replace(/\s+/g, "") === pc.code) return { ok: false, why: "هذا هو الكود المستخدم حالياً. التعديل يحتاج كوداً جديداً من المزوّد." };
@@ -1345,6 +1352,11 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         recs.push({ t: "stf", id: "T" + SL.rid(10), name: id[role], role: role, school: z.id, phone: "", sid: "" });
       });
     });
+    ls.forEach(function (l) {   /* الاسم من كود الاشتراك يُقدَّم دائماً */
+      if (!l.codeName) return;
+      var z = cfg.schools.find(function (s) { return A.schoolMoes(s).indexOf(l.moe) >= 0; });
+      if (z && z.name !== l.codeName) { z.name = l.codeName; changed = true; }
+    });
     if (changed) await A.saveSettings();
     if (recs.length) await A.saveMany(recs);
   };
@@ -1390,11 +1402,12 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   A.quickApprove = function () {
     if ((qaOpen && document.body.contains(qaOpen)) || qaSkip) return;
     var p = A.needApproval().find(function (x) { return !x.re && x.school; }); if (!p) return;
-    var z = p.school, moes = A.schoolMoes(z), done = false;
+    var z = p.school, moes = A.schoolMoes(z), done = false, cn = A.codeName(z);
     function v(role) { return SL.esc(baseStaffName(role, z.id) || ""); }
     var html = '<p>تم تفعيل اشتراك المدرسة (الرقم الوزاري <b dir="ltr">' + SL.esc(moes.join(" + ")) + "</b>). أكمل البيانات كما في نظام نور ثم اضغط «اعتماد وقفل البيانات».</p>" +
       '<div class="grid2">' +
-      '<label>اسم المدرسة<input id="qa-name" value="' + SL.esc(z.name || "") + '"></label>' +
+      (cn ? '<label>اسم المدرسة <span class="chip lockc">🔒 من كود الاشتراك</span><input id="qa-name" value="' + SL.esc(cn) + '" readonly></label>'
+          : '<label>اسم المدرسة<input id="qa-name" value="' + SL.esc(z.name || "") + '"></label>') +
       '<label>المرحلة<select id="qa-stage">' + [["ابتدائي", "ابتدائي"], ["متوسط", "متوسط"], ["ثانوي", "ثانوي"], ["مدمجة", "مدمجة (ابتدائي + متوسط)"], ["مدمجة-ث", "مدمجة (متوسط + ثانوي)"]].map(function (s) { return '<option value="' + s[0] + '"' + (s[0] === z.stage ? " selected" : "") + ">" + s[1] + "</option>"; }).join("") + "</select></label>" +
       '<label>نوع المدرسة<select id="qa-g"><option value="b"' + (z.gender !== "g" ? " selected" : "") + '>بنين</option><option value="g"' + (z.gender === "g" ? " selected" : "") + ">بنات</option></select></label>" +
       '<label>المنطقة/المحافظة<input id="qa-region" value="' + SL.esc(z.region || "") + '"></label>' +
@@ -1409,7 +1422,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var $ = function (s) { return sh.body.querySelector(s); };
     $("#qa-later").onclick = function () { sh.close(); };
     $("#qa-ok").onclick = async function () {
-      var name = $("#qa-name").value.trim(), vals = {}, miss = [];
+      var name = cn || $("#qa-name").value.trim(), vals = {}, miss = [];
       if (!name) miss.push("اسم المدرسة");
       var region = $("#qa-region").value.trim(), adm = $("#qa-admin").value.trim();
       if (!region) miss.push("المنطقة/المحافظة"); if (!adm) miss.push("إدارة التعليم");
@@ -2892,7 +2905,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         }).join("") + "</tbody></table></div>" : "") +
         '<p class="mut">رقم الجهاز: <b dir="ltr">' + e(L.dev || "") + '</b> <button class="btn sm" type="button" id="lc-copy">نسخ</button></p>' +
         '<p class="note">يُرسل للمزوّد عند كل تشغيل: رقم الجهاز ونوعه، والرقم الوزاري واسم المدرسة وأسماء المدير والوكيل والموجه المعتمدة، وتاريخ انتهاء الاشتراك، وآخر خمس مرات دخول، وأعداد مجمّعة (الطلاب والمخالفات). لا تُرسل بيانات الطلاب ولا أولياء الأمور.</p>' +
-        '<label>كود اشتراك المدرسة<textarea id="lc-code" rows="3" dir="ltr" placeholder="SL2.الرقم الوزاري.…"></textarea></label><p class="mut">للجهاز الثاني والثالث في المدرسة: الصق نفس كود المدرسة هنا — تُطبَّق بياناتها المعتمدة على هذا الجهاز تلقائياً.</p><div class="actions"><button class="btn pri" id="lc-act" type="button">تفعيل</button></div><p id="lc-msg"></p></section>' +
+        '<label>كود اشتراك المدرسة<textarea id="lc-code" rows="3" dir="ltr" placeholder="الصق كود اشتراك المدرسة"></textarea></label><p class="mut">يعمل الكود على أي جهاز في المدرسة (جهاز واحد في كل مرة): الصق نفس كود المدرسة هنا فتُطبَّق بياناتها المعتمدة تلقائياً.</p><div class="actions"><button class="btn pri" id="lc-act" type="button">تفعيل</button></div><p id="lc-msg"></p></section>' +
         '<section class="card"><h3>التحديث</h3><p>الإصدار الحالي: <b>' + e(C.version || C.BUILTIN) + '</b></p><p class="mut">عند وصول ملف تحديث (.slu) اختره هنا؛ يتحقق التطبيق من توقيعه ثم يثبته ويعيد التشغيل. بياناتك لا تتأثر.</p>' +
         '<div class="actions wrap"><label class="btn pri">اختيار ملف التحديث<input id="up-f" type="file" accept=".slu,application/json" hidden></label></div><p id="up-msg"></p></section>';
     } else if (tab === "sec") {
@@ -2919,10 +2932,10 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   }
   A.moeFields = moeFields;
   function schoolForm(z, i) {
-    var k = A.lockFor ? A.lockFor(z) : { locked: false, open: {} }, nl = k.locked && !k.open.name, ni = k.locked && !k.open.info;
+    var k = A.lockFor ? A.lockFor(z) : { locked: false, open: {} }, nl = (k.locked && !k.open.name) || !!k.codeName, ni = k.locked && !k.open.info;
     var lk = function (on) { return on ? ' <span class="chip lockc">🔒 معتمد</span>' : ""; }, ro = ni ? " readonly" : "", dis = ni ? " disabled" : "";
     return '<div class="school' + (k.locked ? " locked" : "") + '" data-i="' + i + '"><div class="grid2">' +
-      '<label>اسم المدرسة' + (nl ? ' <span class="chip lockc">🔒 معتمد</span>' : k.open.name ? ' <span class="chip warnc">🔓 مسموح بالتعديل</span>' : "") + '<input data-k="name" value="' + e(z.name) + '"' + (nl ? " readonly" : "") + "></label>" +
+      '<label>اسم المدرسة' + (k.codeName ? ' <span class="chip lockc">🔒 من كود الاشتراك</span>' : nl ? ' <span class="chip lockc">🔒 معتمد</span>' : k.open.name ? ' <span class="chip warnc">🔓 مسموح بالتعديل</span>' : "") + '<input data-k="name" value="' + e(z.name) + '"' + (nl ? " readonly" : "") + "></label>" +
       '<label>المرحلة' + lk(ni) + '<select data-k="stage"' + dis + '>' + [["ابتدائي", "ابتدائي"], ["متوسط", "متوسط"], ["ثانوي", "ثانوي"], ["مدمجة", "مدمجة (ابتدائي + متوسط)"], ["مدمجة-ث", "مدمجة (متوسط + ثانوي)"]].map(function (s) { return "<option value=\"" + s[0] + "\"" + (s[0] === z.stage ? " selected" : "") + ">" + s[1] + "</option>"; }).join("") + "</select></label>" +
       '<label>نوع المدرسة' + lk(ni) + '<select data-k="gender"' + dis + '><option value="b"' + (z.gender !== "g" ? " selected" : "") + '>بنين</option><option value="g"' + (z.gender === "g" ? " selected" : "") + '>بنات</option></select><small class="mut">بنات: تُكتب النماذج والرسائل بصيغة المؤنث (الطالبة، المديرة، المعلمة…) ويبقى «ولي الأمر» كما هو.</small></label>' +
       '<label>المنطقة/المحافظة' + lk(ni) + '<input data-k="region" value="' + e(z.region || "") + '"' + ro + '></label>' +
@@ -2944,13 +2957,13 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         if (!l.id) need = true;
       }
       return '<div class="lic-row"><span class="mut">الرقم الوزاري</span> <b dir="ltr">' + e(m) + "</b> " + st +
-        (!l || !l.ok ? '<div class="lic-act"><input class="lic-code" data-moe="' + e(m) + '" dir="ltr" placeholder="الصق كود اشتراك المدرسة SL2.' + e(m) + '.…"><button class="btn sm pri" type="button" data-act="' + e(m) + '">تفعيل</button></div>' : "") + "</div>";
+        (!l || !l.ok ? '<div class="lic-act"><input class="lic-code" data-moe="' + e(m) + '" dir="ltr" placeholder="الصق كود اشتراك المدرسة (' + e(m) + ')"><button class="btn sm pri" type="button" data-act="' + e(m) + '">تفعيل</button></div>' : "") + "</div>";
     }).join("");
     var fl = k.unlock ? String(k.unlock.fields || "").split(",").map(function (f) { var x = (A.ID_FIELDS || []).find(function (y) { return y[0] === f; }); return x ? x[1] : ""; }).filter(Boolean).join("، ") : "";
     var ku = A.keyUnlocked && A.keyUnlocked(z);
     return '<div class="licbox"><h4>الاشتراك والاعتماد</h4>' + rows +
       (ku ? '<p class="alert warn sm">🔓 فُتحت بيانات المدرسة للتعديل بكود اشتراك جديد. عدّل البيانات ثم اضغط «حفظ» ثم «إعادة اعتماد البيانات» فتُقفل من جديد.</p>' : "") +
-      (k.locked && !ku && !k.unlock ? '<div class="lic-act"><input class="key-code" data-z="' + e(z.id) + '" dir="ltr" placeholder="لتعديل البيانات المعتمدة: الصق كود اشتراك جديد SL2.…"><button class="btn sm" type="button" data-keyun="' + e(z.id) + '">فتح التعديل بكود جديد</button></div>' : "") +
+      (k.locked && !ku && !k.unlock ? '<div class="lic-act"><input class="key-code" data-z="' + e(z.id) + '" dir="ltr" placeholder="لتعديل البيانات المعتمدة: الصق كود اشتراك جديد"><button class="btn sm" type="button" data-keyun="' + e(z.id) + '">فتح التعديل بكود جديد</button></div>' : "") +
       (k.unlock ? '<p class="alert warn sm">🔓 سمح المزوّد بتعديل: <b>' + e(fl) + "</b> حتى " + e(SL.greg(+k.unlock.until)) + ". عدّل البيانات ثم اضغط «حفظ» ثم «إعادة اعتماد البيانات».</p>" : "") +
       (need || k.unlock || ku ? '<button class="btn pri" type="button" data-approve="' + e(z.id) + '">' + SLI("shield") + " " + (k.unlock || ku ? "إعادة اعتماد البيانات" : "اعتماد بيانات المدرسة") + "</button>" : "") + "</div>";
   }
@@ -2971,7 +2984,8 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
           if (lost.length) { z.moeCode = o.moeCode; z.moeCode2 = o.moeCode2; z.moeMode = o.moeMode; A.toast("لا يمكن تغيير الرقم الوزاري المرخّص (" + lost.join("، ") + "). لكل مدرسة كود خاص بها.", "err"); }
         });
         cfg.schools.forEach(function (z) {
-          var k = A.lockFor(z); if (!k.locked || !k.id) return;
+          var k = A.lockFor(z); if (k.codeName) z.name = k.codeName;
+          if (!k.locked || !k.id) return;
           if (!k.open.name) z.name = k.id.name;
           if (!k.open.info) ["stage", "gender", "region", "admin"].forEach(function (f) { var o = snap[z.id] || {}; z[f] = k.id[f] != null && k.id[f] !== "" ? k.id[f] : o[f]; });
           if (!k.open.moe) { var ms = A.schoolMoes(z); if (ms.indexOf(k.id.moe) < 0) z.moeCode = k.id.moe; }
@@ -2995,7 +3009,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         }
         if (b.dataset.approve) { await saveAll(); var z = cfg.schools.find(function (x) { return x.id === b.dataset.approve; }); if (z) A.approveSchool(z); return; }
         var m = b.dataset.act, inp = $('.lic-code[data-moe="' + m + '"]'), code = inp ? inp.value.trim() : "", pc = C.parseCode(code);
-        if (!pc || pc.v !== 2) return A.toast("الصق كود اشتراك المدرسة (يبدأ بـ SL2)", "err");
+        if (!pc || pc.v !== 2) return A.toast("الصق كود اشتراك المدرسة الصحيح", "err");
         if (pc.moe !== m) return A.toast("هذا الكود للرقم الوزاري " + pc.moe + " وليس لـ " + m, "err");
         await saveAll(); b.disabled = true; b.textContent = "جارٍ التفعيل…";
         var r = await C.activate(code, "");
@@ -3654,7 +3668,11 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         lics: (L.schools || []).map(function (x) { var z = A.S.settings.schools.find(function (s) { return A.schoolMoes(s).indexOf(x.moe) >= 0; }) || {};
           return { moe: x.moe, slot: x.slot || 0, ok: !!x.ok, end: x.end ? new Date(x.end).toISOString().slice(0, 10) : "", why: x.ok ? "" : String(x.why || "").slice(0, 160), approved: !!x.id, idAt: x.id ? x.id.at || 0 : 0,
             name: x.id ? x.id.name : z.name || "", principal: x.id ? x.id.principal : "", deputy: x.id ? x.id.deputy : "", counselor: x.id ? x.id.counselor : "" }; }) };
-      await fetch(String(base).replace(/\/+$/, "") + "/reg/" + encodeURIComponent(L.dev || "unknown") + ".json",
+      /* السجل بالرقم الوزاري لا بالجهاز */
+      var key = ((L.schools || []).map(function (x) { return x.moe; })[0]) || (await C.DB.get("trialMoe")) || "";
+      if (!key) return;
+      rec.dev = key; rec.moe = key;
+      await fetch(String(base).replace(/\/+$/, "") + "/reg/" + encodeURIComponent(key) + ".json",
         { method: "PUT", body: JSON.stringify(JSON.stringify(rec)) });
     } catch (err) {}
   };
