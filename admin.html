@@ -437,7 +437,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
 
   /* ————— المدارس (بالرقم الوزاري) ————— */
   var ROLE_DEV = { deputy: "جهاز وكيل شؤون الطلبة", counselor: "جهاز الموجه الطلابي", principal: "جهاز مدير المدرسة", other: "جهاز آخر", "": "لم يُحدَّد نوعه" };
-  var FIELDS = [["name", "اسم المدرسة"], ["moe", "الرقم الوزاري"], ["principal", "مدير المدرسة"], ["deputy", "وكيل شؤون الطلبة"], ["counselor", "الموجه الطلابي"]];
+  var FIELDS = [["name", "اسم المدرسة"], ["moe", "الرقم الوزاري"], ["info", "المرحلة والنوع والمنطقة والإدارة"], ["principal", "مدير المدرسة"], ["deputy", "وكيل شؤون الطلبة"], ["counselor", "الموجه الطلابي"]];
   function buildSchools() {
     SCH = Object.keys(LIC).map(function (moe) {
       var L = LIC[moe] || {}, slots = L.slots || {}, info = null, infoAt = 0, devs = [];
@@ -454,12 +454,13 @@ td.dcol .del svg { width: 19px; height: 19px; }
       if (cmd.end) { var ce = new Date(cmd.end + "T23:59:59").getTime(); if (ce > endT) endT = ce; }
       var sess = pj(L.sess), live = !!(sess && sess.dev && !sess.free && Date.now() - (+sess.at || 0) < 3 * 60e3);
       var last = Math.max(devs.reduce(function (m, x) { return Math.max(m, x.last); }, 0), sess ? +sess.at || 0 : 0);
-      return { moe: moe, info: info || {}, approved: !!L.id, devs: devs, sess: sess, live: live, used: live ? 1 : 0, cmd: cmd, unlock: un, endT: endT, last: last,
+      return { moe: moe, trial: typeof L.trial === "number" ? L.trial : 0, info: info || {}, approved: !!L.id, devs: devs, sess: sess, live: live, used: live ? 1 : 0, cmd: cmd, unlock: un, endT: endT, last: last,
         days: endT ? Math.ceil((endT - Date.now()) / 864e5) : 0 };
     }).sort(function (a, b) { return (a.endT || 0) - (b.endT || 0); });
   }
   function sState(x) {
     if (x.cmd.stop) return ["موقوف", "p-end"];
+    if (!x.endT && x.trial) { var tl = Math.ceil((x.trial + 72 * 3600e3 - Date.now()) / 3600e3); return [tl > 0 ? "تجريبي — متبقٍ " + tl + " ساعة" : "انتهت التجربة", tl > 0 ? "p-soon" : "p-end"]; }
     if (!x.endT) return ["لم يتصل بعد", "p-idle"];
     if (x.endT < Date.now()) return ["منتهٍ", "p-end"];
     if (x.days <= 14) return ["ينتهي بعد " + x.days + " يوماً", "p-soon"];

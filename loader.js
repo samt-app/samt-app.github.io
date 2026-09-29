@@ -157,6 +157,8 @@
     if (!srv) return Object.assign(out, { ok: false, offline: true, id: rec.id || null, why: "يلزم الاتصال بالإنترنت لتشغيل المنصة والتحقق من اشتراك المدرسة (" + moe + "). تحقق من الاتصال ثم أعد المحاولة." });
     rec.slot = 0; rec.okAt = now; rec.cmd = parseJ(srv.cmd); rec.unlock = srv.unlock || null;
     rec.id = srv.id ? ((await openId(moe, v.c.s, srv.id)) || rec.id || null) : null;
+    var kid = await latestKeyId(moe, v.c.s, srv.ids);   /* اعتماد لاحق بكود جديد يتقدّم على الأقدم */
+    if (kid && (!rec.id || (+kid.at || 0) > (+rec.id.at || 0))) rec.id = kid;
     await saveLic(moe, rec);
     var cmd = rec.cmd || {};
     Object.assign(out, { slot: 0, sess: parseJ(srv.sess), id: rec.id || null, unlock: unlockOn(rec.unlock) ? rec.unlock : null, okAt: rec.okAt });
@@ -193,11 +195,52 @@
       return r;
     }
     if (remEnd > now) return { ok: true, dev: dev, end: new Date(remEnd), days: Math.ceil((remEnd - now) / 864e5), remote: true };
-    var start = await DB.get("trialStart");
-    if (!start) { start = now; await DB.set("trialStart", start); }
+    /* الفترة التجريبية مربوطة بالخادم وبالرقم الوزاري: lic/<moe>/trial = وقت البداية (يُكتب مرة واحدة ولا يُعدَّل)
+       فمسح المتصفح أو تغيير الجهاز لا يعيدها. يلزم الإنترنت. */
+    if (!(await DB.get("trialMoe")) && typeof self.SAMT_TRIAL_MOE === "string") await DB.set("trialMoe", self.SAMT_TRIAL_MOE);   /* للاختبارات */
+    var tmoe = await DB.get("trialMoe");
+    if (!tmoe) return { ok: false, trial: true, needMoe: true, dev: dev, why: "" };
+    var local = (await DB.get("trialStart")) || 0, srv = await trialStart(tmoe, local || now);
+    if (srv === undefined) return { ok: false, trial: true, offline: true, dev: dev, why: "يلزم الاتصال بالإنترنت لتشغيل الفترة التجريبية. تحقق من الاتصال ثم أعد المحاولة." };
+    var start = Math.min(srv || now, local || Infinity);
+    if (start !== local) await DB.set("trialStart", start);
     var end = new Date(start + TRIAL_HOURS * 3600e3), left = end - now;
     if (left > 0) return { ok: true, trial: true, dev: dev, end: end, hours: Math.ceil(left / 3600e3) };
     return { ok: false, trial: true, dev: dev, end: end, why: "انتهت الفترة التجريبية (ثلاثة أيام). أدخل كود اشتراك المدرسة للمتابعة." };
+  }
+  /* بداية التجربة على الخادم: تُقرأ، وإن لم توجد تُكتب مرة واحدة. undefined = لا اتصال */
+  async function trialStart(moe, want) {
+    if (!REG) return want;
+    try {
+      var r = await fetch(REG + "/lic/" + moe + "/trial.json", { cache: "no-store" }); if (!r.ok) return undefined;
+      var v = await r.json(); if (typeof v === "number") return v;
+      var w = await fetch(REG + "/lic/" + moe + "/trial.json", { method: "PUT", body: JSON.stringify(Math.min(want, Date.now())) });
+      if (w.ok) return Math.min(want, Date.now());
+      r = await fetch(REG + "/lic/" + moe + "/trial.json", { cache: "no-store" }); v = r.ok ? await r.json() : null;
+      if (typeof v === "number") return v;
+      return w.status === 401 || w.status === 403 ? want : undefined;   /* قواعد الخادم لم تُحدَّث بعد: نعمل محلياً مؤقتاً بدل إيقاف التجربة */
+    } catch (e) { return undefined; }
+  }
+  /* شاشة بدء الفترة التجريبية: الرقم الوزاري للمدرسة */
+  function trialScreen() {
+    var root = document.getElementById("boot");
+    root.innerHTML = '<div class="lock">' + card("<h1>سَمْت</h1>" +
+      '<p class="lock-why">مرحباً بك. للبدء أدخل <b>الرقم الوزاري للمدرسة</b> لتشغيل الفترة التجريبية (ثلاثة أيام).</p>' +
+      '<p class="lock-hint">الفترة التجريبية لكل مدرسة مرة واحدة، وتُحسب من أول تشغيل على أي جهاز.</p>' +
+      '<label class="lock-l">الرقم الوزاري للمدرسة<input id="tr-moe" dir="ltr" inputmode="numeric" placeholder="مثال: 123456"></label>' +
+      '<button class="btn pri" id="tr-go" type="button">بدء الفترة التجريبية</button><p id="tr-m" class="lock-msg err"></p>' +
+      '<details><summary>لديّ كود اشتراك</summary><label class="lock-l">كود اشتراك المدرسة<textarea id="lk-code" rows="3" dir="ltr" placeholder="SL2.123456789.YYYYMMDD.…"></textarea></label><button class="btn" id="lk-act" type="button">تفعيل</button><p id="lk-msg" class="lock-msg"></p></details>') + "</div>";
+    document.getElementById("tr-go").onclick = async function () {
+      var m = String(document.getElementById("tr-moe").value).replace(/[٠-٩]/g, function (d) { return "٠١٢٣٤٥٦٧٨٩".indexOf(d); }).replace(/\D/g, "");
+      if (!/^\d{3,12}$/.test(m)) { document.getElementById("tr-m").textContent = "أدخل الرقم الوزاري الصحيح للمدرسة."; return; }
+      this.disabled = true; await DB.set("trialMoe", m); await fsWriteCore(); location.reload();
+    };
+    document.getElementById("lk-act").onclick = async function () {
+      var msg = document.getElementById("lk-msg"); msg.className = "lock-msg"; msg.textContent = "جارٍ التحقق…";
+      var r = await activate(document.getElementById("lk-code").value, "");
+      if (r.ok) { msg.className = "lock-msg ok"; msg.textContent = "تم التفعيل — جارٍ الفتح…"; setTimeout(function () { location.reload(); }, 800); }
+      else { msg.className = "lock-msg err"; msg.textContent = r.why; }
+    };
   }
   /* تفعيل كود مدرسة على هذا الجهاز ثم جلب بيانات الاعتماد إن وُجدت (لا خانات: جهاز واحد في كل لحظة عبر الجلسة) */
   async function activateSchool(code, role) {
@@ -214,7 +257,37 @@
     await fsWriteCore();
     return { ok: true, v: 2, moe: moe, end: v.end, slot: 0, id: rec.id };
   }
-  /* اعتماد بيانات المدرسة (الاسم، الرقم الوزاري، المدير، الوكيل، الموجه) — لا تُغيَّر بعده إلا بإذن المزوّد */
+  /* ————— إعادة الاعتماد بكود جديد: lic/<moe>/ids/<بصمة الكود> — تُكتب مرة واحدة لكل كود (قواعد الخادم) —————
+     تُقبل فقط إن فُكّ تشفيرها بسر المدرسة، وكان الكود بداخلها موقّعاً لهذا الرقم، وبصمته تطابق مكانها. */
+  async function idHash(code) { return (await sha("samt-ids|" + String(code).replace(/\s+/g, ""))).slice(0, 40); }
+  async function latestKeyId(moe, s, ids) {
+    ids = ids || {}; var best = null;
+    for (var h in ids) {
+      try {
+        var o = await openId(moe, s, ids[h]); if (!o || !o.code) continue;
+        var c = parseCode(o.code); if (!c || c.v !== 2 || c.moe !== moe) continue;
+        if ((await idHash(c.code)) !== h) continue;
+        if (!(await verifySig("SL2|" + c.moe + "|" + c.exp + "|" + c.s, c.sig))) continue;
+        if (!best || (+o.at || 0) > (+best.at || 0)) best = o;
+      } catch (e) {}
+    }
+    return best;
+  }
+  async function idUsed(moe, code) {
+    try { var r = await fetch(REG + "/lic/" + moe + "/ids/" + (await idHash(code)) + ".json", { cache: "no-store" }); return r.ok && (await r.json()) != null; } catch (e) { return false; }
+  }
+  async function approveKey(moe, ident, code) {
+    var rec = (await getLics())[moe];
+    if (!rec) return { ok: false, why: "لا يوجد ترخيص مفعّل لهذا الرقم الوزاري." };
+    var c = parseCode(rec.code), obj = Object.assign({ v: 2, moe: moe }, ident, { code: String(code).replace(/\s+/g, ""), at: Date.now() });
+    try {
+      var r = await fetch(REG + "/lic/" + moe + "/ids/" + (await idHash(code)) + ".json", { method: "PUT", body: JSON.stringify(await sealId(moe, c.s, obj)) });
+      if (!r.ok) return { ok: false, why: r.status === 401 || r.status === 403 ? "سبق استخدام هذا الكود لتعديل البيانات. اطلب كوداً جديداً من المزوّد." : "تعذّر الاعتماد (" + r.status + ")." };
+    } catch (e) { return { ok: false, why: "الاعتماد يحتاج اتصالاً بالإنترنت." }; }
+    rec.id = obj; await saveLic(moe, rec); await fsWriteCore();
+    return { ok: true, id: obj };
+  }
+  /* اعتماد بيانات المدرسة (الاسم، الرقم الوزاري، المرحلة، النوع، المنطقة، الإدارة، المدير، الوكيل، الموجه) — لا تُغيَّر بعده إلا بكود جديد أو بإذن المزوّد */
   async function approve(moe, ident) {
     var rec = (await getLics())[moe];
     if (!rec) return { ok: false, why: "لا يوجد ترخيص مفعّل لهذا الرقم الوزاري." };
@@ -322,7 +395,7 @@
   }
 
   /* حداثة البيانات: مجلد sammt (قد يكون على Google Drive أو OneDrive) قد يتأخر في المزامنة */
-  var KEEP_KV = ["bundle", "license", "lics", "devRole", "remote", "trialStart", "lastSeen", "deviceId", "seat", "dirHandle", "folderSkipAt", "folderSavedAt", "folderDaily", "dataAt"];
+  var KEEP_KV = ["bundle", "license", "lics", "devRole", "remote", "trialStart", "trialMoe", "lastSeen", "deviceId", "seat", "dirHandle", "folderSkipAt", "folderSavedAt", "folderDaily", "dataAt"];
   function fileAt(f) { return f ? (+f.dataAt || Date.parse(f.at) || 0) : 0; }
   async function replaceData(f) {
     await tx("rec", "readwrite", function (s) { s.clear(); });
@@ -427,7 +500,7 @@
   /* ————— نسخة احتياطية (تعمل حتى والتطبيق مقفل) ————— */
   async function backupObject() {
     var kv = await DB.kvAll(), recs = await DB.all();
-    delete kv.bundle; delete kv.license; delete kv.lics; delete kv.devRole; delete kv.remote; delete kv.trialStart; delete kv.lastSeen; delete kv.deviceId; delete kv.seat; delete kv.dirHandle;
+    delete kv.bundle; delete kv.license; delete kv.lics; delete kv.devRole; delete kv.remote; delete kv.trialStart; delete kv.lastSeen; delete kv.deviceId; delete kv.trialMoe; delete kv.seat; delete kv.dirHandle;
     return { format: "sulook-backup", v: 1, at: new Date().toISOString(), kv: kv, recs: recs };
   }
   function download(name, text, mime) {
@@ -530,7 +603,7 @@
   }
   async function fsWriteCore() {
     if (!FS.ok) return;
-    try { await fsWrite("samt-core.json", { format: "samt-core", deviceId: await DB.get("deviceId"), license: (await DB.get("license")) || "", lics: await getLics(), devRole: (await DB.get("devRole")) || "", trialStart: (await DB.get("trialStart")) || 0, lastSeen: (await DB.get("lastSeen")) || 0, at: Date.now() }); } catch (e) { console.warn(e); }
+    try { await fsWrite("samt-core.json", { format: "samt-core", deviceId: await DB.get("deviceId"), license: (await DB.get("license")) || "", lics: await getLics(), devRole: (await DB.get("devRole")) || "", trialStart: (await DB.get("trialStart")) || 0, trialMoe: (await DB.get("trialMoe")) || "", lastSeen: (await DB.get("lastSeen")) || 0, at: Date.now() }); } catch (e) { console.warn(e); }
   }
   /* استعادة من المجلد: الاشتراك دائماً، والبيانات إذا كان المتصفح فارغاً */
   async function fsRestore() {
@@ -541,6 +614,7 @@
       if (core.lics && typeof core.lics === "object") { var cur = await getLics(); Object.keys(core.lics).forEach(function (m) { if (!cur[m]) cur[m] = core.lics[m]; }); await DB.set("lics", cur); }
       if (core.devRole && !(await DB.get("devRole"))) await DB.set("devRole", core.devRole);
       var ts = (await DB.get("trialStart")) || 0; if (core.trialStart && (!ts || core.trialStart < ts)) await DB.set("trialStart", core.trialStart);
+      if (core.trialMoe && !(await DB.get("trialMoe"))) await DB.set("trialMoe", core.trialMoe);
       var ls = (await DB.get("lastSeen")) || 0; if (core.lastSeen > ls) await DB.set("lastSeen", core.lastSeen);
       restored.core = true;
     }
@@ -610,7 +684,7 @@
 
   window.SLCore = {
     DB: DB, BUILTIN: BUILTIN, VENDOR: VENDOR, license: license, activate: activate, licLabel: licLabel, deviceId: deviceId,
-    REG: REG, parseCode: parseCode, approve: approve, maintFetch: maintFetch, maintActive: maintActive, whenAr: whenAr, getLics: getLics, dropLic: dropLic, setRole: setRole, DEV_ROLES: DEV_ROLES, SLOTS: SLOTS, SESS: SESS, seat: seat, sessGet: sessGet, IDLE_MS: IDLE_MS, unlockOn: unlockOn,
+    REG: REG, parseCode: parseCode, approve: approve, approveKey: approveKey, idUsed: idUsed, maintFetch: maintFetch, maintActive: maintActive, whenAr: whenAr, getLics: getLics, dropLic: dropLic, setRole: setRole, DEV_ROLES: DEV_ROLES, SLOTS: SLOTS, SESS: SESS, seat: seat, sessGet: sessGet, IDLE_MS: IDLE_MS, unlockOn: unlockOn,
     installUpdate: installUpdate, readUpdate: readUpdate, currentVersion: currentVersion, rollback: rollback,
     backupObject: backupObject, download: download, vcmp: vcmp,
     FS: FS, fsPick: fsPick, fsRestore: fsRestore, fsSaveData: fsSaveData, fsSchedule: fsSchedule, fsWriteCore: fsWriteCore, fsPerm: fsPerm
@@ -626,6 +700,8 @@
       window.SLCore.lic = L; window.SLCore.maint = M;
       if (maintActive(M)) { maintScreen(M); return; }
       if (!L.ok && L.v === 2 && L.schools.some(function (x) { return x.offline; }) && !L.schools.some(function (x) { return x.ok || x.stopped || x.expired; })) { msgScreen("لا يوجد اتصال بالإنترنت", esc(L.schools.find(function (x) { return x.offline; }).why)); return; }
+      if (!L.ok && L.needMoe) { trialScreen(); return; }
+      if (!L.ok && L.trial && L.offline) { msgScreen("لا يوجد اتصال بالإنترنت", esc(L.why)); return; }
       if (!L.ok) { lockScreen(L); return; }
       if (L.v === 2) { if (!(await sessionGate(L))) return; if (!(await freshnessGate())) return; }
       window.SLCore.version = await loadApp();

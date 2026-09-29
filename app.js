@@ -1,5 +1,5 @@
-/* سَمْت 1.0.0-r44 — حزمة الواجهة */
-window.SAMT_BUILD = "1.0.0-r44";
+/* سَمْت 1.0.0-r45 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r45";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -1206,12 +1206,17 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
 
 /* سَمْت — ترخيص المدارس بالرقم الوزاري واعتماد بياناتها
    • كل رقم وزاري = ترخيص مستقل يعمل على أي جهاز، وعلى جهاز واحد في كل مرة.
-   • عند التفعيل تُعتمد: اسم المدرسة، الرقم الوزاري، مدير المدرسة، وكيل شؤون الطلبة، الموجه الطلابي.
-   • بعد الاعتماد لا تُعدَّل إلا بإذن من المزوّد (لوحة التراخيص)، والبيانات المعتمدة على الخادم هي المرجع. */
+   • عند التفعيل تُعتمد: اسم المدرسة، الرقم الوزاري، المرحلة، نوع المدرسة، المنطقة، إدارة التعليم، المدير، الوكيل، الموجه.
+   • بعد الاعتماد لا تُعدَّل إلا (1) بكود اشتراك جديد لم يُستخدم من قبل — يفتح التعديل مرة واحدة ثم تُقفل بعد الحفظ،
+     أو (2) بإذن مؤقت من المزوّد. البيانات المعتمدة على الخادم هي المرجع. */
 (function () {
   "use strict";
   var SL = window.SL, C = window.SLCore, A = window.APP;
-  var FIELDS = [["name", "اسم المدرسة"], ["moe", "الرقم الوزاري"], ["principal", "مدير المدرسة"], ["deputy", "وكيل شؤون الطلبة"], ["counselor", "الموجه الطلابي"]];
+  var FIELDS = [["name", "اسم المدرسة"], ["moe", "الرقم الوزاري"], ["info", "المرحلة ونوع المدرسة والمنطقة وإدارة التعليم"], ["principal", "مدير المدرسة"], ["deputy", "وكيل شؤون الطلبة"], ["counselor", "الموجه الطلابي"]];
+  var INFO = [["stage", "المرحلة"], ["gender", "نوع المدرسة"], ["region", "المنطقة/المحافظة"], ["admin", "إدارة التعليم"]];
+  var REQ = [["name", "اسم المدرسة"], ["moe", "الرقم الوزاري"], ["region", "المنطقة/المحافظة"], ["admin", "إدارة التعليم"], ["principal", "مدير المدرسة"], ["deputy", "وكيل شؤون الطلبة"], ["counselor", "الموجه الطلابي"]];
+  A.INFO_FIELDS = INFO;
+  var KEYUN = null;   /* فتح التعديل بكود جديد: { moes, code } — في الذاكرة حتى الحفظ والاعتماد */
   var LOCK_ROLES = ["principal", "deputy", "counselor"];
   A.ID_FIELDS = FIELDS; A.LOCK_ROLES = LOCK_ROLES;
 
@@ -1228,13 +1233,16 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var out = { locked: false, id: null, open: {}, unlock: null, moes: A.schoolMoes(z) };
     out.moes.forEach(function (m) {
       var l = A.licOf(m); if (!l || !l.id) return;
-      out.locked = true; out.id = out.id || l.id;
+      out.locked = true; if (!out.id || (+l.id.at || 0) > (+out.id.at || 0)) out.id = l.id;   /* الأحدث اعتماداً */
       var u = l.unlock;
       if (u && +u.until > Date.now() && !(l.id.at > +u.at)) {
         out.unlock = u;
         String(u.fields || "").split(",").forEach(function (f) { if (f) out.open[f.trim()] = true; });
       }
     });
+    if (out.locked && KEYUN && out.moes.some(function (m) { return KEYUN.moes.indexOf(m) >= 0; })) {
+      out.key = KEYUN; FIELDS.forEach(function (f) { out.open[f[0]] = true; });
+    }
     return out;
   };
   A.fieldLocked = function (z, f) { var k = A.lockFor(z); return k.locked && !k.open[f]; };
@@ -1272,10 +1280,27 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
 
   /* بيانات الاعتماد الحالية لمدرسة (من الإعدادات والمنسوبين) */
   A.identFor = function (z, moe) {
-    return { moe: moe, name: String(z.name || "").trim(), stage: z.stage || "",
+    return { moe: moe, name: String(z.name || "").trim(), stage: z.stage || "", gender: z.gender === "g" ? "g" : "b",
+      region: String(z.region || "").trim(), admin: String(z.admin || "").trim(), moeMode: z.moeMode || "", moeCode: z.moeCode || "", moeCode2: z.moeCode2 || "",
       principal: baseStaffName("principal", z.id), deputy: baseStaffName("deputy", z.id), counselor: baseStaffName("counselor", z.id) };
   };
-  A.identMissing = function (id) { return FIELDS.filter(function (f) { return !String(id[f[0]] || "").trim(); }).map(function (f) { return f[1]; }); };
+  A.identMissing = function (id) { return REQ.filter(function (f) { return !String(id[f[0]] || "").trim(); }).map(function (f) { return f[1]; }); };
+
+  /* فتح البيانات المعتمدة للتعديل بكود اشتراك جديد (غير المستخدم حالياً، ولم يُستخدم من قبل للاعتماد) */
+  A.keyUnlock = async function (z, code) {
+    var moes = A.schoolMoes(z), pc = C.parseCode(code);
+    if (!pc || pc.v !== 2) return { ok: false, why: "الصق كود اشتراك صحيحاً (يبدأ بـ SL2)." };
+    if (moes.indexOf(pc.moe) < 0) return { ok: false, why: "هذا الكود للرقم الوزاري " + pc.moe + " وليس لهذه المدرسة." };
+    var cur = (await C.getLics())[pc.moe];
+    if (cur && String(cur.code).replace(/\s+/g, "") === pc.code) return { ok: false, why: "هذا هو الكود المستخدم حالياً. التعديل يحتاج كوداً جديداً من المزوّد." };
+    if (await C.idUsed(pc.moe, pc.code)) return { ok: false, why: "سبق استخدام هذا الكود لتعديل البيانات. اطلب كوداً جديداً من المزوّد." };
+    var r = await C.activate(pc.code, "");   /* يُفعَّل الكود الجديد (تجديد) */
+    if (!r.ok) return r;
+    C.lic = await C.license();
+    KEYUN = { moes: moes, code: pc.code, moe: pc.moe };
+    return { ok: true };
+  };
+  A.keyUnlocked = function (z) { return !!(KEYUN && A.schoolMoes(z).some(function (m) { return KEYUN.moes.indexOf(m) >= 0; })); };
 
   /* مدارس مرخّصة بانتظار الاعتماد */
   A.needApproval = function () {
@@ -1310,6 +1335,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       }
       var k = A.lockFor(z);
       if (!k.open.name && id.name && z.name !== id.name) { z.name = id.name; changed = true; }
+      if (!k.open.info) INFO.concat([["moeMode"], ["moeCode2"]]).forEach(function (f) { if (id[f[0]] != null && id[f[0]] !== "" && z[f[0]] !== id[f[0]]) { z[f[0]] = id[f[0]]; changed = true; } });
       LOCK_ROLES.forEach(function (role) {
         if (!id[role] || k.open[role]) return;
         var mine = A.S.staff.filter(function (x) { return x.role === role && (!x.school || x.school === z.id); });
@@ -1339,15 +1365,20 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     if (!moes.length) return A.toast("أدخل الرقم الوزاري أولاً", "err");
     var id = A.identFor(z, moes[0]), miss = A.identMissing(id);
     if (miss.length) return A.toast("أكمل قبل الاعتماد: " + miss.join("، "), "err");
-    var html = '<p>بعد الاعتماد <b>لا يمكن تعديل</b> البيانات التالية إلا بإذن من المزوّد (تقناس). تُطبع في كل النماذج الرسمية وتظهر على أي جهاز تُفتح عليه المنصة:</p><table class="tbl"><tbody>' +
-      FIELDS.map(function (f) { return "<tr><th>" + f[1] + "</th><td>" + SL.esc(f[0] === "moe" ? moes.join(" + ") : id[f[0]]) + "</td></tr>"; }).join("") +
+    var rowsT = [["اسم المدرسة", id.name], ["الرقم الوزاري", moes.join(" + ")], ["المرحلة", id.stage], ["نوع المدرسة", id.gender === "g" ? "بنات" : "بنين"], ["المنطقة/المحافظة", id.region], ["إدارة التعليم", id.admin], ["مدير المدرسة", id.principal], ["وكيل شؤون الطلبة", id.deputy], ["الموجه الطلابي", id.counselor]];
+    var html = '<p>بعد الاعتماد <b>تُقفل</b> البيانات التالية ولا تُعدَّل إلا بكود اشتراك جديد أو بإذن من المزوّد (تقناس). تُطبع في كل النماذج الرسمية:</p><table class="tbl"><tbody>' +
+      rowsT.map(function (r) { return "<tr><th>" + r[0] + "</th><td>" + SL.esc(r[1] || "") + "</td></tr>"; }).join("") +
       "</tbody></table><p class=\"mut\">تأكد من كتابة الأسماء كما في نظام نور.</p>";
     if (!silent && !(await A.ask("اعتماد بيانات المدرسة", html, "اعتماد نهائي"))) return;
     for (var i = 0; i < moes.length; i++) {
-      var r = await C.approve(moes[i], Object.assign({}, id, { moe: moes[i] }));
+      var r = KEYUN && KEYUN.moes.indexOf(moes[i]) >= 0 && KEYUN.moe === moes[i]
+        ? await C.approveKey(moes[i], Object.assign({}, id, { moe: moes[i] }), KEYUN.code)
+        : KEYUN && KEYUN.moes.indexOf(moes[i]) >= 0 ? { ok: true, skip: true }   /* المدرسة المدمجة: الرقم الآخر يبقى على اعتماده */
+        : await C.approve(moes[i], Object.assign({}, id, { moe: moes[i] }));
       if (!r.ok) { A.toast(r.why, "err"); return; }
     }
-    A.log("اعتماد بيانات المدرسة: " + id.name + " (" + moes.join("، ") + ")");
+    A.log("اعتماد بيانات المدرسة: " + id.name + " (" + moes.join("، ") + ")" + (KEYUN ? " — بكود جديد" : ""));
+    KEYUN = null;
     C.lic = await C.license(); await A.applyIdentity();
     A.toast("تم اعتماد بيانات المدرسة"); A.drawTop(); A.route(); A.ping();
     return true;
@@ -1366,10 +1397,12 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       '<label>اسم المدرسة<input id="qa-name" value="' + SL.esc(z.name || "") + '"></label>' +
       '<label>المرحلة<select id="qa-stage">' + [["ابتدائي", "ابتدائي"], ["متوسط", "متوسط"], ["ثانوي", "ثانوي"], ["مدمجة", "مدمجة (ابتدائي + متوسط)"], ["مدمجة-ث", "مدمجة (متوسط + ثانوي)"]].map(function (s) { return '<option value="' + s[0] + '"' + (s[0] === z.stage ? " selected" : "") + ">" + s[1] + "</option>"; }).join("") + "</select></label>" +
       '<label>نوع المدرسة<select id="qa-g"><option value="b"' + (z.gender !== "g" ? " selected" : "") + '>بنين</option><option value="g"' + (z.gender === "g" ? " selected" : "") + ">بنات</option></select></label>" +
+      '<label>المنطقة/المحافظة<input id="qa-region" value="' + SL.esc(z.region || "") + '"></label>' +
+      '<label>إدارة التعليم<input id="qa-admin" value="' + SL.esc(z.admin || "") + '" placeholder="الإدارة العامة للتعليم بمنطقة …"></label>' +
       '<label>مدير المدرسة<input id="qa-principal" value="' + v("principal") + '"></label>' +
       '<label>وكيل شؤون الطلبة<input id="qa-deputy" value="' + v("deputy") + '"></label>' +
       '<label>الموجه الطلابي<input id="qa-counselor" value="' + v("counselor") + '"></label></div>' +
-      '<p class="alert warn sm">⚠️ <b>تنبيه:</b> بعد الاعتماد تُقفل هذه البيانات: <b>اسم المدرسة، الرقم الوزاري، مدير المدرسة، وكيل شؤون الطلبة، الموجه الطلابي</b>، ولا تُعدَّل إلا بإذن من المزوّد (تقناس). تأكد من صحتها قبل الضغط.</p>' +
+      '<p class="alert warn sm">⚠️ <b>تنبيه:</b> بعد الاعتماد تُقفل هذه البيانات: <b>اسم المدرسة، الرقم الوزاري، المرحلة، نوع المدرسة، المنطقة، إدارة التعليم، المدير، الوكيل، الموجه</b>، ولا تُعدَّل إلا بكود اشتراك جديد أو بإذن من المزوّد (تقناس). تأكد من صحتها قبل الضغط.</p>' +
       '<div class="actions"><button class="btn pri" type="button" id="qa-ok">' + (window.SLI ? SLI("shield") + " " : "") + 'اعتماد وقفل البيانات</button><button class="btn" type="button" id="qa-later">لاحقاً</button></div><p id="qa-msg"></p>';
     var sh = A.sheet("اعتماد بيانات المدرسة", html, { onClose: function () { qaOpen = null; if (!done) qaSkip = true; } });
     qaOpen = sh.el;
@@ -1378,11 +1411,13 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     $("#qa-ok").onclick = async function () {
       var name = $("#qa-name").value.trim(), vals = {}, miss = [];
       if (!name) miss.push("اسم المدرسة");
+      var region = $("#qa-region").value.trim(), adm = $("#qa-admin").value.trim();
+      if (!region) miss.push("المنطقة/المحافظة"); if (!adm) miss.push("إدارة التعليم");
       LOCK_ROLES.forEach(function (r) { vals[r] = $("#qa-" + r).value.trim(); if (!vals[r]) miss.push(FIELDS.find(function (f) { return f[0] === r; })[1]); });
       if (miss.length) { $("#qa-msg").className = "alert err sm"; $("#qa-msg").textContent = "أكمل: " + miss.join("، "); return; }
       this.disabled = true;
       var oldG = !!A.girlsUI;
-      z.name = name; z.gender = $("#qa-g").value; z.stage = $("#qa-stage").value;
+      z.name = name; z.gender = $("#qa-g").value; z.stage = $("#qa-stage").value; z.region = region; z.admin = adm;
       var recs = [];
       LOCK_ROLES.forEach(function (role) {
         var mine = A.S.staff.filter(function (x) { return x.role === role && (!x.school || x.school === z.id); });
@@ -2884,13 +2919,14 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   }
   A.moeFields = moeFields;
   function schoolForm(z, i) {
-    var k = A.lockFor ? A.lockFor(z) : { locked: false, open: {} }, nl = k.locked && !k.open.name;
+    var k = A.lockFor ? A.lockFor(z) : { locked: false, open: {} }, nl = k.locked && !k.open.name, ni = k.locked && !k.open.info;
+    var lk = function (on) { return on ? ' <span class="chip lockc">🔒 معتمد</span>' : ""; }, ro = ni ? " readonly" : "", dis = ni ? " disabled" : "";
     return '<div class="school' + (k.locked ? " locked" : "") + '" data-i="' + i + '"><div class="grid2">' +
       '<label>اسم المدرسة' + (nl ? ' <span class="chip lockc">🔒 معتمد</span>' : k.open.name ? ' <span class="chip warnc">🔓 مسموح بالتعديل</span>' : "") + '<input data-k="name" value="' + e(z.name) + '"' + (nl ? " readonly" : "") + "></label>" +
-      '<label>المرحلة<select data-k="stage">' + [["ابتدائي", "ابتدائي"], ["متوسط", "متوسط"], ["ثانوي", "ثانوي"], ["مدمجة", "مدمجة (ابتدائي + متوسط)"], ["مدمجة-ث", "مدمجة (متوسط + ثانوي)"]].map(function (s) { return "<option value=\"" + s[0] + "\"" + (s[0] === z.stage ? " selected" : "") + ">" + s[1] + "</option>"; }).join("") + "</select></label>" +
-      '<label>نوع المدرسة<select data-k="gender"><option value="b"' + (z.gender !== "g" ? " selected" : "") + '>بنين</option><option value="g"' + (z.gender === "g" ? " selected" : "") + '>بنات</option></select><small class="mut">بنات: تُكتب النماذج والرسائل بصيغة المؤنث (الطالبة، المديرة، المعلمة…) ويبقى «ولي الأمر» كما هو.</small></label>' +
-      '<label>المنطقة/المحافظة<input data-k="region" value="' + e(z.region || "") + '"></label>' +
-      '<label>إدارة التعليم<input data-k="admin" value="' + e(z.admin || "") + '" placeholder="الإدارة العامة للتعليم بمنطقة …"></label>' +
+      '<label>المرحلة' + lk(ni) + '<select data-k="stage"' + dis + '>' + [["ابتدائي", "ابتدائي"], ["متوسط", "متوسط"], ["ثانوي", "ثانوي"], ["مدمجة", "مدمجة (ابتدائي + متوسط)"], ["مدمجة-ث", "مدمجة (متوسط + ثانوي)"]].map(function (s) { return "<option value=\"" + s[0] + "\"" + (s[0] === z.stage ? " selected" : "") + ">" + s[1] + "</option>"; }).join("") + "</select></label>" +
+      '<label>نوع المدرسة' + lk(ni) + '<select data-k="gender"' + dis + '><option value="b"' + (z.gender !== "g" ? " selected" : "") + '>بنين</option><option value="g"' + (z.gender === "g" ? " selected" : "") + '>بنات</option></select><small class="mut">بنات: تُكتب النماذج والرسائل بصيغة المؤنث (الطالبة، المديرة، المعلمة…) ويبقى «ولي الأمر» كما هو.</small></label>' +
+      '<label>المنطقة/المحافظة' + lk(ni) + '<input data-k="region" value="' + e(z.region || "") + '"' + ro + '></label>' +
+      '<label>إدارة التعليم' + lk(ni) + '<input data-k="admin" value="' + e(z.admin || "") + '" placeholder="الإدارة العامة للتعليم بمنطقة …"' + ro + '></label>' +
       moeFields(z) + '</div>' + licBox(z) +
       (k.locked ? "" : '<button class="link danger" type="button" data-rm="' + i + '">حذف هذه المدرسة</button>') + "</div>";
   }
@@ -2911,15 +2947,18 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         (!l || !l.ok ? '<div class="lic-act"><input class="lic-code" data-moe="' + e(m) + '" dir="ltr" placeholder="الصق كود اشتراك المدرسة SL2.' + e(m) + '.…"><button class="btn sm pri" type="button" data-act="' + e(m) + '">تفعيل</button></div>' : "") + "</div>";
     }).join("");
     var fl = k.unlock ? String(k.unlock.fields || "").split(",").map(function (f) { var x = (A.ID_FIELDS || []).find(function (y) { return y[0] === f; }); return x ? x[1] : ""; }).filter(Boolean).join("، ") : "";
+    var ku = A.keyUnlocked && A.keyUnlocked(z);
     return '<div class="licbox"><h4>الاشتراك والاعتماد</h4>' + rows +
+      (ku ? '<p class="alert warn sm">🔓 فُتحت بيانات المدرسة للتعديل بكود اشتراك جديد. عدّل البيانات ثم اضغط «حفظ» ثم «إعادة اعتماد البيانات» فتُقفل من جديد.</p>' : "") +
+      (k.locked && !ku && !k.unlock ? '<div class="lic-act"><input class="key-code" data-z="' + e(z.id) + '" dir="ltr" placeholder="لتعديل البيانات المعتمدة: الصق كود اشتراك جديد SL2.…"><button class="btn sm" type="button" data-keyun="' + e(z.id) + '">فتح التعديل بكود جديد</button></div>' : "") +
       (k.unlock ? '<p class="alert warn sm">🔓 سمح المزوّد بتعديل: <b>' + e(fl) + "</b> حتى " + e(SL.greg(+k.unlock.until)) + ". عدّل البيانات ثم اضغط «حفظ» ثم «إعادة اعتماد البيانات».</p>" : "") +
-      (need || k.unlock ? '<button class="btn pri" type="button" data-approve="' + e(z.id) + '">' + SLI("shield") + " " + (k.unlock ? "إعادة اعتماد البيانات" : "اعتماد بيانات المدرسة") + "</button>" : "") + "</div>";
+      (need || k.unlock || ku ? '<button class="btn pri" type="button" data-approve="' + e(z.id) + '">' + SLI("shield") + " " + (k.unlock || ku ? "إعادة اعتماد البيانات" : "اعتماد بيانات المدرسة") + "</button>" : "") + "</div>";
   }
   function bindSettings(tab) {
     var cfg = A.S.settings;
     if (tab === "school") {
       if (!cfg.schools.length) cfg.schools.push({ id: "C" + SL.rid(6), name: "", stage: "متوسط", region: "", admin: "" }), $("#sc-l").innerHTML = schoolForm(cfg.schools[0], 0);
-      var snap = {}; cfg.schools.forEach(function (z) { snap[z.id] = { moeCode: z.moeCode, moeCode2: z.moeCode2, moeMode: z.moeMode, moes: A.schoolMoes(z) }; });
+      var snap = {}; cfg.schools.forEach(function (z) { snap[z.id] = { moeCode: z.moeCode, moeCode2: z.moeCode2, moeMode: z.moeMode, moes: A.schoolMoes(z), stage: z.stage, gender: z.gender, region: z.region, admin: z.admin }; });
       if ($("#sc-add")) $("#sc-add").onclick = function () { collect(); cfg.schools.push({ id: "C" + SL.rid(6), name: "", stage: "ابتدائي", region: "", admin: "" }); $("#sc-l").innerHTML = cfg.schools.map(schoolForm).join(""); rm(); };
       function collect() { $$(".school").forEach(function (d) { var z = cfg.schools[+d.dataset.i]; $$("[data-k]", d).forEach(function (el) { z[el.dataset.k] = el.value.trim(); }); }); }
       $("#sc-l").addEventListener("change", function (ev) { var k = ev.target.dataset && ev.target.dataset.k; if (k === "stage" || k === "moeMode") { collect(); $("#sc-l").innerHTML = cfg.schools.map(schoolForm).join(""); rm(); } });
@@ -2934,6 +2973,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         cfg.schools.forEach(function (z) {
           var k = A.lockFor(z); if (!k.locked || !k.id) return;
           if (!k.open.name) z.name = k.id.name;
+          if (!k.open.info) ["stage", "gender", "region", "admin"].forEach(function (f) { var o = snap[z.id] || {}; z[f] = k.id[f] != null && k.id[f] !== "" ? k.id[f] : o[f]; });
           if (!k.open.moe) { var ms = A.schoolMoes(z); if (ms.indexOf(k.id.moe) < 0) z.moeCode = k.id.moe; }
         });
       }
@@ -2945,7 +2985,14 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         A.route();
       };
       $("#sc-l").addEventListener("click", async function (ev) {
-        var b = ev.target.closest("[data-act],[data-approve]"); if (!b) return;
+        var b = ev.target.closest("[data-act],[data-approve],[data-keyun]"); if (!b) return;
+        if (b.dataset.keyun) {
+          var zz = cfg.schools.find(function (x) { return x.id === b.dataset.keyun; }), ki = $('.key-code[data-z="' + b.dataset.keyun + '"]');
+          b.disabled = true; b.textContent = "جارٍ التحقق…";
+          var ru = await A.keyUnlock(zz, ki ? ki.value.trim() : "");
+          if (!ru.ok) { A.toast(ru.why, "err"); b.disabled = false; b.textContent = "فتح التعديل بكود جديد"; return; }
+          A.toast("فُتحت البيانات للتعديل — عدّل ثم احفظ وأعد الاعتماد"); A.drawTop(); A.route(); return;
+        }
         if (b.dataset.approve) { await saveAll(); var z = cfg.schools.find(function (x) { return x.id === b.dataset.approve; }); if (z) A.approveSchool(z); return; }
         var m = b.dataset.act, inp = $('.lic-code[data-moe="' + m + '"]'), code = inp ? inp.value.trim() : "", pc = C.parseCode(code);
         if (!pc || pc.v !== 2) return A.toast("الصق كود اشتراك المدرسة (يبدأ بـ SL2)", "err");

@@ -32,6 +32,14 @@
         "id": {
           ".write": "$moe.matches(/^[0-9]{3,12}$/) && newData.isString() && newData.val().length < 4000 && (!data.exists() || root.child('lic').child($moe).child('unlock').child('until').val() > now)"
         },
+        "trial": {
+          ".write": "$moe.matches(/^[0-9]{3,12}$/) && !data.exists() && newData.isNumber() && newData.val() <= now"
+        },
+        "ids": {
+          "$h": {
+            ".write": "$moe.matches(/^[0-9]{3,12}$/) && $h.matches(/^[0-9a-f]{40}$/) && !data.exists() && newData.isString() && newData.val().length < 6000"
+          }
+        },
         "sess": {
           ".write": "$moe.matches(/^[0-9]{3,12}$/) && newData.child('dev').isString() && newData.child('dev').val().length < 40 && newData.child('at').isNumber() && newData.child('at').val() <= now + 600000 && (!newData.child('name').exists() || (newData.child('name').isString() && newData.child('name').val().length < 120))"
         },
