@@ -1,5 +1,5 @@
-/* سَمْت 1.0.0-r49 — حزمة الواجهة */
-window.SAMT_BUILD = "1.0.0-r49";
+/* سَمْت 1.0.0-r50 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r50";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -2042,12 +2042,15 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   A.bindFormRows = bindFormRows;
 
   /* ————— اختيار طالب ————— */
-  function pickStudent(onPick) {
-    var sh = A.sheet("اختر الطالب", '<input id="pk-q" type="search" placeholder="اكتب جزءاً من الاسم أو السجل المدني" autofocus><ul class="list" id="pk-l"></ul>');
+  /* opt: { filter(s), note, none, tag(s) } — مثلاً السلوك التعويضي: من بقيت لهم درجات محسومة فقط */
+  function pickStudent(onPick, opt) {
+    opt = opt || {};
+    var base = opt.filter ? A.S.students.filter(opt.filter) : A.S.students;
+    var sh = A.sheet("اختر الطالب", (opt.note ? '<p class="alert sm">' + opt.note.replace("{n}", base.length) + "</p>" : "") + '<input id="pk-q" type="search" placeholder="اكتب جزءاً من الاسم أو السجل المدني" autofocus><ul class="list" id="pk-l"></ul>');
     function draw() {
       var q = A.norm($("#pk-q", sh.body).value);
-      var l = A.S.students.filter(function (s) { return !q || A.norm(s.name).indexOf(q) >= 0 || String(s.sid || "").indexOf(q) >= 0; }).slice(0, 60);
-      $("#pk-l", sh.body).innerHTML = l.map(function (s) { return '<li><button type="button" class="pick" data-id="' + s.id + '">' + stuLine(s) + "</button></li>"; }).join("") || '<li class="mut">لا نتائج</li>';
+      var l = base.filter(function (s) { return !q || A.norm(s.name).indexOf(q) >= 0 || String(s.sid || "").indexOf(q) >= 0; }).slice(0, opt.filter ? 300 : 60);
+      $("#pk-l", sh.body).innerHTML = l.map(function (s) { return '<li><button type="button" class="pick" data-id="' + s.id + '">' + stuLine(s) + (opt.tag ? " " + opt.tag(s) : "") + "</button></li>"; }).join("") || '<li class="mut">' + (q || !opt.none ? "لا نتائج" : opt.none) + "</li>";
       $$(".pick", sh.body).forEach(function (b) { b.onclick = function () { sh.close(); onPick(A.byId[b.dataset.id]); }; });
     }
     $("#pk-q", sh.body).addEventListener("input", draw); draw();
@@ -2401,7 +2404,15 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     ksel.value = kind;
     function drawStu() {
       $("#fm-stu").innerHTML = stu ? '<div class="stu-mini">' + A.scoreChip(stu) + " <b>" + e(stu.name) + '</b> <button class="link" type="button" id="fm-chg">تغيير</button></div>' : '<button class="btn pri big" type="button" id="fm-pick">اختر الطالب</button>';
-      ($("#fm-pick") || $("#fm-chg")).onclick = function () { pickStudent(function (s) { stu = s; drawStu(); }); };
+      ($("#fm-pick") || $("#fm-chg")).onclick = function () {
+        var comp = ksel.value === "comp";
+        pickStudent(function (s) { stu = s; drawStu(); }, comp ? {
+          filter: function (s) { var c = A.score(s); return !c.qualitative && c.compLeft > 0; },
+          note: "يظهر فقط الطلاب الذين بقيت لهم درجات محسومة لم تُعوَّض ({n} طالباً).",
+          none: "لا يوجد طالب بقيت له درجات محسومة تحتاج تعويضاً.",
+          tag: function (s) { return '<span class="chip warnc">متبقٍ للتعويض ' + A.score(s).compLeft + "</span>"; }
+        } : null);
+      };
       drawState();
     }
     function drawState() {
