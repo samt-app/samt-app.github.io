@@ -107,7 +107,7 @@
      مشتركة بين صفحة المعلم (teacher.html) والمنصة (النموذج TR). */
   SL.teacherReportDoc = function (d) {
     var R = window.RULES || {}, isC = d.role === "counselor", who = isC ? "الموجه الطلابي" : "المعلم", t = d.date ? new Date(d.date) : null, dots = "……………………………………………………";
-    return { id: "TR", title: "تحويل طالب لوكيل شؤون الطلبة",
+    return { id: "TR", title: "تحويل طالب لوكيل شؤون الطلاب",
       fields: [["اسم الطالب", d.stu || "", 1], ["بالصف", d.cls || ""], ["المادة", isC ? "—" : d.subject || ""], ["الحصة الدراسية", d.period || ""]],
       blocks: [
         { k: "h", t: "سبب التحويل" },

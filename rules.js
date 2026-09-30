@@ -29,7 +29,7 @@ const FORMS = {
   F16: { t: "نموذج إجراءات الغياب بدون عذر", sign: ["student", "parent", "principal"] },
   F17: { t: "تعهد الالتزام بالحضور", sign: ["student", "parent", "principal"] },
   /* ليس من ملحق القواعد: ورقة توثيق لما أرسله المعلم من رابط الرصد */
-  TR:  { t: "تحويل طالب لوكيل شؤون الطلبة (من رابط الرصد)", sign: ["teacher", "deputy"], noWa: true, extra: true }
+  TR:  { t: "تحويل طالب لوكيل شؤون الطلاب (من رابط الرصد)", sign: ["teacher", "deputy"], noWa: true, extra: true }
 };
 
 const SIGNER = { student: "الطالب", parent: "ولي الأمر", principal: "مدير المدرسة", deputy: "وكيل شؤون الطلبة", counselor: "الموجه الطلابي", teacher: "المعلم" };

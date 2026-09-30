@@ -1,5 +1,5 @@
-/* سَمْت 1.0.0-r56 — حزمة الواجهة */
-window.SAMT_BUILD = "1.0.0-r56";
+/* سَمْت 1.0.0-r57 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r57";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -109,7 +109,7 @@ window.SAMT_BUILD = "1.0.0-r56";
      مشتركة بين صفحة المعلم (teacher.html) والمنصة (النموذج TR). */
   SL.teacherReportDoc = function (d) {
     var R = window.RULES || {}, isC = d.role === "counselor", who = isC ? "الموجه الطلابي" : "المعلم", t = d.date ? new Date(d.date) : null, dots = "……………………………………………………";
-    return { id: "TR", title: "تحويل طالب لوكيل شؤون الطلبة",
+    return { id: "TR", title: "تحويل طالب لوكيل شؤون الطلاب",
       fields: [["اسم الطالب", d.stu || "", 1], ["بالصف", d.cls || ""], ["المادة", isC ? "—" : d.subject || ""], ["الحصة الدراسية", d.period || ""]],
       blocks: [
         { k: "h", t: "سبب التحويل" },
@@ -390,7 +390,7 @@ const FORMS = {
   F16: { t: "نموذج إجراءات الغياب بدون عذر", sign: ["student", "parent", "principal"] },
   F17: { t: "تعهد الالتزام بالحضور", sign: ["student", "parent", "principal"] },
   /* ليس من ملحق القواعد: ورقة توثيق لما أرسله المعلم من رابط الرصد */
-  TR:  { t: "تحويل طالب لوكيل شؤون الطلبة (من رابط الرصد)", sign: ["teacher", "deputy"], noWa: true, extra: true }
+  TR:  { t: "تحويل طالب لوكيل شؤون الطلاب (من رابط الرصد)", sign: ["teacher", "deputy"], noWa: true, extra: true }
 };
 
 const SIGNER = { student: "الطالب", parent: "ولي الأمر", principal: "مدير المدرسة", deputy: "وكيل شؤون الطلبة", counselor: "الموجه الطلابي", teacher: "المعلم" };
