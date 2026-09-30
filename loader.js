@@ -388,7 +388,7 @@
   }
 
   /* حداثة البيانات: مجلد sammt (قد يكون على Google Drive أو OneDrive) قد يتأخر في المزامنة */
-  var KEEP_KV = ["bundle", "license", "lics", "devRole", "remote", "trialStart", "trialMoe", "lastSeen", "deviceId", "seat", "dirHandle", "folderSkipAt", "folderSavedAt", "folderDaily", "dataAt"];
+  var KEEP_KV = ["bundle", "license", "lics", "devRole", "remote", "trialStart", "trialMoe", "lastSeen", "deviceId", "seat", "dirHandle", "folderSkipAt", "folderSavedAt", "folderDaily", "dataAt", "folderWhere"];
   function fileAt(f) { return f ? (+f.dataAt || Date.parse(f.at) || 0) : 0; }
   async function replaceData(f) {
     await tx("rec", "readwrite", function (s) { s.clear(); });
@@ -493,7 +493,7 @@
   /* ————— نسخة احتياطية (تعمل حتى والتطبيق مقفل) ————— */
   async function backupObject() {
     var kv = await DB.kvAll(), recs = await DB.all();
-    delete kv.bundle; delete kv.license; delete kv.lics; delete kv.devRole; delete kv.remote; delete kv.trialStart; delete kv.lastSeen; delete kv.deviceId; delete kv.trialMoe; delete kv.seat; delete kv.dirHandle;
+    delete kv.bundle; delete kv.license; delete kv.lics; delete kv.devRole; delete kv.remote; delete kv.trialStart; delete kv.lastSeen; delete kv.deviceId; delete kv.trialMoe; delete kv.seat; delete kv.dirHandle; delete kv.folderWhere;
     return { format: "sulook-backup", v: 1, at: new Date().toISOString(), kv: kv, recs: recs };
   }
   function download(name, text, mime) {
@@ -597,7 +597,7 @@
   }
   async function fsWriteCore() {
     if (!FS.ok) return;
-    try { await fsWrite("samt-core.json", { format: "samt-core", deviceId: await DB.get("deviceId"), license: (await DB.get("license")) || "", lics: await getLics(), devRole: (await DB.get("devRole")) || "", trialStart: (await DB.get("trialStart")) || 0, trialMoe: (await DB.get("trialMoe")) || "", lastSeen: (await DB.get("lastSeen")) || 0, at: Date.now() }); } catch (e) { console.warn(e); }
+    try { await fsWrite("samt-core.json", { format: "samt-core", deviceId: await DB.get("deviceId"), license: (await DB.get("license")) || "", lics: await getLics(), devRole: (await DB.get("devRole")) || "", trialStart: (await DB.get("trialStart")) || 0, trialMoe: (await DB.get("trialMoe")) || "", folderWhere: (await DB.get("folderWhere")) || "", lastSeen: (await DB.get("lastSeen")) || 0, at: Date.now() }); } catch (e) { console.warn(e); }
   }
   /* استعادة من المجلد: الاشتراك دائماً، والبيانات إذا كان المتصفح فارغاً */
   async function fsRestore() {
@@ -609,6 +609,7 @@
       if (core.devRole && !(await DB.get("devRole"))) await DB.set("devRole", core.devRole);
       var ts = (await DB.get("trialStart")) || 0; if (core.trialStart && (!ts || core.trialStart < ts)) await DB.set("trialStart", core.trialStart);
       if (core.trialMoe && !(await DB.get("trialMoe"))) await DB.set("trialMoe", core.trialMoe);
+      if (core.folderWhere && !(await DB.get("folderWhere"))) await DB.set("folderWhere", core.folderWhere);   /* مكان المجلد (درايف/محلي) */
       var ls = (await DB.get("lastSeen")) || 0; if (core.lastSeen > ls) await DB.set("lastSeen", core.lastSeen);
       restored.core = true;
     }
@@ -625,7 +626,7 @@
   }
   /* ربط مجلد بأمان: إن كان فيه بيانات مدرسة من متصفح/جهاز آخر وهذا المتصفح فيه بيانات، يُسأل المستخدم ولا يُكتب فوق المجلد */
   async function fsLink(ask) {
-    await fsPick();
+    await fsPick(); await DB.set("folderWhere", "");   /* مجلد جديد: يُسأل عن مكانه من جديد (أو يؤخذ من ملف المجلد) */
     var f = await fsRead("samt-data.json"), me = await seat(), have = (await DB.all()).length;
     if (f && f.format === "sulook-backup" && (f.recs || []).length && have && f.seat !== me) {
       var nm = ((f.kv && f.kv.settings && f.kv.settings.schools) || []).map(function (z) { return z.name; }).filter(Boolean).join(" · ") || "مدرسة";
@@ -636,6 +637,7 @@
       var core = await fsRead("samt-core.json");
       if (core && core.lics) { var cur = await getLics(); Object.keys(core.lics).forEach(function (m) { if (!cur[m]) cur[m] = core.lics[m]; }); await DB.set("lics", cur); }
       if (core && core.trialMoe) await DB.set("trialMoe", core.trialMoe);
+      if (core && core.folderWhere) await DB.set("folderWhere", core.folderWhere);
       return { linked: true, adopted: true };
     }
     var r = await fsRestore();

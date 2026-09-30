@@ -1,5 +1,5 @@
-/* سَمْت 1.0.0-r50 — حزمة الواجهة */
-window.SAMT_BUILD = "1.0.0-r50";
+/* سَمْت 1.0.0-r51 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r51";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -2900,6 +2900,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       html += '<section class="card"><h3>مجلد البيانات sammt</h3>' + (!FS.supported ? '<p class="alert warn sm">هذا المتصفح لا يدعم الحفظ في مجلد على القرص (يعمل على Chrome وEdge في الكمبيوتر). استخدم النسخ الاحتياطي اليدوي أدناه.</p>' :
         '<p>تُحفظ كل البيانات تلقائياً في مجلد <b>sammt</b> على قرص الجهاز بعد كل تعديل، مع نسخة يومية في <code>sammt/backups</code> (آخر 30 يوماً). مسح المتصفح أو حذفه لا يؤثر عليها: أعد ربط المجلد فتُستعاد البيانات والاشتراك.</p>' +
         '<p>الحالة: ' + (FS.ok ? '<span class="chip ok">مربوط' + (FS.handle ? ' — ' + e(FS.handle.name) : '') + '</span>' + (FS.savedAt ? ' <span class="mut">آخر حفظ: ' + e(SL.hijri(FS.savedAt)) + ' ' + e(SL.time(FS.savedAt)) + '</span>' : '') : '<span class="chip warnc">غير مربوط</span>') + '</p>' +
+        (FS.ok ? '<p>مكان المجلد: <b id="fs-where">…</b> <button class="link" type="button" id="fs-wh">تغيير</button></p>' : '') +
         '<div class="actions wrap"><button class="btn pri" id="fs-pick" type="button">' + (FS.ok ? 'تغيير المجلد' : 'ربط مجلد sammt') + '</button>' + (FS.ok ? '<button class="btn" id="fs-now" type="button">حفظ الآن</button>' : '') + '</div><p id="fs-m"></p>') + '</section>';
       html += '<section class="card"><h3>النسخ الاحتياطي اليدوي</h3><p>كل البيانات محفوظة على هذا الجهاز فقط. احفظ نسخة أسبوعياً على الأقل في مكان آمن (ذاكرة خارجية أو بريدك).</p>' +
         '<p class="mut">آخر نسخة: ' + (cfg.lastBackup ? e(SL.hijri(cfg.lastBackup)) + " " + e(SL.time(cfg.lastBackup)) : "لا يوجد") + "</p>" +
@@ -3044,12 +3045,14 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       $("#tp-save").onclick = async function () { $$("[data-tpl]").forEach(function (t) { cfg.tpl[t.dataset.tpl] = t.value; }); await A.saveSettings(); A.toast("تم الحفظ"); };
       $("#tp-reset").onclick = async function () { if (!(await A.confirm("استعادة نصوص الرسائل الافتراضية؟"))) return; cfg.tpl = A.defaults().tpl; await A.saveSettings(); A.route(); };
     } else if (tab === "backup") {
+      var fw = $("#fs-where"); if (fw) C.DB.get("folderWhere").then(function (v) { fw.textContent = A.WHERE[v] || "لم يُحدَّد"; });
+      var fwb = $("#fs-wh"); if (fwb) fwb.onclick = function () { A.askWhere(true); };
       var fp = $("#fs-pick"); if (fp) fp.onclick = async function () {
         try {
           var r = await C.fsLink(function (m) { return A.confirm(m); }); await C.fsWriteCore();
           if (!r.linked) { A.toast("لم يُربط المجلد، ولم يتغير فيه شيء."); A.route(); return; }
           if (r.adopted || r.restored) { A.toast("حُمّلت بيانات المدرسة من المجلد"); setTimeout(function () { location.reload(); }, 800); return; }
-          A.toast("تم ربط المجلد وحفظ البيانات فيه"); A.route();
+          A.toast("تم ربط المجلد وحفظ البيانات فيه"); A.route(); A.askWhere();
         }
         catch (err) { if (err && err.name !== "AbortError") A.toast("تعذّر: " + err.message, "err"); }
       };
@@ -3661,6 +3664,22 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var br = /Edg\//.test(u) ? "Edge" : /Chrome\//.test(u) ? "Chrome" : /Safari\//.test(u) ? "Safari" : /Firefox\//.test(u) ? "Firefox" : "";
     return [os, br].filter(Boolean).join(" ");
   }
+  /* مكان مجلد sammt: المتصفح لا يكشف مسار المجلد، فنسأل المستخدم مرة واحدة ويُحفظ الجواب في المجلد نفسه */
+  A.WHERE = { gdrive: "Google Drive", onedrive: "OneDrive", local: "محلي (على هذا الجهاز فقط)" };
+  A.askWhere = async function (force) {
+    if (!C.FS || !C.FS.ok || document.getElementById("wh-bar")) return;
+    if (!force && (await C.DB.get("folderWhere"))) return;
+    var cur = (await C.DB.get("folderWhere")) || "";
+    var d = document.createElement("div"); d.id = "wh-bar"; d.className = "fc-bar wh-bar";   /* شريط غير مانع أسفل الشاشة */
+    d.innerHTML = '<b>أين يوجد مجلد sammt الذي ربطته' + (C.FS.handle ? " (" + SL.esc(C.FS.handle.name) + ")" : "") + '؟</b> <span class="mut">مجلد Google Drive أو OneDrive يُزامن البيانات بين أجهزة المدرسة، والمحلي يحفظها على هذا الجهاز فقط.</span>' +
+      Object.keys(A.WHERE).map(function (k) { return '<button class="btn sm' + (k === cur ? " pri" : "") + '" type="button" data-wh="' + k + '">' + (k === "local" ? "💻 " : "☁️ ") + SL.esc(A.WHERE[k]) + "</button>"; }).join("") +
+      '<button class="btn sm" type="button" id="wh-x" aria-label="لاحقاً">لاحقاً</button>';
+    document.body.appendChild(d);
+    d.querySelector("#wh-x").onclick = function () { d.remove(); };
+    d.querySelectorAll("[data-wh]").forEach(function (b) {
+      b.onclick = async function () { await C.DB.set("folderWhere", b.dataset.wh); await C.fsWriteCore(); d.remove(); A.toast("حُفظ مكان المجلد: " + A.WHERE[b.dataset.wh]); A.ping(); A.route(); };
+    });
+  };
   A.ping = async function () {
     var cfg = A.S.settings, base = typeof C.REG === "string" ? C.REG : (cfg.relayUrl || A.RELAY);
     if (!base || cfg.noPing) return;
@@ -3676,6 +3695,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         logins: logins, first: first, at: now, n: { stu: A.S.students.length, stf: A.S.staff.length, inc: A.S.incidents.length, sig: pend, mer: A.S.merits.length },
         wa: !!cfg.relayUrl, ua: (navigator.platform || "") + " · " + (navigator.language || "") + " · " + browserName(),
         role: (await C.DB.get("devRole")) || "",
+        fold: C.FS && C.FS.ok ? ((await C.DB.get("folderWhere")) || "unk") : C.FS && C.FS.supported ? "none" : "nosup",
         lics: (L.schools || []).map(function (x) { var z = A.S.settings.schools.find(function (s) { return A.schoolMoes(s).indexOf(x.moe) >= 0; }) || {};
           return { moe: x.moe, slot: x.slot || 0, ok: !!x.ok, end: x.end ? new Date(x.end).toISOString().slice(0, 10) : "", why: x.ok ? "" : String(x.why || "").slice(0, 160), approved: !!x.id, idAt: x.id ? x.id.at || 0 : 0,
             name: x.id ? x.id.name : z.name || "", principal: x.id ? x.id.principal : "", deputy: x.id ? x.id.deputy : "", counselor: x.id ? x.id.counselor : "" }; }) };
@@ -3764,6 +3784,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     A.route();
     A.startPolling();
     A.ping();
+    A.askWhere();
     maintWatch(C.maint);
     setInterval(function () { if (document.visibilityState === "visible") C.maintFetch().then(maintWatch); }, 180000);
     document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible") C.maintFetch().then(maintWatch); });
