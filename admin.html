@@ -79,6 +79,9 @@ tr.det td { background: var(--bg-2); white-space: normal; }
 .sess.on { border-style: solid; border-color: #0d6b61; background: #eef8f5; }
 .sess.on .dot { background: #12a150; box-shadow: 0 0 0 4px rgba(18,161,80,.18); }
 .sess .x { margin-inline-start: auto; }
+.logs3 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 8px; font-size: .84rem; }
+.logs3 b { color: var(--ink); }
+.logs3 .lg1 { background: var(--line-2, #eef1f4); border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
 .acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-2); align-items: center; }
 .unl { margin-top: 10px; padding: 12px; border: 1px dashed var(--gold); border-radius: 14px; background: var(--gold-soft); }
 .unl .checks-inline label { font-size: .88rem; }
@@ -444,13 +447,20 @@ td.dcol .del svg { width: 19px; height: 19px; }
         var dev = slots[n] || "", o = dev ? RAW[dev] || null : null, lg = o ? (o.logins || []) : [];
         devs.push({ n: n, dev: dev, o: o, last: lg[lg.length - 1] || (o && o.at) || 0 });
       }
+      /* آخر ثلاث مرات دخول: من سجل التقارير بالرقم الوزاري ومن سجلات الأجهزة القديمة لهذه المدرسة */
+      var lg = {};
+      Object.keys(RAW).forEach(function (d) {
+        var o = RAW[d]; if (!(d === moe || o.moe === moe || (o.lics || []).some(function (x) { return x.moe === moe; }))) return;
+        (o.logins || []).forEach(function (t) { t = +t; if (t && !Object.keys(lg).some(function (k) { return Math.abs(k - t) < 6e5; })) lg[t] = 1; });
+      });
+      var logins = Object.keys(lg).map(Number).sort(function (a, b) { return b - a; }).slice(0, 3);
       var cmd = pj(L.cmd) || {}, un = L.unlock && +L.unlock.until > Date.now() ? L.unlock : null;
       if (un && info && info.idAt > +un.at) un = Object.assign({ used: true }, un); /* أعادت المدرسة الاعتماد بعد السماح */
       var endT = info && info.end ? new Date(info.end + "T23:59:59").getTime() : 0;
       if (cmd.end) { var ce = new Date(cmd.end + "T23:59:59").getTime(); if (ce > endT) endT = ce; }
       var sess = pj(L.sess), live = !!(sess && sess.dev && !sess.free && Date.now() - (+sess.at || 0) < 3 * 60e3);
       var last = Math.max(devs.reduce(function (m, x) { return Math.max(m, x.last); }, 0), sess ? +sess.at || 0 : 0);
-      return { moe: moe, trial: typeof L.trial === "number" ? L.trial : 0, info: info || {}, approved: !!L.id, devs: devs, sess: sess, live: live, used: live ? 1 : 0, cmd: cmd, unlock: un, endT: endT, last: last,
+      return { logins: logins, moe: moe, trial: typeof L.trial === "number" ? L.trial : 0, info: info || {}, approved: !!L.id, devs: devs, sess: sess, live: live, used: live ? 1 : 0, cmd: cmd, unlock: un, endT: endT, last: last,
         days: endT ? Math.ceil((endT - Date.now()) / 864e5) : 0 };
     }).sort(function (a, b) { return (a.endT || 0) - (b.endT || 0); });
   }
@@ -484,6 +494,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
           ? "<b>تعمل الآن</b> على: " + e(x.sess.name || "جهاز") + ' <span class="mini">· آخر نبضة: ' + e(ago(+x.sess.at)) + '</span><button class="btn sm x" type="button" data-ssess="' + e(x.moe) + '">إنهاء الجلسة</button>'
           : "<b>لا تعمل الآن</b>" + (x.sess && x.sess.at ? ' <span class="mini">· آخر استخدام: ' + e(x.sess.name || "جهاز") + " — " + e(ago(+x.sess.at)) + "</span>" : "")) +
           (x.sess && +x.sess.data ? ' <span class="mini">· آخر تعديل للبيانات: ' + e(ago(+x.sess.data)) + "</span>" : "") + "</div>" +
+        '<div class="logs3"><b>آخر دخول:</b>' + (x.logins.length ? x.logins.map(function (t) { return '<span class="lg1">' + e(SL.dayName ? SL.dayName(t) + " " : "") + e(SL.greg(t)) + " — " + e(SL.time(t)) + "</span>"; }).join("") : '<span class="mini">لا يوجد سجل دخول بعد</span>') + "</div>" +
         '<div class="acts"><button class="btn sm pri" type="button" data-sext="' + e(x.moe) + '" data-m="3">تمديد 3 أشهر</button><button class="btn sm pri" type="button" data-sext="' + e(x.moe) + '" data-m="12">تمديد سنة</button>' +
         '<button class="btn sm" type="button" data-sextd="' + e(x.moe) + '">تمديد حتى تاريخ…</button>' +
         (x.cmd.stop ? '<button class="btn sm" type="button" data-srun="' + e(x.moe) + '">إلغاء الإيقاف</button>' : '<button class="btn sm danger" type="button" data-sstop="' + e(x.moe) + '">إيقاف الاشتراك</button>') +
