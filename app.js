@@ -1,5 +1,5 @@
-/* سَمْت 1.0.0-r51 — حزمة الواجهة */
-window.SAMT_BUILD = "1.0.0-r51";
+/* سَمْت 1.0.0-r52 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r52";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -3674,7 +3674,8 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     d.innerHTML = '<b>أين يوجد مجلد sammt الذي ربطته' + (C.FS.handle ? " (" + SL.esc(C.FS.handle.name) + ")" : "") + '؟</b> <span class="mut">مجلد Google Drive أو OneDrive يُزامن البيانات بين أجهزة المدرسة، والمحلي يحفظها على هذا الجهاز فقط.</span>' +
       Object.keys(A.WHERE).map(function (k) { return '<button class="btn sm' + (k === cur ? " pri" : "") + '" type="button" data-wh="' + k + '">' + (k === "local" ? "💻 " : "☁️ ") + SL.esc(A.WHERE[k]) + "</button>"; }).join("") +
       '<button class="btn sm" type="button" id="wh-x" aria-label="لاحقاً">لاحقاً</button>';
-    document.body.appendChild(d);
+    var top = document.querySelector(".top");   /* شريط ضمن الصفحة تحت الترويسة، لا يغطي أي زر */
+    if (top && top.parentNode) top.parentNode.insertBefore(d, top.nextSibling); else document.body.appendChild(d);
     d.querySelector("#wh-x").onclick = function () { d.remove(); };
     d.querySelectorAll("[data-wh]").forEach(function (b) {
       b.onclick = async function () { await C.DB.set("folderWhere", b.dataset.wh); await C.fsWriteCore(); d.remove(); A.toast("حُفظ مكان المجلد: " + A.WHERE[b.dataset.wh]); A.ping(); A.route(); };
