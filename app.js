@@ -1,5 +1,5 @@
-/* سَمْت 1.0.0-r52 — حزمة الواجهة */
-window.SAMT_BUILD = "1.0.0-r52";
+/* سَمْت 1.0.0-r53 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r53";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -155,7 +155,7 @@ window.SAMT_BUILD = "1.0.0-r52";
         html += '<div class="doc-sig"><div class="doc-sig-l">' + e(s.label) + "</div>" +
           "<div>الاسم: " + e(g.name || s.name || "") + "</div>" +
           '<div class="doc-sig-img">التوقيع: ' + (g.svg || (g.text ? '<span class="refused">' + e(g.text) + "</span>" : "")) + "</div>" +
-          "<div>التاريخ: " + e(g.date || "") + "</div></div>";
+          "<div>التاريخ: " + e(g.date || s.date || "") + "</div></div>";
       });
       html += "</div>";
     }
@@ -1081,8 +1081,11 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
 
   /* ————— سياق النماذج ————— */
   A.schoolCtx = function (stu) {
-    var sc = A.school(stu && stu.school);
-    return { id: sc.id, name: sc.name, region: sc.region || "", admin: sc.admin || "", principal: A.staffName("principal", sc.id), deputy: A.staffName("deputy", sc.id), counselor: A.staffName("counselor", sc.id) };
+    var sc = A.school(stu && stu.school), idn = (A.lockFor ? A.lockFor(sc).id : null) || {};
+    var other = function (f) { var z = A.S.settings.schools.find(function (x) { return x[f]; }); return z ? z[f] : ""; };
+    /* الاسم من منسوبي مدرسة الطالب، ثم من البيانات المعتمدة، ثم من أي منسوب بالدور نفسه */
+    var nm = function (r) { return A.staffName(r, sc.id) || idn[r] || A.staffName(r) || ""; };
+    return { id: sc.id, name: sc.name, region: sc.region || idn.region || other("region"), admin: sc.admin || idn.admin || other("admin"), principal: nm("principal"), deputy: nm("deputy"), counselor: nm("counselor") };
   };
   A.sigFor = function (ref, form, role) {
     return A.S.sigs.filter(function (g) { return g.ref === ref && g.form === form && g.role === role && (g.status === "signed" || g.status === "refused"); })
@@ -2284,6 +2287,13 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     bindFormRows();
   };
 
+  /* تاريخ الخطاب لمنسوبي المدرسة عند العرض فقط (لا يدخل في بصمة النموذج): تاريخ المخالفة أو اليوم.
+     الطالب وولي الأمر يؤرَّخ توقيعهما عند التوقيع. */
+  function withDates(doc, when) {
+    var d = JSON.parse(JSON.stringify(doc)), day = SL.hijri(when || Date.now());
+    (d.signers || []).forEach(function (s) { if (["principal", "deputy", "counselor", "teacher"].indexOf(s.role) >= 0 && !s.date) s.date = day; });
+    return d;
+  }
   /* ————— عرض نموذج وطباعته ————— */
   V.doc = function (p) {
     var kind = p[0], ref = p[1], fid = decodeURIComponent(p[2] || "");
@@ -2295,12 +2305,17 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     main().innerHTML = '<div class="toolbar noprint"><button class="btn" type="button" onclick="history.back()">رجوع</button><button class="btn pri" type="button" id="dc-print">طباعة / حفظ PDF</button>' +
       '<button class="btn" type="button" data-sign-here="' + kind + "|" + ref + "|" + fid + '">توقيع على الجهاز</button>' +
       (!meta.noWa ? '<button class="btn wa" type="button" data-sign-send="' + kind + "|" + ref + "|" + fid + '">إرسال للتوقيع</button>' : "") + '</div><div id="dc-warn"></div>' +
-      '<div class="paper">' + SL.renderDoc(doc, { header: { region: hdr.region, school: hdr.name, admin: hdr.admin }, logo: A.S.settings.useLogo ? "moe-logo.png" : "", sigs: A.docSigs(ref, fid, doc) }) + "</div>";
+      '<div class="paper">' + SL.renderDoc(withDates(doc, kind === "inc" ? A.byId[ref].date : 0), { header: { region: hdr.region, school: hdr.name, admin: hdr.admin }, logo: A.S.settings.useLogo ? "moe-logo.png" : "", sigs: A.docSigs(ref, fid, doc) }) + "</div>";
     $("#dc-print").onclick = function () { window.print(); };
+    /* بيانات ناقصة تظهر فارغة في النموذج: تنبيه (لا يُطبع) مع رابط لإكمالها */
+    var miss = [];
+    if (!hdr.region) miss.push('المنطقة/المحافظة — <a href="#settings?tab=school">بيانات المدرسة</a>');
+    (doc.signers || []).forEach(function (s) { if (["principal", "deputy", "counselor"].indexOf(s.role) >= 0 && !s.name) miss.push("اسم " + e(s.label) + ' — <a href="#staff">المعلمون والإدارة</a>'); });
+    if (miss.length) $("#dc-warn").insertAdjacentHTML("afterbegin", '<p class="alert warn noprint">بيانات غير مسجّلة تظهر فارغة في النموذج: ' + miss.join("، ") + "</p>");
     bindFormRows();
     A.docHash(doc).then(function (h) {
       var changed = A.S.sigs.filter(function (g) { return g.ref === ref && g.form === fid && g.status === "signed" && g.hash && g.hash !== h; });
-      if (changed.length) $("#dc-warn").innerHTML = '<p class="alert warn noprint">تنبيه: عُدّلت بيانات النموذج بعد توقيع: ' + changed.map(function (g) { return e(R.SIGNER[g.role]); }).join("، ") + ". قد تحتاج لتوقيع جديد.</p>";
+      if (changed.length) $("#dc-warn").innerHTML += '<p class="alert warn noprint">تنبيه: عُدّلت بيانات النموذج بعد توقيع: ' + changed.map(function (g) { return e(R.SIGNER[g.role]); }).join("، ") + ". قد تحتاج لتوقيع جديد.</p>";
     });
   };
 
