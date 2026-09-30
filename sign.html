@@ -52,35 +52,74 @@
     document.getElementById("vb").onclick = go; inp.onkeydown = function (ev) { if (ev.key === "Enter") go(); };
   }
 
+  /* قيمة حقل في النموذج بعنوانه (مثل «رقم الجوال» في الالتزام المدرسي) */
+  function docVal(label) {
+    var v = ""; (P.doc.blocks || []).forEach(function (b) { if (b.k === "fields") b.rows.forEach(function (r) { if (r[0] === label && r[1]) v = r[1]; }); });
+    return v;
+  }
+  function setDocVal(doc, label, val) { (doc.blocks || []).forEach(function (b) { if (b.k === "fields") b.rows.forEach(function (r) { if (r[0] === label) r[1] = val; }); }); }
+  var isF1 = false, draft = null;
   function render() {
+    isF1 = P.doc.id === "F1";
     var parent = (P.doc.signers || []).find(function (s) { return s.role === "parent"; }) || { name: "" };
     app.innerHTML = head() +
       '<div class="paper">' + SL.renderDoc(P.doc, { header: { school: P.school }, compact: false }) + "</div>" +
       '<div class="card"><h2>توقيع ولي الأمر</h2>' +
       (P.reply ? '<div><label class="radio"><input type="radio" name="rp" value="0" checked> أقر بالعلم، وسأحضر في الموعد المحدد.</label><label class="radio"><input type="radio" name="rp" value="1"> أقر بالعلم، وأرغب بتغيير الموعد (خلال نفس الأسبوع).</label><label id="alt-w" hidden>الموعد المقترح<input id="alt" placeholder="مثال: الأحد القادم الساعة 9 صباحاً"></label></div>' : "") +
       '<label>اسم ولي الأمر<input id="nm" value="' + e(parent.name || "") + '"></label>' +
+      (isF1 ? '<div class="grid2"><label>رقم جوال ولي الأمر<input id="ph1" type="tel" inputmode="tel" dir="ltr" placeholder="05xxxxxxxx" value="' + e(docVal("رقم الجوال")) + '"></label>' +
+        '<label>رقم آخر للتواصل<input id="ph2" type="tel" inputmode="tel" dir="ltr" placeholder="05xxxxxxxx" value="' + e(docVal("رقم آخر")) + '"></label></div>' +
+        '<p class="mut sm">تتحمل مسؤولية صحة أرقام التواصل كما في نص الالتزام.</p>' : "") +
       '<div class="pad-wrap"><canvas id="pad" class="pad"></canvas><button class="link" type="button" id="clr">مسح</button></div>' +
       '<label class="chk"><input type="checkbox" id="ack"> اطلعت على محتوى النموذج أعلاه وأقر بالعلم بما ورد فيه.</label>' +
-      '<p id="msg" class="lock-msg err"></p><button class="btn pri big" id="send" type="button">إرسال التوقيع للمدرسة</button>' +
+      '<p id="msg" class="lock-msg err"></p><button class="btn pri big" id="prev" type="button">معاينة ' + (isF1 ? "التعهد" : "النموذج") + ' بعد التوقيع</button>' +
       '<details style="margin-top:12px"><summary class="mut">لا أرغب بالتوقيع</summary><label>ملاحظتك للمدرسة<textarea id="rnote" rows="2"></textarea></label><button class="btn danger" id="refuse" type="button">إرسال عدم الموافقة</button></details></div>';
     var pad = new SL.SigPad(document.getElementById("pad"));
     document.getElementById("clr").onclick = function () { pad.clear(); };
     if (P.reply) Array.prototype.forEach.call(document.querySelectorAll("[name=rp]"), function (r) { r.onchange = function () { document.getElementById("alt-w").hidden = r.value !== "1" || !r.checked; }; });
-    document.getElementById("send").onclick = function () {
-      var m = document.getElementById("msg");
-      if (!document.getElementById("nm").value.trim()) return (m.textContent = "اكتب الاسم.");
+    if (draft) { document.getElementById("nm").value = draft.name; if (isF1) { document.getElementById("ph1").value = draft.p1; document.getElementById("ph2").value = draft.p2; } }
+    document.getElementById("prev").onclick = function () {
+      var m = document.getElementById("msg"), nm = document.getElementById("nm").value.trim();
+      if (!nm) return (m.textContent = "اكتب الاسم.");
+      var p1 = "", p2 = "";
+      if (isF1) {
+        p1 = document.getElementById("ph1").value; p2 = document.getElementById("ph2").value;
+        if (!SL.validPhone(p1)) return (m.textContent = "اكتب رقم جوال ولي الأمر صحيحاً (05xxxxxxxx).");
+        if (!SL.validPhone(p2)) return (m.textContent = "اكتب رقماً آخر للتواصل صحيحاً (05xxxxxxxx).");
+        if (SL.normPhone(p1) === SL.normPhone(p2)) return (m.textContent = "الرقم الآخر يجب أن يختلف عن رقم الجوال.");
+      }
       if (pad.isEmpty()) return (m.textContent = "وقّع داخل المربع.");
       if (!document.getElementById("ack").checked) return (m.textContent = "ضع علامة الإقرار بالاطلاع.");
       var rp = document.querySelector("[name=rp]:checked");
-      submit({ sig: pad.encode(), reply: rp ? +rp.value : null, alt: rp && rp.value === "1" ? document.getElementById("alt").value : "" });
+      draft = { name: nm, p1: p1, p2: p2, x: { sig: pad.encode(), reply: rp ? +rp.value : null, alt: rp && rp.value === "1" ? document.getElementById("alt").value : "" } };
+      if (isF1) { draft.x.phone1 = SL.normPhone(p1); draft.x.phone2 = SL.normPhone(p2); }
+      preview();
     };
     document.getElementById("refuse").onclick = function () { submit({ refused: true, note: document.getElementById("rnote").value }); };
   }
 
+  /* معاينة النموذج بعد التوقيع: صورة التعهد بالأسماء والأرقام والتوقيع؛ يتفعل «إرسال» بعد إتمام المعاينة (الوصول لآخرها) */
+  function preview() {
+    var doc = JSON.parse(JSON.stringify(P.doc));
+    if (isF1) { setDocVal(doc, "اسم ولي الأمر", draft.name); setDocVal(doc, "رقم الجوال", SL.showPhone(draft.p1)); setDocVal(doc, "رقم آخر", SL.showPhone(draft.p2)); }
+    var sigs = { parent: { svg: SL.sigSvg(draft.x.sig, 170, 60), name: draft.name, date: SL.hijri(Date.now()) } };
+    app.innerHTML = head() + '<div class="card"><h2>معاينة ' + (isF1 ? "التعهد" : "النموذج") + ' بعد توقيعك</h2><p class="mut">راجع النموذج حتى آخره، ثم اضغط «إرسال التوقيع للمدرسة».</p></div>' +
+      '<div class="paper" id="pv">' + SL.renderDoc(doc, { header: { school: P.school }, compact: false, sigs: sigs }) + '</div><div id="pv-end"></div>' +
+      '<div class="card"><p id="msg" class="lock-msg err"></p><p class="mut sm" id="pv-h">⬇ مرّر حتى نهاية النموذج لتفعيل الإرسال.</p>' +
+      '<button class="btn pri big" id="send" type="button" disabled>إرسال التوقيع للمدرسة</button><button class="btn big" id="back" type="button" style="margin-top:8px">تعديل</button></div>';
+    var send = document.getElementById("send"), done = false;
+    function ok() { if (done) return; done = true; send.disabled = false; document.getElementById("pv-h").textContent = "✓ اكتملت المعاينة."; }
+    if ("IntersectionObserver" in window) new IntersectionObserver(function (en) { if (en.some(function (x) { return x.isIntersecting; })) ok(); }).observe(document.getElementById("pv-end"));
+    else ok();
+    send.onclick = function () { submit(draft.x); };
+    document.getElementById("back").onclick = function () { render(); window.scrollTo(0, 0); };
+    window.scrollTo(0, 0);
+  }
   async function submit(x) {
     var btn = document.getElementById("send"), m = document.getElementById("msg");
     btn.disabled = true; btn.textContent = "جارٍ الإرسال…"; m.textContent = "";
-    var obj = Object.assign({ v: 1, tok: P.tok, role: "parent", name: document.getElementById("nm").value.trim(), at: Date.now(), ua: navigator.userAgent.slice(0, 140) }, x);
+    var nmEl = document.getElementById("nm");
+    var obj = Object.assign({ v: 1, tok: P.tok, role: "parent", name: nmEl ? nmEl.value.trim() : (draft ? draft.name : ""), at: Date.now(), ua: navigator.userAgent.slice(0, 140) }, x);
     var sealed = await SL.seal(P.k, obj);
     try {
       await SL.relay.put(P.relay, P.box, P.tok, sealed);

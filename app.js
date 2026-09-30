@@ -1,5 +1,5 @@
-/* سَمْت 1.0.0-r57 — حزمة الواجهة */
-window.SAMT_BUILD = "1.0.0-r57";
+/* سَمْت 1.0.0-r58 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r58";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -3799,6 +3799,16 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     if (r.tok !== key) return false;
     g.status = r.refused ? "refused" : "signed"; g.enc = r.sig || ""; g.name = r.name || ""; g.at = r.at || Date.now(); g.recvAt = Date.now(); g.ua = r.ua || ""; g.note = r.note || "";
     await A.save(g);
+    /* الالتزام المدرسي: أرقام التواصل التي دوّنها ولي الأمر تُحفظ في بيانات الطالب، وتُحدَّث بصمة النموذج (الأرقام جزء مما وقّع عليه) */
+    if (g.form === "F1" && g.status === "signed" && SL.validPhone(r.phone1)) {
+      var st1 = A.byId[g.ref];
+      if (st1 && st1.t === "stu") {
+        st1.parentPhone = SL.normPhone(r.phone1); if (SL.validPhone(r.phone2)) st1.parentPhone2 = SL.normPhone(r.phone2);
+        if (g.name && !st1.parentName) st1.parentName = g.name;
+        await A.save(st1);
+        try { g.hash = await A.docHash(A.doc("stu", st1.id, "F1")); await A.save(g); } catch (err) {}
+      }
+    }
     if (g.form === "F10" && g.kind === "inc" && r.reply != null) { var inc2 = A.byId[g.ref]; inc2.meeting = Object.assign(inc2.meeting || {}, { reply: +r.reply, altDate: r.alt || "" }); await A.save(inc2); }
     await SL.relay.del(cfg.relayUrl, cfg.box, key);
     if (g.lk) SL.short.del(cfg.relayUrl, g.lk); /* حذف النموذج المشفر من الوسيط بعد التوقيع */
