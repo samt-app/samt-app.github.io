@@ -1,5 +1,5 @@
-/* سَمْت 1.0.0-r58 — حزمة الواجهة */
-window.SAMT_BUILD = "1.0.0-r58";
+/* سَمْت 1.0.0-r59 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r59";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -3807,6 +3807,9 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         if (g.name && !st1.parentName) st1.parentName = g.name;
         await A.save(st1);
         try { g.hash = await A.docHash(A.doc("stu", st1.id, "F1")); await A.save(g); } catch (err) {}
+        /* توقيع الطالب من الرابط نفسه (يوقّع مع ولي الأمر) */
+        if (typeof r.sigStu === "string" && r.sigStu && r.sigStu.length < 20000 && !A.sigFor(st1.id, "F1", "student"))
+          await A.save({ id: "G" + SL.rid(10), t: "sig", ref: st1.id, kind: "stu", form: "F1", role: "student", status: "signed", enc: r.sigStu, name: st1.name, at: g.at, recvAt: Date.now(), via: "link", hash: g.hash, stu: st1.id });
       }
     }
     if (g.form === "F10" && g.kind === "inc" && r.reply != null) { var inc2 = A.byId[g.ref]; inc2.meeting = Object.assign(inc2.meeting || {}, { reply: +r.reply, altDate: r.alt || "" }); await A.save(inc2); }
