@@ -1,5 +1,5 @@
-/* سَمْت 1.0.0-r54 — حزمة الواجهة */
-window.SAMT_BUILD = "1.0.0-r54";
+/* سَمْت 1.0.0-r55 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r55";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -104,6 +104,22 @@ window.SAMT_BUILD = "1.0.0-r54";
     };
     this.fit = fit;
     setTimeout(fit, 0);
+  };
+  /* ورقة «بلاغ المعلم عن مشكلة سلوكية» للحفظ والتوثيق — تُبنى من البيانات التي أرسلها المعلم من جواله.
+     مشتركة بين صفحة المعلم (teacher.html) والمنصة (النموذج TR). */
+  SL.teacherReportDoc = function (d) {
+    var R = window.RULES || {}, isC = d.role === "counselor", who = isC ? "الموجه الطلابي" : "المعلم", t = d.date ? new Date(d.date) : null, dots = "……………………………………………………";
+    return { id: "TR", title: "تحويل طالب لوكيل شؤون الطلبة",
+      fields: [["اسم الطالب", d.stu || "", 1], ["بالصف", d.cls || ""], ["المادة", isC ? "—" : d.subject || ""], ["الحصة الدراسية", d.period || ""]],
+      blocks: [
+        { k: "h", t: "سبب التحويل" },
+        { k: "fields", rows: [["المشكلة السلوكية", d.item || "", 1], ["درجتها", d.degree ? "الدرجة " + ((R.DEGREE_NAME || {})[d.degree] || d.degree) : ""],
+          ["اليوم والتاريخ", t ? SL.dayName(t) + " " + SL.hijri(t) + " — " + SL.greg(t) : ""], ["الوقت", t ? SL.time(t) : ""], ["المكان", d.place || "", 1]] },
+        { k: "h", t: "إيضاح المشكلة" }, { k: "p", t: d.desc || dots },
+        { k: "h", t: "دور " + who + " تجاه ما قام به الطالب" }, { k: "p", t: d.act || dots },
+        { k: "note", t: "أُرسل هذا التحويل إلى وكيل شؤون الطلبة عبر رابط الرصد الإلكتروني في منصة «سَمْت»" + (d.sentAt ? " بتاريخ " + SL.hijri(d.sentAt) + " الساعة " + SL.time(d.sentAt) : "") + "، ويُحفظ للتوثيق والتأكيد." }
+      ],
+      signers: [{ role: "teacher", label: isC ? "الموجه الطلابي" : "المعلم", name: d.teacher || "" }, { role: "deputy", label: "وكيل شؤون الطلبة (الاستلام)", name: d.deputy || "" }] };
   };
   /* الخطوط المرمّزة ← SVG قابل للطباعة */
   SL.sigSvg = function (enc, w, h) {
@@ -371,7 +387,9 @@ const FORMS = {
   F14: { t: "نموذج إبلاغ عن حالة عالية الخطورة", secret: true, noWa: true, sign: ["principal"] },
   F15: { t: "نموذج إجراءات الغياب بعذر", sign: ["student", "parent", "principal"] },
   F16: { t: "نموذج إجراءات الغياب بدون عذر", sign: ["student", "parent", "principal"] },
-  F17: { t: "تعهد الالتزام بالحضور", sign: ["student", "parent", "principal"] }
+  F17: { t: "تعهد الالتزام بالحضور", sign: ["student", "parent", "principal"] },
+  /* ليس من ملحق القواعد: ورقة توثيق لما أرسله المعلم من رابط الرصد */
+  TR:  { t: "تحويل طالب لوكيل شؤون الطلبة (من رابط الرصد)", sign: ["teacher", "deputy"], noWa: true, extra: true }
 };
 
 const SIGNER = { student: "الطالب", parent: "ولي الأمر", principal: "مدير المدرسة", deputy: "وكيل شؤون الطلبة", counselor: "الموجه الطلابي", teacher: "المعلم" };
@@ -926,6 +944,12 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       signers: sgn(c, ["student", "parent", "principal"]) };
   };
 
+  /* TR — بلاغ المعلم من رابط الرصد (ورقة توثيق) */
+  F.TR = function (c) {
+    var i = c.incident || {}, s = c.student || {};
+    return SL.teacherReportDoc({ role: i.src, stu: s.name || i.stuName, cls: (s.grade || "") + (s.section ? " / " + s.section : "") || i.cls, item: i.itemText, degree: i.degree,
+      date: i.date, period: i.period, place: i.place, desc: i.desc, act: i.tAct, teacher: c.teacherName, subject: c.subject, deputy: c.school.deputy, sentAt: i.sentAt || i.createdAt });
+  };
   F.build = function (id, ctx) { return F[id] ? F[id](ctx) : null; };
 })();
 
@@ -1161,6 +1185,9 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     (doc.signers || []).forEach(function (s) {
       var g = A.sigFor(ref, fid, s.role);
       if (g) out[s.role] = { svg: g.enc ? SL.sigSvg(g.enc, 170, 60) : "", text: g.status === "refused" ? "رفض التوقيع" + (g.note ? " — " + g.note : "") : "", name: g.name, date: SL.hijri(g.at) };
+      else if (s.role === "teacher" && A.byId[ref] && A.byId[ref].tSig) {   /* توقيع المعلم من جواله عند الرصد */
+        var x = A.byId[ref]; out.teacher = { svg: SL.sigSvg(x.tSig, 170, 60), name: x.byName || "", date: SL.hijri(x.sentAt || x.createdAt || x.date) };
+      }
     });
     return out;
   };
@@ -2210,13 +2237,15 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       '<h2 class="inc-t">' + e(x.itemText) + "</h2>" +
       '<p><a href="#student/' + s.id + '"><b>' + e(s.name) + '</b></a> <small class="mut">' + e(A.classKey(s)) + "</small> " + A.scoreChip(s) + "</p>" +
       '<p class="mut">' + fmtDate(x.date) + " " + e(SL.time(x.date)) + (x.period ? " · الحصة: " + e(x.period) : "") + (x.place ? " · " + e(x.place) : "") + " · الراصد: " + e(x.byName || "—") + (x.src === "teacher" ? " (عبر رابط المعلم)" : x.src === "counselor" ? " (عبر رابط الموجه الطلابي)" : "") + "</p>" +
-      (x.desc ? '<p class="desc">' + e(x.desc) + "</p>" : "") + "</section>";
+      (x.desc ? '<p class="desc">' + e(x.desc) + "</p>" : "") + (x.tAct ? '<p class="desc"><b>دور ' + (x.src === "counselor" ? "الموجه" : "المعلم") + ":</b> " + e(x.tAct) + "</p>" : "") + "</section>";
+    /* ورقة التحويل الرسمية بما أرسله المعلم من جواله (اسمه وتوقيعه) — للحفظ والتوثيق */
+    if (x.src === "teacher" || x.src === "counselor") html += '<section class="card"><h3>ورقة التحويل من ' + (x.src === "counselor" ? "الموجه الطلابي" : "المعلم") + '</h3><ul class="list">' + formRow("inc", x.id, "TR", x.tSig ? "✓ موقّعة من " + e(x.byName || "") + " عند الإرسال" : "") + "</ul></section>";
 
     if (x.status === "reported") {
       var pl = A.plan(s, x.art, x.item, x.date, x.id);
       html += '<section class="card"><h3>الإجراء المقترح عند الاعتماد</h3>' + planCard(pl) +
         '<div class="actions"><button class="btn pri" id="ic-ok" type="button">اعتماد وتطبيق الإجراء</button><button class="btn danger" id="ic-no" type="button">رفض البلاغ</button></div></section>';
-      main().innerHTML = html;
+      main().innerHTML = html; bindFormRows();
       $("#ic-ok").onclick = async function () {
         Object.assign(x, { status: "open", stepIdx: pl.stepIdx, prior: pl.prior, deduct: pl.deduct, approvedAt: Date.now(), done: x.done || {} });
         await A.save(x); A.log("اعتماد بلاغ معلم: " + s.name, x.id); A.toast("تم الاعتماد — " + pl.step.title); A.route();
@@ -2634,7 +2663,8 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     });
     Object.keys(cls).forEach(function (k) { cls[k].sort(function (a, b) { return a.localeCompare(b, "ar"); }); });
     var stages = {}; A.S.settings.schools.forEach(function (z) { if (!x.school || z.id === x.school) stages[R.stageOf(z.stage)] = 1; });
-    var payload = { v: 1, kind: "teacher", tid: x.id, name: x.name, subject: x.subject || "", school: x.school ? A.school(x.school).name : A.S.settings.schools.map(function (z) { return z.name; }).join(" و"),
+    var z0 = x.school ? A.school(x.school) : (A.S.settings.schools[0] || {});
+    var payload = { v: 1, kind: "teacher", tid: x.id, name: x.name, subject: x.subject || "", region: z0.region || "", admin: z0.admin || "", logo: A.S.settings.useLogo ? 1 : 0, school: x.school ? A.school(x.school).name : A.S.settings.schools.map(function (z) { return z.name; }).join(" و"),
       stage: Object.keys(stages).length === 1 ? Object.keys(stages)[0] : "ms", box: cfg.box, relay: cfg.relayUrl, k: x.key, wa: SL.normPhone(cfg.schoolWa), cls: cls, cst: cst, role: isC ? "counselor" : "teacher", g: (x.school ? A.isGirls(x.school) : A.S.settings.schools.length && A.S.settings.schools.every(function (z) { return z.gender === "g"; })) ? 1 : 0 };
     if (x.lk) SL.short.del(cfg.relayUrl, x.lk);
     var lk = await SL.makeLink(base, "teacher.html", cfg.relayUrl, payload), link = lk.url;
@@ -3754,7 +3784,8 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       var art = R.articleById(o.art); if (!art || !art.items[o.item]) return false;
       var stu = A.S.students.find(function (s) { return A.classKey(s) === o.cls && A.norm(s.name) === A.norm(o.name) && (!t.school || s.school === t.school); });
       var inc = { id: "I" + key, t: "inc", stu: stu ? stu.id : "", stuName: o.name, cls: o.cls, art: art.id, item: o.item, itemText: art.items[o.item], degree: art.degree,
-        date: o.date || new Date().toISOString(), period: o.period || "", place: o.place || "", desc: o.desc || "", by: t.id, byName: t.name, status: "reported", done: {}, createdAt: Date.now(), src: t.role === "counselor" ? "counselor" : "teacher" };
+        date: o.date || new Date().toISOString(), period: o.period || "", place: o.place || "", desc: o.desc || "", by: t.id, byName: t.name, status: "reported", done: {}, createdAt: Date.now(), src: t.role === "counselor" ? "counselor" : "teacher",
+        tSig: typeof o.sig === "string" && o.sig.length < 20000 ? o.sig : "", sentAt: +o.at || 0, tAct: String(o.act || "").slice(0, 2000) };
       var who = t.role === "counselor" ? "الموجه الطلابي " : "المعلم ";
       await A.save(inc); A.log("بلاغ من " + who + t.name + " عن " + o.name, inc.id);
       A.toast("بلاغ جديد من " + who + t.name + ": " + o.name);

@@ -27,7 +27,9 @@ const FORMS = {
   F14: { t: "نموذج إبلاغ عن حالة عالية الخطورة", secret: true, noWa: true, sign: ["principal"] },
   F15: { t: "نموذج إجراءات الغياب بعذر", sign: ["student", "parent", "principal"] },
   F16: { t: "نموذج إجراءات الغياب بدون عذر", sign: ["student", "parent", "principal"] },
-  F17: { t: "تعهد الالتزام بالحضور", sign: ["student", "parent", "principal"] }
+  F17: { t: "تعهد الالتزام بالحضور", sign: ["student", "parent", "principal"] },
+  /* ليس من ملحق القواعد: ورقة توثيق لما أرسله المعلم من رابط الرصد */
+  TR:  { t: "تحويل طالب لوكيل شؤون الطلبة (من رابط الرصد)", sign: ["teacher", "deputy"], noWa: true, extra: true }
 };
 
 const SIGNER = { student: "الطالب", parent: "ولي الأمر", principal: "مدير المدرسة", deputy: "وكيل شؤون الطلبة", counselor: "الموجه الطلابي", teacher: "المعلم" };

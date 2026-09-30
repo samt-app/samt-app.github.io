@@ -29,3 +29,6 @@ body:has(.pub) { background: linear-gradient(180deg, var(--navy) 0, #0e4447 150p
 .sres small { color: var(--mut); font-size: .8rem; }
 .sres p { margin: 6px; }
 .sres[hidden] { display: none; }
+
+/* ورقة التحويل بعد الإرسال: تُطبع الورقة وحدها */
+@media print { .noprint { display: none !important; } .pub { padding: 0 !important; max-width: none !important; } }

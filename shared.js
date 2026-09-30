@@ -103,6 +103,22 @@
     this.fit = fit;
     setTimeout(fit, 0);
   };
+  /* ورقة «بلاغ المعلم عن مشكلة سلوكية» للحفظ والتوثيق — تُبنى من البيانات التي أرسلها المعلم من جواله.
+     مشتركة بين صفحة المعلم (teacher.html) والمنصة (النموذج TR). */
+  SL.teacherReportDoc = function (d) {
+    var R = window.RULES || {}, isC = d.role === "counselor", who = isC ? "الموجه الطلابي" : "المعلم", t = d.date ? new Date(d.date) : null, dots = "……………………………………………………";
+    return { id: "TR", title: "تحويل طالب لوكيل شؤون الطلبة",
+      fields: [["اسم الطالب", d.stu || "", 1], ["بالصف", d.cls || ""], ["المادة", isC ? "—" : d.subject || ""], ["الحصة الدراسية", d.period || ""]],
+      blocks: [
+        { k: "h", t: "سبب التحويل" },
+        { k: "fields", rows: [["المشكلة السلوكية", d.item || "", 1], ["درجتها", d.degree ? "الدرجة " + ((R.DEGREE_NAME || {})[d.degree] || d.degree) : ""],
+          ["اليوم والتاريخ", t ? SL.dayName(t) + " " + SL.hijri(t) + " — " + SL.greg(t) : ""], ["الوقت", t ? SL.time(t) : ""], ["المكان", d.place || "", 1]] },
+        { k: "h", t: "إيضاح المشكلة" }, { k: "p", t: d.desc || dots },
+        { k: "h", t: "دور " + who + " تجاه ما قام به الطالب" }, { k: "p", t: d.act || dots },
+        { k: "note", t: "أُرسل هذا التحويل إلى وكيل شؤون الطلبة عبر رابط الرصد الإلكتروني في منصة «سَمْت»" + (d.sentAt ? " بتاريخ " + SL.hijri(d.sentAt) + " الساعة " + SL.time(d.sentAt) : "") + "، ويُحفظ للتوثيق والتأكيد." }
+      ],
+      signers: [{ role: "teacher", label: isC ? "الموجه الطلابي" : "المعلم", name: d.teacher || "" }, { role: "deputy", label: "وكيل شؤون الطلبة (الاستلام)", name: d.deputy || "" }] };
+  };
   /* الخطوط المرمّزة ← SVG قابل للطباعة */
   SL.sigSvg = function (enc, w, h) {
     w = w || 240; h = h || 90;

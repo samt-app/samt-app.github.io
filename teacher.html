@@ -9,6 +9,7 @@
 <meta name="referrer" content="no-referrer">
 <title>رصد مشكلة سلوكية — سَمْت</title>
 <link rel="stylesheet" href="base.css">
+<link rel="stylesheet" href="doc.css">
 <link rel="stylesheet" href="pub.css">
 </head>
 <body>
@@ -34,6 +35,17 @@
     form();
   })();
 
+  /* بعد الإرسال: ورقة «تحويل طالب لوكيل شؤون الطلبة» بما أرسله المعلم — للحفظ PDF أو الطباعة */
+  function paper(o) {
+    var art = R.articleById(o.art) || { items: [], degree: 0 };
+    var doc = SL.teacherReportDoc({ role: P.role, stu: o.name, cls: o.cls, item: art.items[o.item], degree: art.degree, date: o.date, period: o.period, place: o.place, desc: o.desc, act: o.act, teacher: P.name, subject: P.subject, sentAt: o.at });
+    app.innerHTML = '<p class="alert ok noprint">✓ تم الإرسال إلى ' + (P.role === "counselor" ? "إدارة المدرسة للاعتماد" : "وكيل شؤون الطلبة") + '. هذه ورقة التحويل للحفظ.</p>' +
+      '<div class="paper">' + SL.renderDoc(doc, { header: { school: P.school, region: P.region || "", admin: P.admin || "" }, logo: P.logo ? "moe-logo.png" : "", sigs: { teacher: { svg: SL.sigSvg(o.sig, 170, 60), name: P.name, date: SL.hijri(o.at) } } }) + "</div>" +
+      '<div class="actions noprint"><button class="btn pri big" type="button" id="pp">حفظ PDF / طباعة</button><button class="btn big" type="button" id="nw">رصد جديد</button></div>';
+    document.getElementById("pp").onclick = function () { window.print(); };
+    document.getElementById("nw").onclick = function () { form(); window.scrollTo(0, 0); };
+    window.scrollTo(0, 0);
+  }
   function sentList() { try { return JSON.parse(localStorage.getItem("samt_sent_" + P.tid) || "[]"); } catch (err) { return []; } }
   function form() {
     var classes = Object.keys(P.cls || {}).sort(function (a, b) { return a.localeCompare(b, "ar"); });
@@ -46,11 +58,14 @@
       '<label>ابحث عن المشكلة<input id="q" type="search" placeholder="مثال: التأخر، الجوال، الهروب…"></label><div class="degtabs" id="dg"></div><div class="items" id="its"></div>' +
       '<div class="hint" id="hint" hidden></div>' +
       '<div class="grid2"><label>التاريخ والوقت<input id="dt" type="datetime-local" value="' + local + '"></label><label>الحصة<input id="pr" placeholder="مثال: الثالثة"></label></div>' +
-      '<label>المكان<input id="pl" placeholder="الفصل، الساحة…"></label><label>وصف مختصر<textarea id="ds" rows="3"></textarea></label>' +
+      '<label>المكان<input id="pl" placeholder="الفصل، الساحة…"></label><label>إيضاح المشكلة<textarea id="ds" rows="3"></textarea></label>' +
+      '<label>دور ' + (isC ? "الموجه" : "المعلم") + ' تجاه ما قام به الطالب<textarea id="ac" rows="2" placeholder="مثال: نبّهته شفهياً، غيّرت مكان جلوسه…"></textarea></label>' +
+      '<label>توقيعك <small class="mut">(' + e(P.name) + ')</small></label><div class="pad-wrap"><canvas id="pad" class="pad"></canvas><button class="link" type="button" id="clr">مسح</button></div>' +
       '<p id="msg" class="lock-msg err"></p><button class="btn pri big" id="go" type="button">إرسال إلى ' + to + '</button></div>' +
       (sent.length ? '<div class="card"><h3>آخر ما أرسلته</h3><ul class="sent">' + sent.slice(0, 15).map(function (s) { return "<li>" + e(s) + "</li>"; }).join("") + "</ul></div>" : "") +
       '<p class="note center">لا تُحفظ بيانات الرصد على هذا الجوال؛ تُرسل مشفرة إلى جهاز المدرسة مباشرة.</p>';
     var sel = { art: null, item: null }, deg = 0;
+    var pad = new SL.SigPad(document.getElementById("pad")); document.getElementById("clr").onclick = function () { pad.clear(); };
     var cl = document.getElementById("cl"), st = document.getElementById("st");
     var sq = document.getElementById("sq");
     if (sq) {
@@ -98,18 +113,19 @@
       var m = document.getElementById("msg"), b = this;
       if (!cl.value || !st.value) return (m.textContent = "اختر الفصل والطالب.");
       if (sel.art == null) return (m.textContent = "اختر المشكلة السلوكية.");
+      if (pad.isEmpty()) return (m.textContent = "وقّع داخل المربع قبل الإرسال.");
       b.disabled = true; b.textContent = "جارٍ الإرسال…"; m.textContent = "";
       var dt = document.getElementById("dt").value;
       var obj = { v: 1, kind: "rpt", cls: cl.value, name: st.value, art: sel.art, item: sel.item, date: dt ? new Date(dt).toISOString() : new Date().toISOString(),
-        period: document.getElementById("pr").value, place: document.getElementById("pl").value, desc: document.getElementById("ds").value };
+        period: document.getElementById("pr").value, place: document.getElementById("pl").value, desc: document.getElementById("ds").value,
+        act: document.getElementById("ac").value, sig: pad.encode(), at: Date.now() };
       try {
         var key = "R" + P.tid + "-" + SL.rid(8);
         await SL.relay.put(P.relay, P.box, key, await SL.seal(P.k, obj));
         var l = sentList(); l.unshift(st.value + " — " + R.articleById(sel.art).items[sel.item] + " (" + SL.hijri(new Date()) + ")");
         try { localStorage.setItem("samt_sent_" + P.tid, JSON.stringify(l.slice(0, 30))); } catch (err) {}
         sel = { art: null, item: null };
-        form();
-        var ok = document.createElement("p"); ok.className = "alert ok"; ok.textContent = "✓ تم الإرسال إلى " + (P.role === "counselor" ? "إدارة المدرسة — يُعتمد من جهاز المدرسة." : "وكيل شؤون الطلبة."); app.insertBefore(ok, app.children[1]);
+        paper(obj);
       } catch (err) { b.disabled = false; b.textContent = "إعادة المحاولة"; m.textContent = "تعذّر الإرسال — تحقق من الإنترنت ثم أعد المحاولة."; }
     };
   }
