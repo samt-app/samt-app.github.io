@@ -1,5 +1,5 @@
-/* سَمْت 1.0.0-r53 — حزمة الواجهة */
-window.SAMT_BUILD = "1.0.0-r53";
+/* سَمْت 1.0.0-r54 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r54";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -153,7 +153,7 @@ window.SAMT_BUILD = "1.0.0-r53";
       doc.signers.forEach(function (s) {
         var g = sigs[s.role] || {};
         html += '<div class="doc-sig"><div class="doc-sig-l">' + e(s.label) + "</div>" +
-          "<div>الاسم: " + e(g.name || s.name || "") + "</div>" +
+          "<div>الاسم: " + e((/^(principal|deputy|counselor)$/.test(s.role) ? s.name || g.name : g.name || s.name) || "") + "</div>" +
           '<div class="doc-sig-img">التوقيع: ' + (g.svg || (g.text ? '<span class="refused">' + e(g.text) + "</span>" : "")) + "</div>" +
           "<div>التاريخ: " + e(g.date || s.date || "") + "</div></div>";
       });
@@ -2294,6 +2294,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     (d.signers || []).forEach(function (s) { if (["principal", "deputy", "counselor", "teacher"].indexOf(s.role) >= 0 && !s.date) s.date = day; });
     return d;
   }
+  var STAFF_ROLES = ["principal", "deputy", "counselor"];
   /* ————— عرض نموذج وطباعته ————— */
   V.doc = function (p) {
     var kind = p[0], ref = p[1], fid = decodeURIComponent(p[2] || "");
@@ -2327,13 +2328,17 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var isInvite = fid === "F10";
     var sh = A.sheet("توقيع — " + doc.title,
       '<label>الموقّع<select id="sg-role">' + roles.map(function (r) { return '<option value="' + r.role + '"' + (r === first ? " selected" : "") + ">" + e(r.label) + (A.sigFor(ref, fid, r.role) ? " (موقّع سابقاً)" : "") + "</option>"; }).join("") + "</select></label>" +
-      '<label>الاسم<input id="sg-name"></label>' +
+      '<label>الاسم<input id="sg-name"></label><p class="mut sm" id="sg-nh"></p>' +
       (isInvite ? '<div id="sg-reply" class="checks-inline"><label><input type="radio" name="rp" value="0" checked> سأحضر في الموعد المحدد</label><label><input type="radio" name="rp" value="1"> أرغب بتغيير الموعد</label><input id="sg-alt" placeholder="الموعد المقترح"></div>' : "") +
       '<div class="pad-wrap"><canvas id="sg-pad" class="pad"></canvas><button class="link" type="button" id="sg-clr">مسح</button></div>' +
       '<div class="actions"><button class="btn pri" type="button" id="sg-ok">اعتماد التوقيع</button><button class="btn danger" type="button" id="sg-ref">رفض التوقيع</button></div>' +
       '<p class="note">' + e(R.GENERAL.refuse) + "</p>");
     var pad = new SL.SigPad($("#sg-pad", sh.body));
-    function setName() { var r = roles.find(function (x) { return x.role === $("#sg-role", sh.body).value; }); $("#sg-name", sh.body).value = (r && r.name) || ""; var rp = $("#sg-reply", sh.body); if (rp) rp.style.display = r && r.role === "parent" ? "" : "none"; }
+    function setName() {
+      var r = roles.find(function (x) { return x.role === $("#sg-role", sh.body).value; }), inp = $("#sg-name", sh.body), hint = $("#sg-nh", sh.body);
+      var staff = r && STAFF_ROLES.indexOf(r.role) >= 0;   /* المدير والوكيل والموجه: الاسم من البيانات الأساسية تلقائياً */
+      inp.value = (r && r.name) || ""; inp.readOnly = !!(staff && r.name);
+      hint.innerHTML = staff ? (r.name ? "🔒 الاسم من البيانات الأساسية (المعلمون والإدارة)." : 'لم يُسجَّل اسم ' + e(r.label) + ' — سجّله في <a href="#staff">المعلمون والإدارة</a> ليظهر تلقائياً.') : ""; var rp = $("#sg-reply", sh.body); if (rp) rp.style.display = r && r.role === "parent" ? "" : "none"; }
     $("#sg-role", sh.body).onchange = setName; setName();
     $("#sg-clr", sh.body).onclick = function () { pad.clear(); };
     async function store(status, enc, note) {

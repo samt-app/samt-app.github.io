@@ -151,7 +151,7 @@
       doc.signers.forEach(function (s) {
         var g = sigs[s.role] || {};
         html += '<div class="doc-sig"><div class="doc-sig-l">' + e(s.label) + "</div>" +
-          "<div>الاسم: " + e(g.name || s.name || "") + "</div>" +
+          "<div>الاسم: " + e((/^(principal|deputy|counselor)$/.test(s.role) ? s.name || g.name : g.name || s.name) || "") + "</div>" +
           '<div class="doc-sig-img">التوقيع: ' + (g.svg || (g.text ? '<span class="refused">' + e(g.text) + "</span>" : "")) + "</div>" +
           "<div>التاريخ: " + e(g.date || s.date || "") + "</div></div>";
       });
