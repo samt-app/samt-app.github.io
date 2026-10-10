@@ -1,5 +1,5 @@
-/* سَمْت 1.0.0-r60 — حزمة الواجهة */
-window.SAMT_BUILD = "1.0.0-r60";
+/* سَمْت 1.0.0-r61 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r61";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -43,6 +43,9 @@ window.SAMT_BUILD = "1.0.0-r60";
   };
   /* واتساب يفتح في التبويب نفسه — لا تُفتح تبويبات جديدة داخل المنصة */
   SL.openWa = function (phone, text) { var u = SL.wa(phone, text); if (!window.open(u, "_self")) location.href = u; };
+  /* واتساب في تبويب جديد (تبقى المنصة مفتوحة): يُفتح التبويب فوراً عند الضغط ثم يُوجَّه للرابط بعد تجهيزه */
+  SL.waTab = function () { var w = null; try { w = window.open("about:blank", "_blank"); } catch (e) {} return w; };
+  SL.openWaIn = function (w, phone, text) { var u = SL.wa(phone, text); if (w && !w.closed) { try { w.opener = null; w.location.href = u; return; } catch (e) {} } if (!window.open(u, "_blank")) SL.openWa(phone, text); };
 
   /* ————— عشوائي وبصمات ————— */
   var B32 = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -119,8 +122,8 @@ window.SAMT_BUILD = "1.0.0-r60";
         { k: "h", t: "دور " + who + " تجاه ما قام به الطالب" }, { k: "p", t: d.act || dots }
       ],
       /* في التذييل بعد التوقيعات */
-      footer: ["أُرسل هذا التحويل إلى وكيل شؤون الطلبة عبر رابط الرصد الإلكتروني في منصة «سَمْت»" + (d.sentAt ? " بتاريخ " + SL.hijri(d.sentAt) + " الساعة " + SL.time(d.sentAt) : "") + "، ويُحفظ للتوثيق والتأكيد."],
-      signers: [{ role: "teacher", label: isC ? "الموجه الطلابي" : "المعلم", name: d.teacher || "" }, { role: "deputy", label: "وكيل شؤون الطلبة (الاستلام)", name: d.deputy || "" }] };
+      footer: ["أُرسل هذا التحويل إلى وكيل شؤون الطلاب عبر رابط الرصد الإلكتروني في منصة «سَمْت»" + (d.sentAt ? " بتاريخ " + SL.hijri(d.sentAt) + " الساعة " + SL.time(d.sentAt) : "") + "، ويُحفظ للتوثيق والتأكيد."],
+      signers: [{ role: "teacher", label: isC ? "الموجه الطلابي" : "المعلم", name: d.teacher || "" }, { role: "deputy", label: "وكيل شؤون الطلاب (الاستلام)", name: d.deputy || "" }] };
   };
   /* الخطوط المرمّزة ← SVG قابل للطباعة */
   SL.sigSvg = function (enc, w, h) {
@@ -393,7 +396,7 @@ const FORMS = {
   TR:  { t: "تحويل طالب لوكيل شؤون الطلاب (من رابط الرصد)", sign: ["teacher", "deputy"], noWa: true, extra: true }
 };
 
-const SIGNER = { student: "الطالب", parent: "ولي الأمر", principal: "مدير المدرسة", deputy: "وكيل شؤون الطلبة", counselor: "الموجه الطلابي", teacher: "المعلم" };
+const SIGNER = { student: "الطالب", parent: "ولي الأمر", principal: "مدير المدرسة", deputy: "وكيل شؤون الطلاب", counselor: "الموجه الطلابي", teacher: "المعلم" };
 
 /* أعلام تشغيلية: notify=إشعار ولي الأمر، invite=دعوة حضورية، pledge=تعهد، refer=إحالة للموجه،
    plan=خطة تعديل سلوك، committee=لجنة التوجيه، report=محضر ضبط واقعة/مصادرة،
@@ -713,7 +716,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   function sgn(c, roles) {
     return roles.map(function (r) {
       var nm = r === "principal" ? c.school.principal : r === "deputy" ? c.school.deputy : r === "counselor" ? c.school.counselor : r === "student" ? (c.student || {}).name : r === "parent" ? (c.student || {}).parentName : r === "teacher" ? c.teacherName : "";
-      var lbl = { student: "الطالب", parent: "ولي الأمر", principal: "مدير المدرسة", deputy: "وكيل شؤون الطلبة", counselor: "القائم بتعديل السلوك (الموجه الطلابي)", teacher: "المعلم" }[r];
+      var lbl = { student: "الطالب", parent: "ولي الأمر", principal: "مدير المدرسة", deputy: "وكيل شؤون الطلاب", counselor: "القائم بتعديل السلوك (الموجه الطلابي)", teacher: "المعلم" }[r];
       return { role: r, label: lbl, name: nm || "" };
     });
   }
@@ -733,7 +736,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         { k: "fields", rows: [["اسم ولي الأمر", s.parentName, 1], ["رقم الجوال", SL.showPhone(s.parentPhone)], ["رقم آخر", SL.showPhone(s.parentPhone2)]] }
       ],
       signers: sgn(c, ["student", "parent"]),
-      footer: ["ملحوظة: يؤخذ توقيع الطالب وولي الأمر في بداية العام الدراسي، وتحفظ النماذج في ملف خاص لدى وكيل شؤون الطلبة."] };
+      footer: ["ملحوظة: يؤخذ توقيع الطالب وولي الأمر في بداية العام الدراسي، وتحفظ النماذج في ملف خاص لدى وكيل شؤون الطلاب."] };
   };
 
   /* 2 — رصد درجات السلوك المتميز */
@@ -871,7 +874,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   /* 12 — محضر اجتماع لجنة التوجيه الطلابي (سري) */
   F.F12 = function (c) {
     var i = c.incident || {}, cm = i.committee || {}, mem = c.committeeMembers || [];
-    var rows = [["وكيل المدرسة لشؤون الطلبة", "رئيس"], ["وكيل المدرسة للشؤون التعليمية", "عضو"], ["الموجه الطلابي", "مقرر"], ["معلم متميز", "عضو"], ["معلم متميز", "عضو"], ["معلم متميز", "عضو"]]
+    var rows = [["وكيل المدرسة لشؤون الطلاب", "رئيس"], ["وكيل المدرسة للشؤون التعليمية", "عضو"], ["الموجه الطلابي", "مقرر"], ["معلم متميز", "عضو"], ["معلم متميز", "عضو"], ["معلم متميز", "عضو"]]
       .map(function (r, n) { return [String(n + 1), (mem[n] || ""), r[0], r[1], ""]; });
     return { id: "F12", title: R.FORMS.F12.t, secret: 1,
       blocks: [
@@ -972,20 +975,21 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       wahajCode: "", wahajCodes: {}, useLogo: true, lastBackup: 0,
       tpl: {
         sign: "المكرم ولي أمر الطالب {الطالب}\nالسلام عليكم ورحمة الله وبركاته\nنأمل التكرم بالاطلاع على «{النموذج}» والتوقيع عليه عبر الرابط التالي:\n{الرابط}\nللتحقق يُطلب آخر 4 أرقام من السجل المدني للطالب، والرابط صالح {المدة} ساعة.\n{المدرسة}",
-        notify: "المكرم ولي أمر الطالب {الطالب}\nالسلام عليكم ورحمة الله وبركاته\nنفيدكم بوجود ملاحظة سلوكية تخص ابنكم، نأمل التواصل مع وكيل شؤون الطلبة أو مراجعة المدرسة.\n{المدرسة}",
+        notify: "المكرم ولي أمر الطالب {الطالب}\nالسلام عليكم ورحمة الله وبركاته\nنفيدكم بوجود ملاحظة سلوكية تخص ابنكم، نأمل التواصل مع وكيل شؤون الطلاب أو مراجعة المدرسة.\n{المدرسة}",
         absence: "المكرم ولي أمر الطالب {الطالب}\nالسلام عليكم ورحمة الله وبركاته\nنفيدكم بأن غياب ابنكم {النوع} بلغ {العدد} أيام، ونأمل مراجعة المدرسة لمقابلة الموجه الطلابي وفق قواعد السلوك والمواظبة.\n{المدرسة}",
         counselorLink: "الأستاذ {المعلم} — الموجه الطلابي\nالسلام عليكم ورحمة الله وبركاته\nهذا رابط الرصد الخاص بك، ويشمل جميع طلاب المدرسة. ما ترصده يصل إلى جهاز المدرسة ويُعتمد من الإدارة:\n{الرابط}\n{المدرسة}",
         teacherLink: "الأستاذ {المعلم}\nالسلام عليكم ورحمة الله وبركاته\nيمكنك رصد المشكلات السلوكية للطلاب عبر الرابط التالي وإرسالها لوكيل شؤون الطلاب :\n{الرابط}\n{المدرسة}",
         teacherDone: "الأستاذ {المعلم}\nتم اعتماد رصدك للطالب {الطالب} ({المشكلة}) واتخاذ: {الإجراء}.\nشكراً لتعاونك.\n{المدرسة}",
-        referral: "المكرم الموجه الطلابي {الموجه}\nتمت إحالة الطالب {الطالب} ({الصف}) إليكم لدراسة حالته وفق قواعد السلوك والمواظبة. تفاصيل الإحالة لدى وكيل شؤون الطلبة.\n{المدرسة}"
+        referral: "المكرم الموجه الطلابي {الموجه}\nتمت إحالة الطالب {الطالب} ({الصف}) إليكم لدراسة حالته وفق قواعد السلوك والمواظبة. تفاصيل الإحالة لدى وكيل شؤون الطلاب.\n{المدرسة}"
       }
     };
   };
   A.load = async function () {
     var S = { settings: Object.assign(A.defaults(), (await C.DB.get("settings")) || {}) };
     S.settings.tpl = Object.assign(A.defaults().tpl, S.settings.tpl || {});
+    Object.keys(S.settings.tpl).forEach(function (k) { if (typeof S.settings.tpl[k] === "string") S.settings.tpl[k] = S.settings.tpl[k].replace(/وكيل شؤون الطلبة/g, "وكيل شؤون الطلاب"); });
     /* نص رابط الرصد القديم (غير المعدَّل) ← النص الجديد */
-    if (S.settings.tpl.teacherLink === "الأستاذ {المعلم}\nالسلام عليكم ورحمة الله وبركاته\nهذا رابط رصد المشكلات السلوكية الخاص بك — يصل الرصد مباشرة إلى وكيل شؤون الطلبة:\n{الرابط}\n{المدرسة}") S.settings.tpl.teacherLink = A.defaults().tpl.teacherLink;
+    if (S.settings.tpl.teacherLink === "الأستاذ {المعلم}\nالسلام عليكم ورحمة الله وبركاته\nهذا رابط رصد المشكلات السلوكية الخاص بك — يصل الرصد مباشرة إلى وكيل شؤون الطلاب:\n{الرابط}\n{المدرسة}") S.settings.tpl.teacherLink = A.defaults().tpl.teacherLink;
     if (!S.settings.relayUrl) S.settings.relayUrl = A.RELAY;
     if (!S.settings.publicBase && /samt-app\.github\.io$/.test(location.hostname)) S.settings.publicBase = A.BASE;
     var all = await C.DB.all();
@@ -1245,9 +1249,9 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
 (function () {
   "use strict";
   var SL = window.SL, C = window.SLCore, A = window.APP;
-  var FIELDS = [["name", "اسم المدرسة"], ["moe", "الرقم الوزاري"], ["info", "المرحلة ونوع المدرسة والمنطقة وإدارة التعليم"], ["principal", "مدير المدرسة"], ["deputy", "وكيل شؤون الطلبة"], ["counselor", "الموجه الطلابي"]];
+  var FIELDS = [["name", "اسم المدرسة"], ["moe", "الرقم الوزاري"], ["info", "المرحلة ونوع المدرسة والمنطقة وإدارة التعليم"], ["principal", "مدير المدرسة"], ["deputy", "وكيل شؤون الطلاب"], ["counselor", "الموجه الطلابي"]];
   var INFO = [["stage", "المرحلة"], ["gender", "نوع المدرسة"], ["region", "المنطقة/المحافظة"], ["admin", "إدارة التعليم"]];
-  var REQ = [["name", "اسم المدرسة"], ["moe", "الرقم الوزاري"], ["region", "المنطقة/المحافظة"], ["admin", "إدارة التعليم"], ["principal", "مدير المدرسة"], ["deputy", "وكيل شؤون الطلبة"], ["counselor", "الموجه الطلابي"]];
+  var REQ = [["name", "اسم المدرسة"], ["moe", "الرقم الوزاري"], ["region", "المنطقة/المحافظة"], ["admin", "إدارة التعليم"], ["principal", "مدير المدرسة"], ["deputy", "وكيل شؤون الطلاب"], ["counselor", "الموجه الطلابي"]];
   A.INFO_FIELDS = INFO;
   var KEYUN = null;   /* فتح التعديل بكود جديد: { moes, code } — في الذاكرة حتى الحفظ والاعتماد */
   var LOCK_ROLES = ["principal", "deputy", "counselor"];
@@ -1410,7 +1414,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     if (!moes.length) return A.toast("أدخل الرقم الوزاري أولاً", "err");
     var id = A.identFor(z, moes[0]), miss = A.identMissing(id);
     if (miss.length) return A.toast("أكمل قبل الاعتماد: " + miss.join("، "), "err");
-    var rowsT = [["اسم المدرسة", id.name], ["الرقم الوزاري", moes.join(" + ")], ["المرحلة", id.stage], ["نوع المدرسة", id.gender === "g" ? "بنات" : "بنين"], ["المنطقة/المحافظة", id.region], ["إدارة التعليم", id.admin], ["مدير المدرسة", id.principal], ["وكيل شؤون الطلبة", id.deputy], ["الموجه الطلابي", id.counselor]];
+    var rowsT = [["اسم المدرسة", id.name], ["الرقم الوزاري", moes.join(" + ")], ["المرحلة", id.stage], ["نوع المدرسة", id.gender === "g" ? "بنات" : "بنين"], ["المنطقة/المحافظة", id.region], ["إدارة التعليم", id.admin], ["مدير المدرسة", id.principal], ["وكيل شؤون الطلاب", id.deputy], ["الموجه الطلابي", id.counselor]];
     var html = '<p>بعد الاعتماد <b>تُقفل</b> البيانات التالية ولا تُعدَّل إلا بكود اشتراك جديد أو بإذن من المزوّد (تقناس). تُطبع في كل النماذج الرسمية:</p><table class="tbl"><tbody>' +
       rowsT.map(function (r) { return "<tr><th>" + r[0] + "</th><td>" + SL.esc(r[1] || "") + "</td></tr>"; }).join("") +
       "</tbody></table><p class=\"mut\">تأكد من كتابة الأسماء كما في نظام نور.</p>";
@@ -1446,7 +1450,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       '<label>المنطقة/المحافظة<input id="qa-region" value="' + SL.esc(z.region || "") + '"></label>' +
       '<label>إدارة التعليم<input id="qa-admin" value="' + SL.esc(z.admin || "") + '" placeholder="الإدارة العامة للتعليم بمنطقة …"></label>' +
       '<label>مدير المدرسة<input id="qa-principal" value="' + v("principal") + '"></label>' +
-      '<label>وكيل شؤون الطلبة<input id="qa-deputy" value="' + v("deputy") + '"></label>' +
+      '<label>وكيل شؤون الطلاب<input id="qa-deputy" value="' + v("deputy") + '"></label>' +
       '<label>الموجه الطلابي<input id="qa-counselor" value="' + v("counselor") + '"></label></div>' +
       '<p class="alert warn sm">⚠️ <b>تنبيه:</b> بعد الاعتماد تُقفل هذه البيانات: <b>اسم المدرسة، الرقم الوزاري، المرحلة، نوع المدرسة، المنطقة، إدارة التعليم، المدير، الوكيل، الموجه</b>، ولا تُعدَّل إلا بكود اشتراك جديد أو بإذن من المزوّد (تقناس). تأكد من صحتها قبل الضغط.</p>' +
       '<div class="actions"><button class="btn pri" type="button" id="qa-ok">' + (window.SLI ? SLI("shield") + " " : "") + 'اعتماد وقفل البيانات</button><button class="btn" type="button" id="qa-later">لاحقاً</button></div><p id="qa-msg"></p>';
@@ -1727,7 +1731,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   var R = window.RULES, SL = window.SL, C = window.SLCore, A = window.APP, e = SL.esc;
   var $ = A.$, $$ = A.$$;
   var V = A.views = {};
-  var ROLE = { principal: "مدير المدرسة", deputy: "وكيل شؤون الطلبة", deputyEdu: "وكيل الشؤون التعليمية", counselor: "الموجه الطلابي", activity: "رائد النشاط", teacher: "معلم", admin: "إداري" };
+  var ROLE = { principal: "مدير المدرسة", deputy: "وكيل شؤون الطلاب", deputyEdu: "وكيل الشؤون التعليمية", counselor: "الموجه الطلابي", activity: "رائد النشاط", teacher: "معلم", admin: "إداري" };
   A.ROLE = ROLE;
 
   function main() { return document.getElementById("main"); }
@@ -2115,7 +2119,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       '<div class="grid2"><label>التاريخ والوقت<input name="date" type="datetime-local" value="' + local + '" required></label><label>الحصة<input name="period" placeholder="مثال: الثالثة"></label></div>' +
       '<label>مكان الواقعة<input name="place" placeholder="الفصل، الساحة، الحافلة…"></label>' +
       '<label>وصف مختصر للواقعة<textarea name="desc" rows="3"></textarea></label>' +
-      '<label>الراصد<select name="by"><option value="">— وكيل شؤون الطلبة —</option>' + staffOpts + "</select></label>" +
+      '<label>الراصد<select name="by"><option value="">— وكيل شؤون الطلاب —</option>' + staffOpts + "</select></label>" +
       '<div class="actions"><button class="btn pri big" type="submit">حفظ واعتماد الإجراء</button></div></form>';
     var degSel = 0;
     function picked() { return A.S.students.filter(function (s) { return sel[s.id]; }); }
@@ -2632,7 +2636,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     var s = x || { role: "teacher", school: (A.S.settings.schools[0] || {}).id }, lk = x ? A.lockedStaff(x) : null;
     var sh = A.sheet(x ? "تعديل" : "إضافة منسوب", '<form class="form" id="fsf">' +
       (lk ? '<p class="alert sm lockn">🔒 ' + e(ROLE[s.role]) + " معتمد لمدرسة «" + e(lk.name) + "»: الاسم والوظيفة لا يُعدَّلان إلا بكود اشتراك جديد أو بإذن من المزوّد. يمكنك تعديل الجوال والمادة والفصول.</p>" :
-        '<p class="note">أسماء <b>مدير المدرسة ووكيل شؤون الطلبة والموجه الطلابي</b> تُعتمد عند تفعيل الاشتراك، ولا تُعدَّل بعدها إلا بكود اشتراك جديد أو بإذن من المزوّد — اكتبها كما في نظام نور.</p>') +
+        '<p class="note">أسماء <b>مدير المدرسة ووكيل شؤون الطلاب والموجه الطلابي</b> تُعتمد عند تفعيل الاشتراك، ولا تُعدَّل بعدها إلا بكود اشتراك جديد أو بإذن من المزوّد — اكتبها كما في نظام نور.</p>') +
       '<label>الاسم<input name="name" value="' + e(s.name || "") + '" required' + (lk ? " readonly" : "") + "></label>" + A.fld("sid", "رقم السجل المدني", s.sid) +
       '<label>الوظيفة<select name="role"' + (lk ? " disabled" : "") + ">" + Object.keys(ROLE).map(function (r) { return '<option value="' + r + '"' + (r === s.role ? " selected" : "") + ">" + ROLE[r] + "</option>"; }).join("") + "</select></label>" +
       (A.S.settings.schools.length > 1 ? '<label>المدرسة<select name="school"' + (lk ? " disabled" : "") + '><option value="">كل المدارس</option>' + A.S.settings.schools.map(function (z) { return '<option value="' + e(z.id) + '"' + (z.id === s.school ? " selected" : "") + ">" + e(z.name) + "</option>"; }).join("") + "</select></label>" : "") +
@@ -2654,6 +2658,8 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   A.sendTeacherLink = async function (x) {
     var cfg = A.S.settings, base = SL.base(cfg.publicBase);
     if (!cfg.relayUrl || !base) { A.toast("أكمل إعداد الروابط أولاً", "err"); return A.go("settings?tab=links"); }
+    var tab = SL.waTab();   /* تبويب جديد لواتساب يُفتح مع الضغطة نفسها (قبل تجهيز الرابط) فلا يمنعه المتصفح */
+    try {
     if (!x.key) { x.key = SL.newKey(); await A.save(x); }
     var isC = x.role === "counselor";
     var want = isC ? [] : String(x.classes || "").split(/[،,;]+/).map(function (c) { return A.norm(c).replace(/\s*\/\s*/g, "/"); }).filter(Boolean);
@@ -2672,8 +2678,9 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     if (x.lk) SL.short.del(cfg.relayUrl, x.lk);
     var lk = await SL.makeLink(base, "teacher.html", cfg.relayUrl, payload), link = lk.url;
     x.lk = lk.code; await A.save(x);
-    SL.openWa(x.phone, A.fill(isC ? cfg.tpl.counselorLink : cfg.tpl.teacherLink, { "المعلم": x.name, "الرابط": link, "المدرسة": payload.school, __g: !!payload.g }));
+    SL.openWaIn(tab, x.phone, A.fill(isC ? cfg.tpl.counselorLink : cfg.tpl.teacherLink, { "المعلم": x.name, "الرابط": link, "المدرسة": payload.school, __g: !!payload.g }));
     A.log("إرسال رابط الرصد " + (isC ? "للموجه الطلابي " : "للمعلم ") + x.name);
+    } catch (err) { if (tab && !tab.closed) tab.close(); A.toast("تعذّر تجهيز رابط الرصد: " + err.message, "err"); }
   };
 
   /* ————— الاستيراد من Excel ————— */
@@ -2928,7 +2935,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     if (tab === "school") {
       var need = A.needApproval();
       if (need.length) html += '<div class="alert warn"><b>' + (need.some(function (x) { return !x.re; }) ? "اعتماد بيانات المدرسة مطلوب قبل استخدام المنصة." : "سمح المزوّد بتعديل بيانات معتمدة.") + "</b> راجع البيانات أدناه ثم اضغط «" + (need.some(function (x) { return !x.re; }) ? "اعتماد بيانات المدرسة" : "إعادة اعتماد البيانات") + "».</div>";
-      html += '<section class="card id-note"><h3>' + SLI("shield") + ' بيانات تُعتمد ولا تُعدَّل</h3><p>عند تفعيل الاشتراك تُعتمد بيانات المدرسة التالية: <b>اسم المدرسة، الرقم الوزاري، المرحلة، نوع المدرسة، المنطقة، إدارة التعليم، مدير المدرسة، وكيل شؤون الطلبة، الموجه الطلابي</b>. تُطبع في كل النماذج الرسمية وتظهر على أي جهاز تُفتح عليه المنصة، و<b>لا يمكن تعديلها بعد الاعتماد إلا بكود اشتراك جديد أو بإذن من المزوّد (تقناس)</b>. اكتبها كما هي في نظام نور وراجعها قبل الاعتماد.</p><p class="mut">أسماء المدير والوكيل والموجه تُدخل من صفحة <a href="#staff">المعلمون والإدارة</a> أو باستيراد ملف نور.</p></section>';
+      html += '<section class="card id-note"><h3>' + SLI("shield") + ' بيانات تُعتمد ولا تُعدَّل</h3><p>عند تفعيل الاشتراك تُعتمد بيانات المدرسة التالية: <b>اسم المدرسة، الرقم الوزاري، المرحلة، نوع المدرسة، المنطقة، إدارة التعليم، مدير المدرسة، وكيل شؤون الطلاب، الموجه الطلابي</b>. تُطبع في كل النماذج الرسمية وتظهر على أي جهاز تُفتح عليه المنصة، و<b>لا يمكن تعديلها بعد الاعتماد إلا بكود اشتراك جديد أو بإذن من المزوّد (تقناس)</b>. اكتبها كما هي في نظام نور وراجعها قبل الاعتماد.</p><p class="mut">أسماء المدير والوكيل والموجه تُدخل من صفحة <a href="#staff">المعلمون والإدارة</a> أو باستيراد ملف نور.</p></section>';
       html += '<section class="card"><h3>المدارس</h3><div id="sc-l">' +
         cfg.schools.map(function (z, i) { return schoolForm(z, i); }).join("") + '</div>' + (C.lic && C.lic.v === 2 ? '<p class="mut sm">لكل مدرسة كود اشتراك خاص برقمها الوزاري. لإضافة مدرسة أخرى فعّل كودها من تبويب «الاشتراك والتحديث».</p>' : '<button class="btn" id="sc-add" type="button">＋ إضافة مدرسة</button>') + '</section>' +
         '<section class="card"><label class="row-check"><input type="checkbox" id="sc-logo"' + (cfg.useLogo ? " checked" : "") + "> إظهار شعار وزارة التعليم في ترويسة النماذج</label></section>" +
@@ -3253,7 +3260,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     return { id: "RPT", title: "تقرير عن مخالفات الطالب",
       fields: [["اسم الطالب", s.name, 1], ["الصف", s.grade || ""], ["الفصل", s.section || ""], ["المرحلة", A.stageLabel(s)], ["تاريخ التقرير", SL.hijri(Date.now())]],
       blocks: blocks,
-      signers: [{ role: "deputy", label: "وكيل شؤون الطلبة", name: A.staffName("deputy", s.school) }, { role: "principal", label: "مدير المدرسة", name: A.staffName("principal", s.school) }], stamp: true };
+      signers: [{ role: "deputy", label: "وكيل شؤون الطلاب", name: A.staffName("deputy", s.school) }, { role: "principal", label: "مدير المدرسة", name: A.staffName("principal", s.school) }], stamp: true };
   };
   V.repdoc = function (p) {
     var s = A.byId[p[0]]; if (!s || s.t !== "stu") return A.go("reports");

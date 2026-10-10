@@ -41,6 +41,9 @@
   };
   /* واتساب يفتح في التبويب نفسه — لا تُفتح تبويبات جديدة داخل المنصة */
   SL.openWa = function (phone, text) { var u = SL.wa(phone, text); if (!window.open(u, "_self")) location.href = u; };
+  /* واتساب في تبويب جديد (تبقى المنصة مفتوحة): يُفتح التبويب فوراً عند الضغط ثم يُوجَّه للرابط بعد تجهيزه */
+  SL.waTab = function () { var w = null; try { w = window.open("about:blank", "_blank"); } catch (e) {} return w; };
+  SL.openWaIn = function (w, phone, text) { var u = SL.wa(phone, text); if (w && !w.closed) { try { w.opener = null; w.location.href = u; return; } catch (e) {} } if (!window.open(u, "_blank")) SL.openWa(phone, text); };
 
   /* ————— عشوائي وبصمات ————— */
   var B32 = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -117,8 +120,8 @@
         { k: "h", t: "دور " + who + " تجاه ما قام به الطالب" }, { k: "p", t: d.act || dots }
       ],
       /* في التذييل بعد التوقيعات */
-      footer: ["أُرسل هذا التحويل إلى وكيل شؤون الطلبة عبر رابط الرصد الإلكتروني في منصة «سَمْت»" + (d.sentAt ? " بتاريخ " + SL.hijri(d.sentAt) + " الساعة " + SL.time(d.sentAt) : "") + "، ويُحفظ للتوثيق والتأكيد."],
-      signers: [{ role: "teacher", label: isC ? "الموجه الطلابي" : "المعلم", name: d.teacher || "" }, { role: "deputy", label: "وكيل شؤون الطلبة (الاستلام)", name: d.deputy || "" }] };
+      footer: ["أُرسل هذا التحويل إلى وكيل شؤون الطلاب عبر رابط الرصد الإلكتروني في منصة «سَمْت»" + (d.sentAt ? " بتاريخ " + SL.hijri(d.sentAt) + " الساعة " + SL.time(d.sentAt) : "") + "، ويُحفظ للتوثيق والتأكيد."],
+      signers: [{ role: "teacher", label: isC ? "الموجه الطلابي" : "المعلم", name: d.teacher || "" }, { role: "deputy", label: "وكيل شؤون الطلاب (الاستلام)", name: d.deputy || "" }] };
   };
   /* الخطوط المرمّزة ← SVG قابل للطباعة */
   SL.sigSvg = function (enc, w, h) {

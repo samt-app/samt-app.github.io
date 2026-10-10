@@ -90,7 +90,7 @@
   var SLOTS = 1;
   var TT = self.SAMT_SESS || {};   /* أزمنة قصيرة للاختبارات فقط */
   var SESS_TTL = TT.ttl || 3 * 60e3, SESS_BEAT = TT.beat || 60e3, IDLE_MS = TT.idle || 20 * 60e3;
-  var DEV_ROLES = [["deputy", "جهاز وكيل شؤون الطلبة"], ["counselor", "جهاز الموجه الطلابي"], ["principal", "جهاز مدير المدرسة"], ["other", "جهاز آخر"]];
+  var DEV_ROLES = [["deputy", "جهاز وكيل شؤون الطلاب"], ["counselor", "جهاز الموجه الطلابي"], ["principal", "جهاز مدير المدرسة"], ["other", "جهاز آخر"]];
   function parseCode(code) {
     var p = String(code || "").trim().replace(/\s+/g, "").split(".");
     if (p[0] === "SL2" && p.length === 5 && /^\d{3,12}$/.test(p[1]) && /^\d{8}$/.test(p[2]) && /^[A-Za-z0-9_-]{16}$/.test(p[3])) return { v: 2, moe: p[1], exp: p[2], s: p[3], sig: p[4], code: p.join(".") };

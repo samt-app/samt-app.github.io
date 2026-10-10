@@ -32,7 +32,7 @@ const FORMS = {
   TR:  { t: "تحويل طالب لوكيل شؤون الطلاب (من رابط الرصد)", sign: ["teacher", "deputy"], noWa: true, extra: true }
 };
 
-const SIGNER = { student: "الطالب", parent: "ولي الأمر", principal: "مدير المدرسة", deputy: "وكيل شؤون الطلبة", counselor: "الموجه الطلابي", teacher: "المعلم" };
+const SIGNER = { student: "الطالب", parent: "ولي الأمر", principal: "مدير المدرسة", deputy: "وكيل شؤون الطلاب", counselor: "الموجه الطلابي", teacher: "المعلم" };
 
 /* أعلام تشغيلية: notify=إشعار ولي الأمر، invite=دعوة حضورية، pledge=تعهد، refer=إحالة للموجه،
    plan=خطة تعديل سلوك، committee=لجنة التوجيه، report=محضر ضبط واقعة/مصادرة،
