@@ -1,5 +1,5 @@
-/* سَمْت 1.0.0-r62 — حزمة الواجهة */
-window.SAMT_BUILD = "1.0.0-r62";
+/* سَمْت 1.0.0-r63 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r63";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -41,11 +41,11 @@ window.SAMT_BUILD = "1.0.0-r62";
     var n = SL.normPhone(phone);
     return "https://wa.me/" + (n || "") + "?text=" + encodeURIComponent(text || "");
   };
-  /* واتساب يفتح في التبويب نفسه — لا تُفتح تبويبات جديدة داخل المنصة */
-  SL.openWa = function (phone, text) { var u = SL.wa(phone, text); if (!window.open(u, "_self")) location.href = u; };
+  /* واتساب يفتح دائماً في تبويب جديد، وتبقى المنصة مفتوحة في تبويبها (عند منع النوافذ المنبثقة: في الصفحة نفسها) */
+  SL.openWa = function (phone, text) { var u = SL.wa(phone, text), w = null; try { w = window.open(u, "_blank"); } catch (e) {} if (w) { try { w.opener = null; } catch (e) {} } else location.href = u; };
   /* واتساب في تبويب جديد (تبقى المنصة مفتوحة): يُفتح التبويب فوراً عند الضغط ثم يُوجَّه للرابط بعد تجهيزه */
   SL.waTab = function () { var w = null; try { w = window.open("about:blank", "_blank"); } catch (e) {} return w; };
-  SL.openWaIn = function (w, phone, text) { var u = SL.wa(phone, text); if (w && !w.closed) { try { w.opener = null; w.location.href = u; return; } catch (e) {} } if (!window.open(u, "_blank")) SL.openWa(phone, text); };
+  SL.openWaIn = function (w, phone, text) { var u = SL.wa(phone, text); if (w && !w.closed) { try { w.opener = null; w.location.href = u; return; } catch (e) {} } SL.openWa(phone, text); };
 
   /* ————— عشوائي وبصمات ————— */
   var B32 = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -2403,6 +2403,8 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     if (meta.noWa) return A.toast("هذا النموذج لا يُرسل بالواتساب", "err");
     var hasParent = (doc.signers || []).some(function (s) { return s.role === "parent"; });
     if (!hasParent) { if (!(await A.confirm("هذا النموذج لا يتضمن توقيع ولي الأمر. إرسال رابط اطلاع وإقرار بالعلم؟"))) return; doc.signers = (doc.signers || []).concat([{ role: "parent", label: "ولي الأمر (إقرار بالعلم)", name: stu.parentName || "" }]); }
+    var tab = SL.waTab();   /* تبويب واتساب يُفتح مع الضغطة نفسها، ثم يُوجَّه للرابط بعد تجهيزه */
+    try {
     var old = A.pendingFor(ref, fid, "parent");
     if (old) { old.status = "replaced"; await A.save(old); if (old.lk) SL.short.del(cfg.relayUrl, old.lk); }
     var tok = SL.rid(14), key = SL.newKey(), last4 = String(stu.sid || "").replace(/\D/g, "").slice(-4);
@@ -2413,7 +2415,8 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       h4: last4 ? (await SL.sha256(tok + last4)).slice(0, 12) : "", doc: doc, reply: fid === "F10", g: A.stuGirls(stu) ? 1 : 0 };
     var lk = await SL.makeLink(base, "sign.html", cfg.relayUrl, payload), link = lk.url;
     if (lk.code) { g.lk = lk.code; await A.save(g); }
-    SL.openWa(stu.parentPhone, A.fill(cfg.tpl.sign, vars(stu, { "النموذج": doc.title, "الرابط": link })));
+    SL.openWaIn(tab, stu.parentPhone, A.fill(cfg.tpl.sign, vars(stu, { "النموذج": doc.title, "الرابط": link })));
+    } catch (err) { if (tab && !tab.closed) tab.close(); return A.toast("تعذّر تجهيز رابط التوقيع: " + err.message, "err"); }
     A.log("إرسال رابط توقيع «" + doc.title + "» لولي أمر " + stu.name, ref);
     A.toast("فُتح واتساب — سيظهر التوقيع تلقائياً فور توقيع ولي الأمر");
     setTimeout(A.route, 400);

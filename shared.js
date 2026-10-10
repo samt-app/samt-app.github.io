@@ -39,11 +39,11 @@
     var n = SL.normPhone(phone);
     return "https://wa.me/" + (n || "") + "?text=" + encodeURIComponent(text || "");
   };
-  /* واتساب يفتح في التبويب نفسه — لا تُفتح تبويبات جديدة داخل المنصة */
-  SL.openWa = function (phone, text) { var u = SL.wa(phone, text); if (!window.open(u, "_self")) location.href = u; };
+  /* واتساب يفتح دائماً في تبويب جديد، وتبقى المنصة مفتوحة في تبويبها (عند منع النوافذ المنبثقة: في الصفحة نفسها) */
+  SL.openWa = function (phone, text) { var u = SL.wa(phone, text), w = null; try { w = window.open(u, "_blank"); } catch (e) {} if (w) { try { w.opener = null; } catch (e) {} } else location.href = u; };
   /* واتساب في تبويب جديد (تبقى المنصة مفتوحة): يُفتح التبويب فوراً عند الضغط ثم يُوجَّه للرابط بعد تجهيزه */
   SL.waTab = function () { var w = null; try { w = window.open("about:blank", "_blank"); } catch (e) {} return w; };
-  SL.openWaIn = function (w, phone, text) { var u = SL.wa(phone, text); if (w && !w.closed) { try { w.opener = null; w.location.href = u; return; } catch (e) {} } if (!window.open(u, "_blank")) SL.openWa(phone, text); };
+  SL.openWaIn = function (w, phone, text) { var u = SL.wa(phone, text); if (w && !w.closed) { try { w.opener = null; w.location.href = u; return; } catch (e) {} } SL.openWa(phone, text); };
 
   /* ————— عشوائي وبصمات ————— */
   var B32 = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
