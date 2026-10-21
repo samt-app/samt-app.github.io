@@ -1,5 +1,5 @@
-/* سَمْت 1.0.0-r63 — حزمة الواجهة */
-window.SAMT_BUILD = "1.0.0-r63";
+/* سَمْت 1.0.0-r64 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r64";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -979,6 +979,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         absence: "المكرم ولي أمر الطالب {الطالب}\nالسلام عليكم ورحمة الله وبركاته\nنفيدكم بأن غياب ابنكم {النوع} بلغ {العدد} أيام، ونأمل مراجعة المدرسة لمقابلة الموجه الطلابي وفق قواعد السلوك والمواظبة.\n{المدرسة}",
         counselorLink: "الأستاذ {المعلم} — الموجه الطلابي\nالسلام عليكم ورحمة الله وبركاته\nهذا رابط الرصد الخاص بك، ويشمل جميع طلاب المدرسة. ما ترصده يصل إلى جهاز المدرسة ويُعتمد من الإدارة:\n{الرابط}\n{المدرسة}",
         teacherLink: "الأستاذ {المعلم}\nالسلام عليكم ورحمة الله وبركاته\nيمكنك رصد المشكلات السلوكية للطلاب عبر الرابط التالي وإرسالها لوكيل شؤون الطلاب :\n{الرابط}\n{المدرسة}",
+        signStaff: "الأستاذ {الاسم}\nالسلام عليكم ورحمة الله وبركاته\nنأمل الاطلاع على «{النموذج}» الخاص بالطالب {الطالب} ({الصف}) والتوقيع عليه عبر الرابط التالي:\n{الرابط}\nوكيل شؤون الطلاب",
         teacherDone: "الأستاذ {المعلم}\nتم اعتماد رصدك للطالب {الطالب} ({المشكلة}) واتخاذ: {الإجراء}.\nشكراً لتعاونك.\nوكيل شؤون الطلاب",
         referral: "المكرم الموجه الطلابي {الموجه}\nتمت إحالة الطالب {الطالب} ({الصف}) إليكم لدراسة حالته وفق قواعد السلوك والمواظبة. تفاصيل الإحالة لدى وكيل شؤون الطلاب.\n{المدرسة}"
       }
@@ -2394,31 +2395,57 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
   };
 
   /* ————— إرسال رابط توقيع عبر واتساب ————— */
-  A.sendSign = async function (kind, ref, fid) {
+  /* من يُرسل له رابط التوقيع: كل موقّع في النموذج (ولي الأمر، المعلم الراصد، المدير، الوكيل، الموجه) — الطالب يوقّع على الجهاز */
+  function signTargets(kind, ref, doc, stu) {
+    var rec = A.byId[ref] || {};
+    return (doc.signers || []).filter(function (s) { return s.role !== "student"; }).map(function (s) {
+      var who = null;
+      if (s.role === "parent") who = { name: stu.parentName || s.name || "", phone: stu.parentPhone, sid: stu.sid };
+      else if (s.role === "teacher") { var t = A.byId[rec.by]; who = t ? { name: t.name, phone: t.phone, sid: t.sid } : { name: s.name || rec.byName || "", phone: "" }; }
+      else { var st = A.staffBy(s.role, stu.school)[0] || A.staffBy(s.role)[0]; who = st ? { name: st.name, phone: st.phone, sid: st.sid } : { name: s.name || "", phone: "" }; }
+      return { role: s.role, label: s.label, name: who.name || s.name || "", phone: who.phone || "", sid: who.sid || "", ok: SL.validPhone(who.phone) };
+    });
+  }
+  /* اختيار الموقّع عند تعدد الموقّعين */
+  function pickSigner(kind, ref, fid, all) {
+    var sh = A.sheet("إرسال للتوقيع — اختر الموقّع", '<p class="mut">يُرسل رابط التوقيع عبر واتساب لمن تختاره:</p><ul class="list">' + all.map(function (t) {
+      return '<li><button type="button" class="pick" data-role="' + e(t.role) + '"' + (t.ok ? "" : " disabled") + '><b>' + e(t.label) + "</b> — " + e(t.name || "—") +
+        (t.done ? ' <span class="chip ok">وقّع ✓</span>' : A.pendingFor(ref, fid, t.role) ? ' <span class="chip pend">أُرسل ⏳</span>' : "") + (t.ok ? "" : ' <span class="chip warnc">بلا جوال</span>') + "</button></li>";
+    }).join("") + "</ul>");
+    $$("[data-role]", sh.body).forEach(function (b) { b.onclick = function () { sh.close(); A.sendSign(kind, ref, fid, b.dataset.role); }; });
+  }
+  A.sendSign = async function (kind, ref, fid, roleWanted) {
     var cfg = A.S.settings, base = SL.base(cfg.publicBase);
     if (!cfg.relayUrl || !base) { A.toast("أكمل إعداد الروابط أولاً", "err"); return A.go("settings?tab=links"); }
     var stu = kind === "inc" || kind === "abs" ? A.byId[A.byId[ref].stu] : A.byId[ref];
-    if (!SL.validPhone(stu.parentPhone)) return A.toast("لا يوجد جوال صحيح لولي الأمر", "err");
     var doc = A.doc(kind, ref, fid), meta = R.FORMS[fid.split(":")[0]];
     if (meta.noWa) return A.toast("هذا النموذج لا يُرسل بالواتساب", "err");
-    var hasParent = (doc.signers || []).some(function (s) { return s.role === "parent"; });
-    if (!hasParent) { if (!(await A.confirm("هذا النموذج لا يتضمن توقيع ولي الأمر. إرسال رابط اطلاع وإقرار بالعلم؟"))) return; doc.signers = (doc.signers || []).concat([{ role: "parent", label: "ولي الأمر (إقرار بالعلم)", name: stu.parentName || "" }]); }
+    var all = signTargets(kind, ref, doc, stu).map(function (t) { t.done = !!A.sigFor(ref, fid, t.role); return t; });
+    if (!all.length) return A.toast("هذا النموذج يوقّعه الطالب فقط — استخدم «توقيع على الجهاز»", "err");
+    var tg = roleWanted ? all.find(function (t) { return t.role === roleWanted; }) : null;
+    if (!tg) {
+      var open = all.filter(function (t) { return !t.done; });
+      if (all.length === 1 || open.length === 1) tg = open[0] || all[0];
+      else return pickSigner(kind, ref, fid, all);
+    }
+    if (!tg.ok) return A.toast("لا يوجد جوال صحيح لـ" + tg.label + (tg.role === "parent" ? "" : " — أضفه في «المعلمون والإدارة»"), "err");
     var tab = SL.waTab();   /* تبويب واتساب يُفتح مع الضغطة نفسها، ثم يُوجَّه للرابط بعد تجهيزه */
     try {
-    var old = A.pendingFor(ref, fid, "parent");
+    var old = A.pendingFor(ref, fid, tg.role);
     if (old) { old.status = "replaced"; await A.save(old); if (old.lk) SL.short.del(cfg.relayUrl, old.lk); }
-    var tok = SL.rid(14), key = SL.newKey(), last4 = String(stu.sid || "").replace(/\D/g, "").slice(-4);
+    var tok = SL.rid(14), key = SL.newKey(), last4 = String(tg.sid || "").replace(/\D/g, "").slice(-4);
     var hash = await A.docHash(A.doc(kind, ref, fid)), exp = Date.now() + (+cfg.linkHours || 72) * 3600e3;
-    var g = { id: tok, t: "sig", ref: ref, kind: kind, form: fid, role: "parent", status: "pending", key: key, hash: hash, exp: exp, createdAt: Date.now(), via: "link", stu: stu.id };
+    var g = { id: tok, t: "sig", ref: ref, kind: kind, form: fid, role: tg.role, status: "pending", key: key, hash: hash, exp: exp, createdAt: Date.now(), via: "link", stu: stu.id };
     await A.save(g);
     var payload = { v: 1, tok: tok, box: cfg.box, relay: cfg.relayUrl, k: key, exp: exp, school: A.school(stu.school).name, wa: SL.normPhone(cfg.schoolWa),
-      h4: last4 ? (await SL.sha256(tok + last4)).slice(0, 12) : "", doc: doc, reply: fid === "F10", g: A.stuGirls(stu) ? 1 : 0 };
+      h4: last4 ? (await SL.sha256(tok + last4)).slice(0, 12) : "", doc: doc, reply: fid === "F10" && tg.role === "parent", g: A.stuGirls(stu) ? 1 : 0,
+      role: tg.role, label: tg.label, name: tg.role === "parent" ? "" : tg.name };
     var lk = await SL.makeLink(base, "sign.html", cfg.relayUrl, payload), link = lk.url;
     if (lk.code) { g.lk = lk.code; await A.save(g); }
-    SL.openWaIn(tab, stu.parentPhone, A.fill(cfg.tpl.sign, vars(stu, { "النموذج": doc.title, "الرابط": link })));
+    SL.openWaIn(tab, tg.phone, A.fill(tg.role === "parent" ? cfg.tpl.sign : cfg.tpl.signStaff, vars(stu, { "النموذج": doc.title, "الرابط": link, "الاسم": tg.name })));
     } catch (err) { if (tab && !tab.closed) tab.close(); return A.toast("تعذّر تجهيز رابط التوقيع: " + err.message, "err"); }
-    A.log("إرسال رابط توقيع «" + doc.title + "» لولي أمر " + stu.name, ref);
-    A.toast("فُتح واتساب — سيظهر التوقيع تلقائياً فور توقيع ولي الأمر");
+    A.log("إرسال رابط توقيع «" + doc.title + "» إلى " + (tg.role === "parent" ? "ولي أمر " + stu.name : tg.label + " " + tg.name), ref);
+    A.toast("فُتح واتساب — سيظهر التوقيع تلقائياً فور توقيع " + tg.label);
     setTimeout(A.route, 400);
   };
 
@@ -2955,8 +2982,8 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         '<p class="mut">رمز صندوق هذا الجهاز: <code dir="ltr">' + e(cfg.box) + "</code></p>" +
         '<div class="actions wrap"><button class="btn pri" id="ln-save" type="button">حفظ</button><button class="btn" id="ln-test" type="button">اختبار الاتصال</button></div><p id="ln-msg"></p></section>';
     } else if (tab === "msgs") {
-      var names = { sign: "رابط التوقيع لولي الأمر", notify: "إشعار عام لولي الأمر", absence: "إشعار غياب", teacherLink: "رابط الرصد للمعلم", counselorLink: "رابط الرصد للموجه الطلابي", teacherDone: "إبلاغ المعلم بالاعتماد", referral: "إحالة للموجه الطلابي" };
-      html += '<section class="card"><p class="mut">المتغيرات: {الطالب} {الصف} {المدرسة} {النموذج} {الرابط} {المدة} {المعلم} {المشكلة} {الإجراء} {الموجه} {النوع} {العدد}. لا تُذكر تفاصيل المخالفة في رسائل ولي الأمر حفاظاً على السرية.</p>' +
+      var names = { sign: "رابط التوقيع لولي الأمر", notify: "إشعار عام لولي الأمر", absence: "إشعار غياب", teacherLink: "رابط الرصد للمعلم", counselorLink: "رابط الرصد للموجه الطلابي", teacherDone: "إبلاغ المعلم بالاعتماد", signStaff: "رابط التوقيع للمعلم أو الإدارة", referral: "إحالة للموجه الطلابي" };
+      html += '<section class="card"><p class="mut">المتغيرات: {الطالب} {الصف} {الاسم} {المدرسة} {النموذج} {الرابط} {المدة} {المعلم} {المشكلة} {الإجراء} {الموجه} {النوع} {العدد}. لا تُذكر تفاصيل المخالفة في رسائل ولي الأمر حفاظاً على السرية.</p>' +
         Object.keys(names).map(function (k) { return '<label' + (k === "absence" ? ' class="wj"' : "") + ">" + names[k] + '<textarea data-tpl="' + k + '" rows="5">' + e(cfg.tpl[k]) + "</textarea></label>"; }).join("") +
         '<div class="actions"><button class="btn pri" id="tp-save" type="button">حفظ</button><button class="btn" id="tp-reset" type="button">استعادة الافتراضي</button></div></section>';
     } else if (tab === "backup") {
@@ -3813,7 +3840,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
     g.status = r.refused ? "refused" : "signed"; g.enc = r.sig || ""; g.name = r.name || ""; g.at = r.at || Date.now(); g.recvAt = Date.now(); g.ua = r.ua || ""; g.note = r.note || "";
     await A.save(g);
     /* الالتزام المدرسي: أرقام التواصل التي دوّنها ولي الأمر تُحفظ في بيانات الطالب، وتُحدَّث بصمة النموذج (الأرقام جزء مما وقّع عليه) */
-    if (g.form === "F1" && g.status === "signed" && SL.validPhone(r.phone1)) {
+    if (g.form === "F1" && g.role === "parent" && g.status === "signed" && SL.validPhone(r.phone1)) {
       var st1 = A.byId[g.ref];
       if (st1 && st1.t === "stu") {
         st1.parentPhone = SL.normPhone(r.phone1); if (SL.validPhone(r.phone2)) st1.parentPhone2 = SL.normPhone(r.phone2);

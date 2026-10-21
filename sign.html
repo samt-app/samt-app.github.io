@@ -39,7 +39,7 @@
   })();
 
   function verify() {
-    app.innerHTML = head() + '<div class="card"><h2>التحقق</h2><p>للحفاظ على خصوصية بيانات الطالب، أدخل <b>آخر 4 أرقام</b> من السجل المدني (الهوية) للطالب.</p>' +
+    app.innerHTML = head() + '<div class="card"><h2>التحقق</h2><p>للحفاظ على خصوصية بيانات الطالب، أدخل <b>آخر 4 أرقام</b> من السجل المدني (الهوية) ' + (isParent() ? "للطالب" : "الخاص بك") + '.</p>' +
       '<label>آخر 4 أرقام<input id="v4" inputmode="numeric" maxlength="4" dir="ltr" autocomplete="off"></label><p id="vm" class="lock-msg err"></p>' +
       '<button class="btn pri big" id="vb" type="button">متابعة</button></div>';
     var tries = 0, inp = document.getElementById("v4");
@@ -59,16 +59,20 @@
   }
   function setDocVal(doc, label, val) { (doc.blocks || []).forEach(function (b) { if (b.k === "fields") b.rows.forEach(function (r) { if (r[0] === label) r[1] = val; }); }); }
   var isF1 = false, draft = null, stuName = "";
+  /* الموقّع المرسَل إليه الرابط: ولي الأمر (الافتراضي) أو المعلم أو المدير أو الوكيل أو الموجه */
+  function role() { return P.role || "parent"; }
+  function isParent() { return role() === "parent"; }
+  function signer() { return (P.doc.signers || []).find(function (s) { return s.role === role(); }) || { role: role(), label: P.label || "ولي الأمر", name: P.name || "" }; }
   function render() {
-    isF1 = P.doc.id === "F1";
+    isF1 = P.doc.id === "F1" && isParent();
     stuName = ((P.doc.signers || []).find(function (s) { return s.role === "student"; }) || {}).name || "";
-    var parent = (P.doc.signers || []).find(function (s) { return s.role === "parent"; }) || { name: "" };
+    var parent = signer(), lbl = String(parent.label || "ولي الأمر").replace(/\s*\(.*\)\s*$/, ""), fixed = !isParent() && !!(P.name || parent.name);
     app.innerHTML = head() +
       '<div class="paper">' + SL.renderDoc(P.doc, { header: { school: P.school }, compact: false }) + "</div>" +
       (isF1 ? '<div class="card"><h2>توقيع الطالب</h2><p class="mut sm">يوقّع الطالب <b>' + e(stuName) + '</b> بنفسه.</p><div class="pad-wrap"><canvas id="pad2" class="pad"></canvas><button class="link" type="button" id="clr2">مسح</button></div></div>' : "") +
-      '<div class="card"><h2>توقيع ولي الأمر</h2>' +
-      (P.reply ? '<div><label class="radio"><input type="radio" name="rp" value="0" checked> أقر بالعلم، وسأحضر في الموعد المحدد.</label><label class="radio"><input type="radio" name="rp" value="1"> أقر بالعلم، وأرغب بتغيير الموعد (خلال نفس الأسبوع).</label><label id="alt-w" hidden>الموعد المقترح<input id="alt" placeholder="مثال: الأحد القادم الساعة 9 صباحاً"></label></div>' : "") +
-      '<label>اسم ولي الأمر<input id="nm" value="' + e(parent.name || "") + '"></label>' +
+      '<div class="card"><h2>توقيع ' + e(lbl) + '</h2>' +
+      (P.reply && isParent() ? '<div><label class="radio"><input type="radio" name="rp" value="0" checked> أقر بالعلم، وسأحضر في الموعد المحدد.</label><label class="radio"><input type="radio" name="rp" value="1"> أقر بالعلم، وأرغب بتغيير الموعد (خلال نفس الأسبوع).</label><label id="alt-w" hidden>الموعد المقترح<input id="alt" placeholder="مثال: الأحد القادم الساعة 9 صباحاً"></label></div>' : "") +
+      '<label>الاسم<input id="nm" value="' + e(P.name || parent.name || "") + '"' + (fixed ? " readonly" : "") + '></label>' +
       (isF1 ? '<div class="grid2"><label>رقم جوال ولي الأمر<input id="ph1" type="tel" inputmode="tel" dir="ltr" placeholder="05xxxxxxxx" value="' + e(docVal("رقم الجوال")) + '"></label>' +
         '<label>رقم آخر للتواصل<input id="ph2" type="tel" inputmode="tel" dir="ltr" placeholder="05xxxxxxxx" value="' + e(docVal("رقم آخر")) + '"></label></div>' +
         '<p class="mut sm">تتحمل مسؤولية صحة أرقام التواصل كما في نص الالتزام.</p>' : "") +
@@ -92,7 +96,7 @@
         if (SL.normPhone(p1) === SL.normPhone(p2)) return (m.textContent = "الرقم الآخر يجب أن يختلف عن رقم الجوال.");
       }
       if (pad2 && pad2.isEmpty()) return (m.textContent = "يوقّع الطالب داخل مربع «توقيع الطالب».");
-      if (pad.isEmpty()) return (m.textContent = "وقّع داخل مربع «توقيع ولي الأمر».");
+      if (pad.isEmpty()) return (m.textContent = "وقّع داخل مربع «توقيع " + String(signer().label || "ولي الأمر").replace(/\s*\(.*\)\s*$/, "") + "».");
       if (!document.getElementById("ack").checked) return (m.textContent = "ضع علامة الإقرار بالاطلاع.");
       var rp = document.querySelector("[name=rp]:checked");
       draft = { name: nm, p1: p1, p2: p2, x: { sig: pad.encode(), reply: rp ? +rp.value : null, alt: rp && rp.value === "1" ? document.getElementById("alt").value : "" } };
@@ -106,7 +110,7 @@
   function preview() {
     var doc = JSON.parse(JSON.stringify(P.doc));
     if (isF1) { setDocVal(doc, "اسم ولي الأمر", draft.name); setDocVal(doc, "رقم الجوال", SL.showPhone(draft.p1)); setDocVal(doc, "رقم آخر", SL.showPhone(draft.p2)); }
-    var sigs = { parent: { svg: SL.sigSvg(draft.x.sig, 170, 60), name: draft.name, date: SL.hijri(Date.now()) } };
+    var sigs = {}; sigs[role()] = { svg: SL.sigSvg(draft.x.sig, 170, 60), name: draft.name, date: SL.hijri(Date.now()) };
     if (draft.x.sigStu) sigs.student = { svg: SL.sigSvg(draft.x.sigStu, 170, 60), name: stuName, date: SL.hijri(Date.now()) };
     app.innerHTML = head() + '<div class="card"><h2>معاينة ' + (isF1 ? "التعهد" : "النموذج") + ' بعد توقيعك</h2><p class="mut">راجع النموذج حتى آخره، ثم اضغط «إرسال التوقيع للمدرسة».</p></div>' +
       '<div class="paper" id="pv">' + SL.renderDoc(doc, { header: { school: P.school }, compact: false, sigs: sigs }) + '</div><div id="pv-end"></div>' +
@@ -124,7 +128,7 @@
     var btn = document.getElementById("send"), m = document.getElementById("msg");
     btn.disabled = true; btn.textContent = "جارٍ الإرسال…"; m.textContent = "";
     var nmEl = document.getElementById("nm");
-    var obj = Object.assign({ v: 1, tok: P.tok, role: "parent", name: nmEl ? nmEl.value.trim() : (draft ? draft.name : ""), at: Date.now(), ua: navigator.userAgent.slice(0, 140) }, x);
+    var obj = Object.assign({ v: 1, tok: P.tok, role: role(), name: nmEl ? nmEl.value.trim() : (draft ? draft.name : ""), at: Date.now(), ua: navigator.userAgent.slice(0, 140) }, x);
     var sealed = await SL.seal(P.k, obj);
     try {
       await SL.relay.put(P.relay, P.box, P.tok, sealed);
