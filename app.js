@@ -1,5 +1,5 @@
-/* سَمْت 1.0.0-r64 — حزمة الواجهة */
-window.SAMT_BUILD = "1.0.0-r64";
+/* سَمْت 1.0.0-r65 — حزمة الواجهة */
+window.SAMT_BUILD = "1.0.0-r65";
 /* سَمْت — أدوات مشتركة بين التطبيق وصفحة التوقيع وصفحة رصد المعلم.
    لا تتصل بأي خادم: كل ما يُرسل يُحمل داخل الرابط أو رسالة واتساب. */
 (function () {
@@ -3780,7 +3780,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
       var logins = (await C.DB.get("logins")) || [];
       if (!logins.length || now - logins[logins.length - 1] > 6e5) { logins.push(now); logins = logins.slice(-5); await C.DB.set("logins", logins); }
       var first = (await C.DB.get("firstSeen")) || now; if (!(await C.DB.get("firstSeen"))) await C.DB.set("firstSeen", first);
-      var pend = A.S.sigs.filter(function (g) { return g.via === "link"; }).length;
+      var pend = A.S.sigs.filter(function (g) { return g.via === "link"; }).length, lics0 = (await C.getLics()) || {};
       var rec = { v: 1, dev: L.dev || "", school: A.S.settings.schools.map(function (z) { return z.name; }).filter(Boolean).join(" · "),
         region: (A.S.settings.schools[0] || {}).region || "", admin: (A.S.settings.schools[0] || {}).admin || "",
         ver: C.version || C.BUILTIN, trial: !!L.trial, end: L.end ? new Date(L.end).toISOString().slice(0, 10) : "", days: L.days || 0, hours: L.hours || 0,
@@ -3789,7 +3789,7 @@ window.RULES = { SOURCE, DEDUCT, DEGREE_NAME, FORMS, SIGNER, ARTICLES, MERITS, M
         role: (await C.DB.get("devRole")) || "",
         fold: C.FS && C.FS.ok ? ((await C.DB.get("folderWhere")) || "unk") : C.FS && C.FS.supported ? "none" : "nosup",
         lics: (L.schools || []).map(function (x) { var z = A.S.settings.schools.find(function (s) { return A.schoolMoes(s).indexOf(x.moe) >= 0; }) || {};
-          return { moe: x.moe, slot: x.slot || 0, ok: !!x.ok, end: x.end ? new Date(x.end).toISOString().slice(0, 10) : "", why: x.ok ? "" : String(x.why || "").slice(0, 160), approved: !!x.id, idAt: x.id ? x.id.at || 0 : 0,
+          return { moe: x.moe, code: (lics0[x.moe] || {}).code || "", slot: x.slot || 0, ok: !!x.ok, end: x.end ? new Date(x.end).toISOString().slice(0, 10) : "", why: x.ok ? "" : String(x.why || "").slice(0, 160), approved: !!x.id, idAt: x.id ? x.id.at || 0 : 0,
             name: x.id ? x.id.name : z.name || "", principal: x.id ? x.id.principal : "", deputy: x.id ? x.id.deputy : "", counselor: x.id ? x.id.counselor : "" }; }) };
       /* السجل بالرقم الوزاري لا بالجهاز */
       var key = ((L.schools || []).map(function (x) { return x.moe; })[0]) || (await C.DB.get("trialMoe")) || "";

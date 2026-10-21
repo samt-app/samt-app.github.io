@@ -61,6 +61,8 @@ tr.det td { background: var(--bg-2); white-space: normal; }
 .scard .top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
 .scard .top .sch { font-size: 1.12rem; }
 .scard .moe { font-family: ui-monospace, Menlo, Consolas, monospace; direction: ltr; background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 1px 8px; font-size: .84rem; }
+.subrow { display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: center; margin: 8px 0 2px; font-size: .9rem; }
+.codev { font-family: ui-monospace, Menlo, Consolas, monospace; background: #f1f4f6; border: 1px solid var(--line); border-radius: 8px; padding: 2px 8px; font-size: .82rem; }
 .scard .who { margin: 8px 0 12px; font-size: .88rem; color: var(--ink); display: flex; flex-wrap: wrap; gap: 4px 16px; }
 .scard .who b { color: var(--mut); font-weight: 500; }
 .slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
@@ -454,6 +456,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
         (o.logins || []).forEach(function (t) { t = +t; if (t && !Object.keys(lg).some(function (k) { return Math.abs(k - t) < 6e5; })) lg[t] = 1; });
       });
       var logins = Object.keys(lg).map(Number).sort(function (a, b) { return b - a; }).slice(0, 3);
+      var codeAt = 0, code = ""; Object.keys(RAW).forEach(function (d) { (RAW[d].lics || []).forEach(function (x) { if (x.moe === moe && x.code && (RAW[d].at || 0) >= codeAt) { code = x.code; codeAt = RAW[d].at || 0; } }); });
       var cmd = pj(L.cmd) || {}, un = L.unlock && +L.unlock.until > Date.now() ? L.unlock : null;
       if (un && info && info.idAt > +un.at) un = Object.assign({ used: true }, un); /* أعادت المدرسة الاعتماد بعد السماح */
       var endT = info && info.end ? new Date(info.end + "T23:59:59").getTime() : 0;
@@ -461,7 +464,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
       var sess = pj(L.sess), live = !!(sess && sess.dev && !sess.free && Date.now() - (+sess.at || 0) < 3 * 60e3);
       var last = Math.max(devs.reduce(function (m, x) { return Math.max(m, x.last); }, 0), sess ? +sess.at || 0 : 0);
       var fr = null; Object.keys(RAW).forEach(function (d) { var o = RAW[d]; if ((d === moe || o.moe === moe || (o.lics || []).some(function (x) { return x.moe === moe; })) && o.fold && (!fr || (o.at || 0) > (fr.at || 0))) fr = o; });
-      return { fold: fr ? fr.fold : "", logins: logins, moe: moe, trial: typeof L.trial === "number" ? L.trial : 0, info: info || {}, approved: !!L.id, devs: devs, sess: sess, live: live, used: live ? 1 : 0, cmd: cmd, unlock: un, endT: endT, last: last,
+      return { code: code, fold: fr ? fr.fold : "", logins: logins, moe: moe, trial: typeof L.trial === "number" ? L.trial : 0, info: info || {}, approved: !!L.id, devs: devs, sess: sess, live: live, used: live ? 1 : 0, cmd: cmd, unlock: un, endT: endT, last: last,
         days: endT ? Math.ceil((endT - Date.now()) / 864e5) : 0 };
     }).sort(function (a, b) { return (a.endT || 0) - (b.endT || 0); });
   }
@@ -487,11 +490,13 @@ td.dcol .del svg { width: 19px; height: 19px; }
       var i = x.info, st = sState(x);
       var fl = x.unlock ? String(x.unlock.fields || "").split(",").map(function (f) { var y = FIELDS.find(function (z) { return z[0] === f; }); return y ? y[1] : ""; }).filter(Boolean).join("، ") : "";
       return '<article class="scard" data-moe="' + e(x.moe) + '"><div class="top"><span class="sch">' + e(i.name || "— لم تُعتمد بعد —") + '</span><span class="moe">' + e(x.moe) + "</span>" +
-        '<span class="pill ' + st[1] + '">' + e(st[0]) + "</span>" + (x.endT ? '<span class="mini">حتى ' + e(isoDay(x.endT)) + "</span>" : "") +
+        '<span class="pill ' + st[1] + '">' + e(st[0]) + "</span>" + 
         foldPill(x.fold) + (x.approved ? '<span class="pill p-lock">🔒 معتمدة</span>' : '<span class="pill p-wait">بانتظار الاعتماد</span>') + (x.cmd.wahaj ? '<span class="pill p-ok">وهج مفعّل</span>' : "") +
         (x.unlock ? (x.unlock.used ? '<span class="pill p-ok">✓ عدّلت المدرسة وأعادت الاعتماد</span>' : '<span class="pill p-open">🔓 مسموح بتعديل: ' + e(fl) + " حتى " + e(isoDay(+x.unlock.until)) + "</span>") : "") +
         '<span class="mini" style="margin-inline-start:auto">آخر نشاط: ' + e(ago(x.last)) + "</span>" +
         '<button class="del" type="button" data-sdel="' + e(x.moe) + '" title="حذف المدرسة نهائياً" aria-label="حذف المدرسة نهائياً">' + TRASH + "</button></div>" +
+        '<div class="subrow"><span><b>ينتهي الاشتراك:</b> ' + (x.endT ? '<span class="dev">' + e(isoDay(x.endT)) + "</span>" + (x.days > 0 ? ' <span class="mini">(بعد ' + x.days + " يوماً)</span>" : ' <span class="mini" style="color:#b3261e">(منتهٍ)</span>') : '<span class="mini">—</span>') + "</span>" +
+          '<span><b>كود التفعيل:</b> ' + (x.code ? '<code class="codev" dir="ltr" title="' + e(x.code) + '">' + e(x.code.slice(0, 22)) + '…</code> <button class="btn sm" type="button" data-ccopy="' + e(x.code) + '">نسخ الكود</button>' : (x.trial && !x.approved ? '<span class="mini">لا يوجد — المدرسة في الفترة التجريبية</span>' : '<span class="mini">يظهر بعد أول فتح للمنصة في المدرسة</span>')) + "</span></div>" +
         '<div class="who"><span><b>المدير:</b> ' + e(i.principal || "—") + "</span><span><b>الوكيل:</b> " + e(i.deputy || "—") + "</span><span><b>الموجه الطلابي:</b> " + e(i.counselor || "—") + "</span></div>" +
         '<div class="sess' + (x.live ? " on" : "") + '"><span class="dot"></span>' + (x.live
           ? "<b>تعمل الآن</b> على: " + e(x.sess.name || "جهاز") + ' <span class="mini">· آخر نبضة: ' + e(ago(+x.sess.at)) + '</span><button class="btn sm x" type="button" data-ssess="' + e(x.moe) + '">إنهاء الجلسة</button>'
@@ -613,6 +618,7 @@ td.dcol .del svg { width: 19px; height: 19px; }
     });
     each("[data-lock]", function (b) { act(b, function () { return put("/lic/" + b.dataset.lock + "/unlock", null); }, "أُلغي السماح"); });
     each("[data-sdel]", function (b) { delSchool(sx(b.dataset.sdel)); });
+    each("[data-ccopy]", function (b) { navigator.clipboard.writeText(b.dataset.ccopy); b.textContent = "نُسخ"; setTimeout(function () { b.textContent = "نسخ الكود"; }, 1500); });
     each("[data-swj]", function (b) {
       var x = sx(b.dataset.swj), c = Object.assign({}, x.cmd);
       if (c.wahaj) delete c.wahaj; else c.wahaj = true;
